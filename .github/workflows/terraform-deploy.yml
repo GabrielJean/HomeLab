@@ -205,7 +205,7 @@ jobs:
         run: terraform init -input=false -no-color
 
       - name: Download tfplan artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: tfplan
           path: Terraform
