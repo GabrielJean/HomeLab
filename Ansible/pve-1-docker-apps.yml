@@ -12,7 +12,7 @@
             - { name: traefik }
             # - { name: teamspeak }
             - { name: plexapps }
-            - { name: heimdall }
+            # - { name: heimdall }
             - { name: homepage-1, restart: true }
             - { name: gitea }
             - { name: pdf }

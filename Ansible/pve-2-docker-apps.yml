@@ -10,7 +10,7 @@
         _docker_apps_by_host:
           Docker-2:
             - { name: traefik }
-            - { name: heimdall }
+            # - { name: heimdall }
             - { name: homepage-2, restart: true }
             - { name: pdf }
             - { name: homeassistant }
