@@ -53,7 +53,7 @@ services:
       - traefik_default
 
   flaresolverr:
-    image: flaresolverr/flaresolverr:v3.3.25
+    image: flaresolverr/flaresolverr:v3.4.1
     container_name: flaresolverr
     environment:
       - LOG_LEVEL=${LOG_LEVEL:-info}
