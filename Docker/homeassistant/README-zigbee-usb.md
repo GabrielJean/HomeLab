@@ -7,10 +7,12 @@ Context
 - Stable device alias: /dev/ttyUSB-zigbee (via udev rule)
 - Compose uses: /dev/ttyUSB-zigbee:/dev/ttyUSB0
 
-Common Symptom
-- docker compose up fails with an error like:
-  Error response from daemon: error gathering device information while adding custom device "/dev/serial/by-id/...": no such file or directory
+Common Symptoms
+- docker compose up or docker restart fails with an error like:
+  Error response from daemon: error gathering device information while adding custom device "/dev/ttyUSB-zigbee": no such file or directory
+  Error response from daemon: Cannot restart container homeassistant: error gathering device information while adding custom device "/dev/ttyUSB-zigbee": no such file or directory
 - And no /dev/ttyUSB* or /dev/serial/by-id entries exist after replug/reboot.
+- This typically happens after a kernel update when the kernel extra modules haven't been installed yet, or when the system hasn't been rebooted after installing them.
 
 Quick Fix Checklist
 1) Confirm the USB device is seen by the OS
@@ -20,8 +22,9 @@ Quick Fix Checklist
    - dpkg -l | grep "linux-modules-extra-$(uname -r)"
    - If missing, install: sudo apt-get update && sudo apt-get install -y "linux-modules-extra-$(uname -r)"
 3) Load or verify drivers are loaded
-   - sudo modprobe cp210x
+   - sudo modprobe cp210x usbserial
    - lsmod | egrep "cp210x|usbserial"
+   - If modules fail to load, the kernel extra modules may not be installed (see step 2)
 4) Verify device nodes
    - ls -l /dev/serial/by-id || true
    - ls -l /dev/ttyUSB* || true
@@ -48,9 +51,10 @@ Permanent Improvements Already in Place
 If It Breaks Again After a Kernel Update
 - Ensure the extra modules for the running kernel are installed:
   sudo apt-get update && sudo apt-get install -y "linux-modules-extra-$(uname -r)"
-- Re-load modules (or just reboot):
-  sudo modprobe cp210x
-- Replug the USB dongle.
+- Re-load modules manually (or just reboot):
+  sudo modprobe cp210x usbserial
+- Replug the USB dongle (if needed).
+- **Important**: After installing kernel modules, reboot the server for systemd-modules-load to properly initialize the drivers on boot. Until you reboot, you'll need to manually load the modules before restarting the container.
 
 VM/Hypervisor Note
 - If running in a VM and lsusb does NOT show the CP210x device, pass the USB device through to the VM/host again (hypervisor UI) and replug.
@@ -80,11 +84,14 @@ Advanced: Bind to this exact dongle only
 One-liners to Re-apply Core Fixes
 - Install kernel extras for current kernel:
   sudo apt-get update && sudo apt-get install -y "linux-modules-extra-$(uname -r)"
-- Ensure modules auto-load:
+- Load modules immediately (without reboot):
+  sudo modprobe cp210x usbserial
+- Ensure modules auto-load on boot:
   printf "%s\n" cp210x usbserial | sudo tee /etc/modules-load.d/zigbee.conf
 - Recreate udev rule (if ever needed):
   printf '%s\n' 'KERNEL=="ttyUSB[0-9]*", SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", SYMLINK+="ttyUSB-zigbee", GROUP="dialout", MODE="0660"' | sudo tee /etc/udev/rules.d/99-zigbee.rules
   sudo udevadm control --reload && sudo udevadm trigger
+- After kernel module installation, reboot for permanent fix or manually load modules each time before restarting the container.
 
 That’s it—this should get Home Assistant back up quickly whenever the USB dongle is replugged or after a reboot/kernel update.
 
