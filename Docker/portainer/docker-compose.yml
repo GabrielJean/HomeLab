@@ -1,7 +1,7 @@
 services:
   portainer:
     container_name: portainer
-    image: portainer/portainer-ce:2.35.0
+    image: portainer/portainer-ce:2.36.0
     ports:
       - 8000:8000
       - 9443:9443
