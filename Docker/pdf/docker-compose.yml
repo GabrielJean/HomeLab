@@ -1,7 +1,7 @@
 services:
   stirling-pdf:
     container_name: Stirling-PDF
-    image: frooodle/s-pdf:1.6.0
+    image: frooodle/s-pdf:2.1.0
     restart: always
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/api/v1/info/status | grep -q 'UP' && curl -fL http://localhost:8080/ | grep -qv 'Please sign in'"]
