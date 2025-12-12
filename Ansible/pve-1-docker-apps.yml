@@ -21,7 +21,7 @@
             - { name: portainer }
             - { name: upsnap }
             # - { name: homeassistant }
-            - { name: dns-update, restart: true, pull_latest: true }
+            - { name: dns-update, restart: true, pull_latest: true, build: true }
             - { name: open-webui }
             - { name: joke-de-jean, restart: true, pull_latest: true }
             - { name: code-server }
@@ -78,6 +78,7 @@
         application: "{{ item.name }}"
         restart: "{{ item.restart | default(omit) }}"
         pull_latest: "{{ item.pull_latest | default(omit) }}"
+        build: "{{ item.build | default(build | default(false)) }}"
 
     - name: Wait for all docker compose jobs to finish
       ansible.builtin.async_status:

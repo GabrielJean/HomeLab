@@ -132,3 +132,4 @@ while true; do
 
   log "INFO: DNS sync completed. Sleeping for 10 minutes..."
   sleep 600
+done
