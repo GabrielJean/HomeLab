@@ -1,39 +1,49 @@
 # Tasks/docker.yml
 
-- name: Create application directory for {{ application }}
-  ansible.builtin.file:
-    path: /home/gabriel/{{ application }}
-    state: directory
+- block:
+    - name: Create application directory for {{ application }}
+      ansible.builtin.file:
+        path: /home/gabriel/{{ application }}
+        state: directory
 
-- name: Copy application folder for {{ application }} only if different
-  ansible.builtin.copy:
-    src: ../Docker/{{ application }}/
-    dest: /home/gabriel/{{ application }}
-    decrypt: true
-    mode: '0755'
-    force: true  # Only overwrites if changed
-    remote_src: no
+    - name: Copy application folder for {{ application }} only if different
+      ansible.builtin.copy:
+        src: ../Docker/{{ application }}/
+        dest: /home/gabriel/{{ application }}
+        decrypt: true
+        mode: '0755'
+        force: true  # Only overwrites if changed
+        remote_src: no
 
-- name: Build docker compose command for {{ application }}
-  ansible.builtin.set_fact:
-    docker_compose_command: >-
-      docker compose up -d
-      {% if (restart | default(false)) | bool %} --force-recreate{% endif %}
-      {% if (pull_latest | default(false)) | bool %} --pull always{% endif %}
+    - name: Build docker compose command for {{ application }}
+      ansible.builtin.set_fact:
+        docker_compose_command: >-
+          docker compose up -d
+          {% if (restart | default(false)) | bool %} --force-recreate{% endif %}
+          {% if (pull_latest | default(false)) | bool %} --pull always{% endif %}
 
-- name: Print docker compose command for {{ application }}
-  ansible.builtin.debug:
-    msg: "{{ docker_compose_command }}"
+    - name: Print docker compose command for {{ application }}
+      ansible.builtin.debug:
+        msg: "{{ docker_compose_command }}"
 
-- name: Launch docker compose up in background for {{ application }}
-  ansible.builtin.command: "{{ docker_compose_command }}"
-  args:
-    chdir: /home/gabriel/{{ application }}/
-  async: 1800
-  poll: 0
-  register: compose_async
+    - name: Launch docker compose up in background for {{ application }}
+      ansible.builtin.command: "{{ docker_compose_command }}"
+      args:
+        chdir: /home/gabriel/{{ application }}/
+      async: 1800
+      poll: 0
+      register: compose_async
 
-- name: Record compose job id for {{ application }}
-  ansible.builtin.set_fact:
-    compose_job_ids: "{{ (compose_job_ids | default([])) + [compose_async.ansible_job_id] }}"
-  when: compose_async.ansible_job_id is defined
+    - name: Record compose job id for {{ application }}
+      ansible.builtin.set_fact:
+        compose_job_ids: "{{ (compose_job_ids | default([])) + [compose_async.ansible_job_id] }}"
+      when: compose_async.ansible_job_id is defined
+
+  rescue:
+    - name: Record failed app but continue
+      ansible.builtin.set_fact:
+        docker_failures: "{{ (docker_failures | default([])) + [application] }}"
+
+    - name: Log failure for {{ application }}
+      ansible.builtin.debug:
+        msg: "Deployment failed for {{ application }}; continuing with remaining apps"

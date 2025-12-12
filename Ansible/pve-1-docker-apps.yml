@@ -3,6 +3,8 @@
   become: true
   strategy: free
   ignore_unreachable: yes
+  vars:
+    deploy_only: []
 
   pre_tasks:
     - name: Define docker apps by host (without cadvisor)
@@ -61,7 +63,13 @@
 
     - name: Check if host has docker apps
       set_fact:
-        has_docker_apps: "{{ inventory_hostname in docker_apps_by_host and docker_apps_by_host[inventory_hostname]|length > 0 }}"
+        docker_apps_for_host: >-
+          {{
+            docker_apps_by_host.get(inventory_hostname, [])
+            if (deploy_only | length == 0)
+            else (docker_apps_by_host.get(inventory_hostname, []) | selectattr('name', 'in', deploy_only) | list)
+          }}
+        has_docker_apps: "{{ docker_apps_for_host | length > 0 }}"
       when: not (ansible_unreachable is defined and ansible_unreachable)
 
     - name: Ensure Docker is installed (only if needed)
@@ -70,14 +78,14 @@
 
     - name: Deploy docker apps (only if host has apps)
       include_tasks: ./Tasks/docker.yml
-      loop: "{{ docker_apps_by_host[inventory_hostname] | default([]) }}"
+      loop: "{{ docker_apps_for_host }}"
       loop_control:
         loop_var: item
-      when: has_docker_apps | default(false)
       vars:
         application: "{{ item.name }}"
         restart: "{{ item.restart | default(omit) }}"
         pull_latest: "{{ item.pull_latest | default(omit) }}"
+      when: has_docker_apps | default(false)
 
     - name: Wait for all docker compose jobs to finish
       ansible.builtin.async_status:

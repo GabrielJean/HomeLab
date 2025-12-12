@@ -13,8 +13,73 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  run-pve-1:
+  discover:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.build.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install matrix dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+
+      - name: Build dynamic app matrix
+        id: build
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          import yaml
+
+          playbooks = [
+              ("Ansible/pve-1-docker-apps.yml", "pve-1-docker-apps.yml"),
+              ("Ansible/pve-2-docker-apps.yml", "pve-2-docker-apps.yml"),
+          ]
+
+          matrix = []
+
+          for path, playbook in playbooks:
+              data = yaml.safe_load(Path(path).read_text())
+              if not isinstance(data, list) or not data:
+                  continue
+              play = data[0]
+              pre_tasks = play.get("pre_tasks", [])
+              apps_by_host = {}
+              for task in pre_tasks:
+                  set_fact = task.get("set_fact") or {}
+                  if "_docker_apps_by_host" in set_fact:
+                      apps_by_host = set_fact["_docker_apps_by_host"]
+                      break
+
+              for host, apps in apps_by_host.items():
+                  app_list = list(apps)
+                  names = [app.get("name") for app in app_list]
+                  if "cadvisor" not in names:
+                      app_list.append({"name": "cadvisor"})
+
+                  for app in app_list:
+                      matrix.append({
+                          "playbook": playbook,
+                          "host": host,
+                          "app": app["name"],
+                      })
+
+          payload = {"include": matrix}
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"matrix={json.dumps(payload)}\n")
+          PY
+
+  deploy:
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -50,70 +115,14 @@ jobs:
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
 
-      - name: Run Ansible Playbook PVE-1 (ignore only unreachable)
+      - name: Deploy ${{ matrix.app }} on ${{ matrix.host }}
         env:
           ANSIBLE_HOST_KEY_CHECKING: 'false'
         run: |
           set -o pipefail
-          ansible-playbook pve-1-docker-apps.yml --private-key private_key \
-            -i inventory.ini --extra-vars "ansible_user=ci" --vault-password-file .vault_pass.txt | tee ansible_output.log
-          rc=${PIPESTATUS[0]}
-          if [[ $rc -eq 0 ]]; then
-            echo "Ansible succeeded."
-            exit 0
-          elif [[ $rc -eq 2 ]]; then
-            echo "Only unreachable hosts detected. Treating as success."
-            exit 0
-          else
-            echo "Ansible failed with exit code $rc."
-            exit $rc
-          fi
-        working-directory: Ansible
-
-  run-pve-2:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Grace period for cancel
-        run: sleep 10
-
-      - name: Install Ansible
-        run: |
-          python -m pip install --upgrade pip
-          pip install ansible
-
-      - name: Create ansible_vault_password_file
-        run: echo "${{ secrets.ANSIBLE_VAULT_DOCKER }}" > .vault_pass.txt
-        working-directory: Ansible
-
-      - name: Decrypt inventory.ini
-        run: ansible-vault decrypt --vault-password-file .vault_pass.txt inventory.ini
-        working-directory: Ansible
-
-      - name: Retrieve SSH private key
-        run: echo "${{ secrets.CI_PRIVATE_KEY }}" > private_key
-        working-directory: Ansible
-
-      - name: Set permissions for private key
-        run: chmod 600 private_key
-        working-directory: Ansible
-
-      - name: Tailscale
-        uses: tailscale/github-action@v4
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-
-      - name: Run Ansible Playbook PVE-2 (ignore only unreachable)
-        env:
-          ANSIBLE_HOST_KEY_CHECKING: 'false'
-        run: |
-          set -o pipefail
-          ansible-playbook pve-2-docker-apps.yml --private-key private_key \
-            -i inventory.ini --extra-vars "ansible_user=ci" --vault-password-file .vault_pass.txt | tee ansible_output.log
+          ansible-playbook ${{ matrix.playbook }} --private-key private_key \
+            -i inventory.ini --extra-vars '{"ansible_user":"ci","deploy_only":["${{ matrix.app }}"]}' \
+            --vault-password-file .vault_pass.txt -l "${{ matrix.host }}" | tee ansible_output.log
           rc=${PIPESTATUS[0]}
           if [[ $rc -eq 0 ]]; then
             echo "Ansible succeeded."
