@@ -78,7 +78,8 @@
         application: "{{ item.name }}"
         restart: "{{ item.restart | default(omit) }}"
         pull_latest: "{{ item.pull_latest | default(omit) }}"
-        build: "{{ item.build | default(build | default(false)) }}"
+        # Use per-item build flag; if absent, fall back to global extra var build_default (not 'build' to avoid recursion)
+        build: "{{ item.build | default(build_default | default(false)) }}"
 
     - name: Wait for all docker compose jobs to finish
       ansible.builtin.async_status:
