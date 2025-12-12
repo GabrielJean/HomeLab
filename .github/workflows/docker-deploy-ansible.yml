@@ -8,12 +8,19 @@ on:
       - '**/*docker*'
   workflow_dispatch:
 
+concurrency:
+  group: deploy-docker-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   run-pve-1:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+
+      - name: Grace period for cancel
+        run: sleep 10
 
       - name: Install Ansible
         run: |
@@ -68,6 +75,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+
+      - name: Grace period for cancel
+        run: sleep 10
 
       - name: Install Ansible
         run: |

@@ -29,8 +29,9 @@
             - { name: adguardhome }
           Plex-1:
             - { name: plex }
-          Satisfactory:
+            Gaming-1:
             - { name: satisfactory }
+            - { name: astroneer }
 
     - name: Initialize docker_apps_by_host
       set_fact:
