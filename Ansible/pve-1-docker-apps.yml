@@ -29,7 +29,7 @@
             - { name: adguardhome }
           Plex-1:
             - { name: plex }
-            Gaming-1:
+          Gaming-1:
             - { name: satisfactory }
             - { name: astroneer }
 
