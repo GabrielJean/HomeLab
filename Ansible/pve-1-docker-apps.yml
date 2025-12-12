@@ -21,7 +21,7 @@
             - { name: portainer }
             - { name: upsnap }
             # - { name: homeassistant }
-            - { name: dns-update, restart: true }
+            - { name: dns-update, restart: true, pull_latest: true }
             - { name: open-webui }
             - { name: joke-de-jean, restart: true, pull_latest: true }
             - { name: code-server }
