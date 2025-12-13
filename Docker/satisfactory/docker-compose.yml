@@ -7,6 +7,7 @@ services:
       - '7777:7777/udp'
       - '7777:7777/tcp'
       - '8080:8080/tcp'
+      - '8888:8888/tcp'
     volumes:
       - '/Apps/satisfactory:/config'
     environment:
