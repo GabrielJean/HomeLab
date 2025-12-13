@@ -31,8 +31,8 @@
             - { name: plex }
           Gaming-1:
             - { name: satisfactory }
-            - { name: astroneer }
-            - { name: zomboid }
+            - { name: astroneer, restart: true }
+            - { name: zomboid, restart: true }
 
     - name: Initialize docker_apps_by_host
       set_fact:
