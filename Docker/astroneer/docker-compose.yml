@@ -13,7 +13,7 @@ services:
     ports:
       - ${ASTRO_SERVER_PORT:-8777}:${ASTRO_SERVER_PORT:-8777}/tcp
       - ${ASTRO_SERVER_PORT:-8777}:${ASTRO_SERVER_PORT:-8777}/udp
-    restart: always
+    restart: unless-stopped
     volumes:
      - astroneer:/astroneer
      - steamcmd:/steamcmd
