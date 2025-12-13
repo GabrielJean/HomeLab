@@ -32,6 +32,7 @@
           Gaming-1:
             - { name: satisfactory }
             - { name: astroneer }
+            - { name: zomboid }
 
     - name: Initialize docker_apps_by_host
       set_fact:
