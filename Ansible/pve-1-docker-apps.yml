@@ -9,6 +9,7 @@
       set_fact:
         _docker_apps_by_host:
           Docker-1:
+            - { name: n8n }
             - { name: traefik }
             # - { name: teamspeak }
             - { name: plexapps }
