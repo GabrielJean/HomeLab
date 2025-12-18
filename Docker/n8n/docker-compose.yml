@@ -2,6 +2,7 @@ services:
   n8n:
     image: docker.n8n.io/n8nio/n8n
     container_name: n8n
+    user: "0:0"              # run as root
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
