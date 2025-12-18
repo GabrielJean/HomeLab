@@ -1,11 +1,16 @@
 # Tasks/docker.yml
 
-- name: Create application directory for {{ application }}
+- name: Determine desired online state for {{ application }}
+  ansible.builtin.set_fact:
+    app_online: "{{ online | default(true) | bool }}"
+
+- name: Create application directory for {{ application }} (only when online)
   ansible.builtin.file:
     path: /home/gabriel/{{ application }}
     state: directory
+  when: app_online
 
-- name: Copy application folder for {{ application }} only if different
+- name: Copy application folder for {{ application }} only if different (only when online)
   ansible.builtin.copy:
     src: ../Docker/{{ application }}/
     dest: /home/gabriel/{{ application }}
@@ -13,28 +18,43 @@
     mode: '0755'
     force: true  # Only overwrites if changed
     remote_src: no
+  when: app_online
 
-- name: Build docker compose command for {{ application }}
+- name: Build docker compose command for {{ application }} (only when online)
   ansible.builtin.set_fact:
     docker_compose_command: >-
       docker compose up -d
       {% if (restart | default(false)) | bool %} --force-recreate{% endif %}
       {% if (pull_latest | default(false)) | bool %} --pull always{% endif %}
       {% if (build | default(false)) | bool %} --build{% endif %}
+  when: app_online
 
 - name: Print docker compose command for {{ application }}
   ansible.builtin.debug:
-    msg: "{{ docker_compose_command }}"
+    msg: "{{ docker_compose_command | default('offline') }}"
 
-- name: Launch docker compose up in background for {{ application }}
+- name: Launch docker compose up in background for {{ application }} (only when online)
   ansible.builtin.command: "{{ docker_compose_command }}"
   args:
     chdir: /home/gabriel/{{ application }}/
   async: 1800
   poll: 0
   register: compose_async
+  when: app_online
 
 - name: Record compose job id for {{ application }}
   ansible.builtin.set_fact:
     compose_job_ids: "{{ (compose_job_ids | default([])) + [compose_async.ansible_job_id] }}"
-  when: compose_async.ansible_job_id is defined
+  when: app_online and (compose_async.ansible_job_id is defined)
+
+- name: Check if app directory exists for {{ application }} (when offline)
+  ansible.builtin.stat:
+    path: /home/gabriel/{{ application }}/docker-compose.yml
+  register: compose_file
+  when: not app_online
+
+- name: Stop application when marked offline
+  ansible.builtin.command: docker compose stop
+  args:
+    chdir: /home/gabriel/{{ application }}/
+  when: not app_online and compose_file.stat.exists

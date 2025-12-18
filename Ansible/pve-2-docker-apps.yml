@@ -9,15 +9,15 @@
       set_fact:
         _docker_apps_by_host:
           Docker-2:
-            - { name: traefik }
-            # - { name: heimdall }
-            - { name: homepage-2, restart: true }
-            - { name: pdf }
-            - { name: homeassistant }
-            - { name: portainer }
-            - { name: upsnap }
+            - { name: traefik, online: true }
+            # - { name: heimdall, online: false }
+            - { name: homepage-2, restart: true, online: true }
+            - { name: pdf, online: true }
+            - { name: homeassistant, online: true }
+            - { name: portainer, online: true }
+            - { name: upsnap, online: true }
           DNS-2:
-            - { name: adguardhome }
+            - { name: adguardhome, online: true }
 
     - name: Initialize docker_apps_by_host
       set_fact:
@@ -64,6 +64,7 @@
         application: "{{ item.name }}"
         restart: "{{ item.restart | default(omit) }}"
         pull_latest: "{{ item.pull_latest | default(omit) }}"
+        online: "{{ item.online | default(true) }}"
 
     - name: Wait for all docker compose jobs to finish
       ansible.builtin.async_status:
@@ -74,3 +75,8 @@
       delay: 5
       loop: "{{ compose_job_ids | default([]) }}"
       when: has_docker_apps | default(false) and (compose_job_ids | default([])) | length > 0
+
+    - name: Cleanup orphan app directories not declared for this host
+      include_tasks: ./Tasks/cleanup_orphans.yml
+      vars:
+        declared_apps: "{{ docker_apps_by_host[inventory_hostname] | default([]) | map(attribute='name') | list }}"

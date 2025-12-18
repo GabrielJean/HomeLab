@@ -1,0 +1,52 @@
+---
+# Cleanup app directories on the server that are not declared for this host
+
+- name: Gather declared apps for this host
+  ansible.builtin.set_fact:
+    declared_apps: "{{ declared_apps | default([]) }}"
+
+- name: Find docker-compose files under /home/gabriel
+  ansible.builtin.find:
+    paths: /home/gabriel
+    patterns: docker-compose.yml
+    recurse: yes
+    file_type: file
+  register: found_compose_files
+
+- name: Derive app directories from found compose files
+  ansible.builtin.set_fact:
+    found_app_dirs: "{{ found_compose_files.files | map(attribute='path') | map('dirname') | list }}"
+    found_app_names: "{{ found_compose_files.files | map(attribute='path') | map('dirname') | map('basename') | list }}"
+
+- name: Compute orphan app names (not declared)
+  ansible.builtin.set_fact:
+    orphan_app_names: "{{ found_app_names | difference(declared_apps | default([])) }}"
+
+- name: Initialize orphan app dirs list
+  ansible.builtin.set_fact:
+    orphan_app_dirs: []
+
+- name: Build orphan app dirs list from names
+  ansible.builtin.set_fact:
+    orphan_app_dirs: "{{ orphan_app_dirs + [item] }}"
+  loop: "{{ found_app_dirs }}"
+  when: (item | basename) in (orphan_app_names | default([]))
+
+- name: Summary of orphan app directories
+  ansible.builtin.debug:
+    msg: "Orphan app dirs to clean: {{ orphan_app_dirs }}"
+
+- name: Bring down orphan apps before cleanup
+  ansible.builtin.command: docker compose down --remove-orphans
+  args:
+    chdir: "{{ item }}"
+  loop: "{{ orphan_app_dirs }}"
+  when: orphan_app_dirs | length > 0
+  ignore_errors: yes
+
+- name: Remove orphan app directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ orphan_app_dirs }}"
+  when: orphan_app_dirs | length > 0
