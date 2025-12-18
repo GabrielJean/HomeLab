@@ -4,13 +4,12 @@
   ansible.builtin.set_fact:
     app_online: "{{ online | default(true) | bool }}"
 
-- name: Create application directory for {{ application }} (only when online)
+- name: Create application directory for {{ application }}
   ansible.builtin.file:
     path: /home/gabriel/{{ application }}
     state: directory
-  when: app_online
 
-- name: Copy application folder for {{ application }} only if different (only when online)
+- name: Copy application folder for {{ application }} only if different
   ansible.builtin.copy:
     src: ../Docker/{{ application }}/
     dest: /home/gabriel/{{ application }}
@@ -18,7 +17,6 @@
     mode: '0755'
     force: true  # Only overwrites if changed
     remote_src: no
-  when: app_online
 
 - name: Build docker compose command for {{ application }} (only when online)
   ansible.builtin.set_fact:
