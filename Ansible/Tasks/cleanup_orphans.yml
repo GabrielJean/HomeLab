@@ -5,6 +5,10 @@
   ansible.builtin.set_fact:
     declared_apps: "{{ declared_apps | default([]) }}"
 
+- name: Abort cleanup when no declared apps provided
+  ansible.builtin.meta: end_play
+  when: declared_apps is not defined or (declared_apps | length == 0)
+
 - name: Find docker-compose files under /home/gabriel
   ansible.builtin.find:
     paths: /home/gabriel

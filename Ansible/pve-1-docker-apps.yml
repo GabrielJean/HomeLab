@@ -96,5 +96,6 @@
 
     - name: Cleanup orphan app directories not declared for this host
       include_tasks: ./Tasks/cleanup_orphans.yml
+      when: has_docker_apps | default(false)
       vars:
         declared_apps: "{{ docker_apps_by_host[inventory_hostname] | default([]) | map(attribute='name') | list }}"
