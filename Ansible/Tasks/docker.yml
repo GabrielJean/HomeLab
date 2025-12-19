@@ -8,6 +8,9 @@
   ansible.builtin.file:
     path: /home/gabriel/{{ application }}
     state: directory
+    owner: 1000
+    group: 1000
+    mode: '0755'
 
 - name: Copy application folder for {{ application }} only if different
   ansible.builtin.copy:
@@ -17,6 +20,14 @@
     mode: '0755'
     force: true  # Only overwrites if changed
     remote_src: no
+
+- name: Ensure application directory ownership and permissions for {{ application }}
+  ansible.builtin.file:
+    path: /home/gabriel/{{ application }}
+    owner: 1000
+    group: 1000
+    mode: '0755'
+    recurse: true
 
 - name: Build docker compose command for {{ application }} (only when online)
   ansible.builtin.set_fact:
