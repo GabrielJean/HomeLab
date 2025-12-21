@@ -31,7 +31,7 @@
           Plex-1:
             - { name: plex, online: true }
           Gaming-1:
-            - { name: satisfactory, online: false }
+            - { name: satisfactory, online: true }
             - { name: astroneer, restart: true, online: false }
             - { name: zomboid, restart: true, online: false }
 
