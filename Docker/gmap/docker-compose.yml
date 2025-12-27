@@ -1,0 +1,7 @@
+services:
+  gmap:
+    build: .
+    env_file: .env
+    volumes:
+      - /Apps/gmap:/app/data_runs
+    restart: unless-stopped

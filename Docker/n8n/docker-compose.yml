@@ -37,6 +37,8 @@ services:
       - N8N_HOST=${SUBDOMAIN}.${DOMAIN_NAME}
       - N8N_PORT=5678
       - N8N_PROTOCOL=https
+      # Trust reverse proxies (loopback/linklocal/uniquelocal + private ranges for Traefik)
+      - N8N_SECURITY_TRUSTED_PROXIES=loopback,linklocal,uniquelocal,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
       - NODE_ENV=production
       - WEBHOOK_URL=https://${SUBDOMAIN}.${DOMAIN_NAME}/
       - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
@@ -59,6 +61,8 @@ services:
       - N8N_RUNNERS_AUTH_TOKEN=${N8N_RUNNERS_AUTH_TOKEN}
       - N8N_RUNNERS_AUTO_SHUTDOWN_TIMEOUT=15
       - N8N_RUNNERS_LAUNCHER_LOG_LEVEL=debug
+      - PLAYWRIGHT_BROWSERS_PATH=0
+      - PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
     depends_on:
       - n8n
     networks:
