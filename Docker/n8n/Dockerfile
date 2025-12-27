@@ -1,4 +1,6 @@
-FROM docker.n8n.io/n8nio/runners:2.0.0
+# Use the Docker Hub mirror of the n8n runner image because docker.n8n.io
+# does not host the 2.0.0 tag and the build fails with "not found".
+FROM n8nio/runners:2.0.0
 
 USER root
 
