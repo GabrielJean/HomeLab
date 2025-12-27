@@ -1,9 +1,12 @@
 services:
   n8n:
-    image: docker.n8n.io/n8nio/n8n
+    image: docker.n8n.io/n8nio/n8n:2.0.0
     container_name: n8n
     user: "0:0"              # run as root
     restart: unless-stopped
+    ports:
+      - "5678:5678"
+      - "5679:5679"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.n8n.rule=Host(`${SUBDOMAIN}.${DOMAIN_NAME}`)"
@@ -22,7 +25,15 @@ services:
       - N8N_TEMPLATES_ENABLED=false
       - N8N_HIRING_BANNER_ENABLED=false
       - N8N_VERSION_NOTIFICATIONS_ENABLED=false
-      - N8N_RUNNERS_ENABLED=false
+      - N8N_RUNNERS_ENABLED=true
+      - N8N_RUNNERS_MODE=external
+      - N8N_RUNNERS_DISABLED_MODES=embedded
+      - N8N_RUNNERS_JAVASCRIPT_ENABLED=true
+      - N8N_RUNNERS_PYTHON_ENABLED=true
+      - N8N_RUNNERS_AUTH_TOKEN=${N8N_RUNNERS_AUTH_TOKEN}
+      - N8N_RUNNERS_BROKER_LISTEN_ADDRESS=0.0.0.0
+      - N8N_RUNNERS_BROKER_PORT=5679
+      - N8N_NATIVE_PYTHON_RUNNER=true
       - N8N_HOST=${SUBDOMAIN}.${DOMAIN_NAME}
       - N8N_PORT=5678
       - N8N_PROTOCOL=https
@@ -33,6 +44,23 @@ services:
     volumes:
       - /Apps/n8n/data:/home/node/.n8n
       - /Apps/n8n/files:/files
+    networks:
+      - traefik_default
+
+  task-runners:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: custom-n8n-runner:2.0.0
+    container_name: n8n-task-runners
+    restart: unless-stopped
+    environment:
+      - N8N_RUNNERS_TASK_BROKER_URI=http://n8n:5679
+      - N8N_RUNNERS_AUTH_TOKEN=${N8N_RUNNERS_AUTH_TOKEN}
+      - N8N_RUNNERS_AUTO_SHUTDOWN_TIMEOUT=15
+      - N8N_RUNNERS_LAUNCHER_LOG_LEVEL=debug
+    depends_on:
+      - n8n
     networks:
       - traefik_default
 

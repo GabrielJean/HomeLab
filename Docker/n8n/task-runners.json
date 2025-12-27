@@ -1,0 +1,30 @@
+{
+  "task-runners": [
+    {
+      "runner-type": "python",
+      "workdir": "/home/runner",
+      "command": "/opt/runners/task-runner-python/.venv/bin/python",
+      "args": ["-m", "src.main"],
+      "health-check-server-port": "5682",
+      "allowed-env": [
+        "PATH",
+        "PYTHONPATH",
+        "N8N_RUNNERS_LAUNCHER_LOG_LEVEL",
+        "N8N_RUNNERS_AUTO_SHUTDOWN_TIMEOUT",
+        "N8N_RUNNERS_TASK_TIMEOUT",
+        "N8N_RUNNERS_MAX_CONCURRENCY",
+        "N8N_SENTRY_DSN",
+        "N8N_VERSION",
+        "ENVIRONMENT",
+        "DEPLOYMENT_NAME",
+        "N8N_RUNNERS_STDLIB_ALLOW",
+        "N8N_RUNNERS_EXTERNAL_ALLOW"
+      ],
+      "env-overrides": {
+        "PYTHONPATH": "/opt/runners/task-runner-python",
+        "N8N_RUNNERS_STDLIB_ALLOW": "*",
+        "N8N_RUNNERS_EXTERNAL_ALLOW": "yt_dlp,numpy,pandas"
+      }
+    }
+  ]
+}
