@@ -208,7 +208,8 @@ def write_outputs_for_result(result: Dict[str, Optional[Any]], entry: UrlEntry, 
 	output_base = OUTPUT_DIR / name_part / dir_part
 	output_base.mkdir(parents=True, exist_ok=True)
 
-	csv_path = output_base / f"{slug}.csv"
+	# Keep file names short: just the friendly name + direction
+	csv_path = output_base / f"{name_part}-{dir_part}.csv"
 	write_header = not csv_path.exists()
 	with csv_path.open("a", newline="") as f:
 		writer = csv.DictWriter(f, fieldnames=OUTPUT_FIELDS)
