@@ -7,7 +7,7 @@ WORKDIR /app
 RUN apt-get update \
 	&& DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 		libnss3 libatk1.0-0 libx11-xcb1 libxcomposite1 libxdamage1 libxrandr2 libgbm1 \
-		libasound2 libxshmfence1 libgtk-3-0 libpango-1.0-0 libcups2 libdrm2 \
+		libasound2 libxshmfence1 libgtk-3-0 libpango-1.0-0 libcups2 libdrm2 tzdata \
 	&& rm -rf /var/lib/apt/lists/*
 
 # Python deps + browser binaries

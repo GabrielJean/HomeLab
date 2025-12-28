@@ -20,8 +20,8 @@ import csv
 import hashlib
 import json
 import os
-from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
+from datetime import datetime, timezone, tzinfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Union
@@ -34,7 +34,16 @@ HEADLESS = True  # set to False to watch the browser
 OUTPUT_DIR = Path("data_runs")
 ENV_PATH = Path(".env")
 ENV_URL_KEY = "URLS"
-LOCAL_TZ = ZoneInfo("America/Toronto")
+def get_local_tz(key: str = "America/Toronto") -> tzinfo:
+	"""Return desired TZ or UTC if tzdata is missing in the container."""
+	try:
+		return ZoneInfo(key)
+	except ZoneInfoNotFoundError:
+		print(f"Warning: timezone '{key}' not found; falling back to UTC")
+		return timezone.utc
+
+
+LOCAL_TZ = get_local_tz()
 
 # Keep a stable field order for CSV-friendly outputs.
 OUTPUT_FIELDS = [
