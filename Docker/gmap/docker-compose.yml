@@ -2,6 +2,7 @@ services:
   gmap:
     build: .
     env_file: .env
+    container_name: gmap
     volumes:
       - /Apps/gmap:/app/data_runs
     restart: unless-stopped

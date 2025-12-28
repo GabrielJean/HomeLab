@@ -21,8 +21,10 @@ import hashlib
 import json
 import os
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
-from typing import Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
 from playwright.sync_api import Page, sync_playwright
@@ -32,6 +34,28 @@ HEADLESS = True  # set to False to watch the browser
 OUTPUT_DIR = Path("data_runs")
 ENV_PATH = Path(".env")
 ENV_URL_KEY = "URLS"
+LOCAL_TZ = ZoneInfo("America/Toronto")
+
+# Keep a stable field order for CSV-friendly outputs.
+OUTPUT_FIELDS = [
+	"timestamp_utc",
+	"timestamp_local",
+	"name",
+	"direction",
+	"slug",
+	"url",
+	"page_title",
+	"duration_text",
+	"duration_minutes",
+]
+
+
+@dataclass
+class UrlEntry:
+	name: str
+	direction: str
+	url: str
+
 def load_env_file(env_path: Path = ENV_PATH) -> None:
 	"""Populate os.environ with values from a simple .env file if present."""
 	if not env_path.exists():
@@ -71,47 +95,120 @@ def parse_urls(raw_urls: str) -> List[str]:
 	return [u for u in urls if u]
 
 
-def load_urls(env_key: str = ENV_URL_KEY, env_path: Path = ENV_PATH) -> List[str]:
-	"""Load URLs from the specified environment variable, populating from .env if present."""
+def parse_url_entries(raw_urls: str) -> List[UrlEntry]:
+	"""Return structured URL entries from a JSON array of strings or objects."""
+	if not raw_urls:
+		return []
+	try:
+		parsed = json.loads(raw_urls)
+	except json.JSONDecodeError:
+		parsed = None
+
+	entries: List[UrlEntry] = []
+	if isinstance(parsed, list):
+		for idx, item in enumerate(parsed):
+			if isinstance(item, str):
+				entries.append(UrlEntry(name=f"group-{idx + 1}", direction=f"dir-{idx + 1}", url=item))
+			elif isinstance(item, dict):
+				url = item.get("url") or item.get("URL") or item.get("href")
+				if not isinstance(url, str) or not url.strip():
+					continue
+				name = item.get("name") or item.get("label") or f"group-{idx + 1}"
+				direction = item.get("direction") or item.get("dir") or f"dir-{idx + 1}"
+				entries.append(UrlEntry(name=name, direction=direction, url=url.strip()))
+	elif isinstance(parsed, str):
+		entries.append(UrlEntry(name="group-1", direction="dir-1", url=parsed))
+
+	return entries
+
+
+def load_urls(env_key: str = ENV_URL_KEY, env_path: Path = ENV_PATH) -> List[UrlEntry]:
+	"""Load URLs from env var (JSON/CSV) with optional friendly names and directions."""
 	load_env_file(env_path)
+
 	raw = os.getenv(env_key, "")
-	urls = parse_urls(raw)
-	if not urls:
+	entries = parse_url_entries(raw)
+
+	# Fallback: plain JSON/CSV list of URLs without objects
+	if not entries:
+		urls = parse_urls(raw)
+		entries = [
+			UrlEntry(name=f"group-{idx + 1}", direction=f"dir-{idx + 1}", url=url)
+			for idx, url in enumerate(urls)
+		]
+
+	if not entries:
 		raise SystemExit(
-			f"Set {env_key} in {env_path} (JSON array or comma-separated list) before running."
+			f"Provide URLs via {env_key} in {env_path} (JSON array or comma-separated) before running."
 		)
-	return urls
+	return entries
 
 
-def safe_slug(url: str, index: int) -> str:
-	"""Create a stable, filename-safe slug for a URL."""
-	parsed = urlparse(url)
+def clean_segment(text: str) -> str:
+	"""Make a string filesystem-safe (alnum, dash, underscore)."""
+	cleaned = "".join(c if c.isalnum() or c in "-_" else "-" for c in text.strip())
+	return cleaned or "default"
+
+
+def safe_slug(entry: UrlEntry, index: int) -> str:
+	"""Create a stable, filename-safe slug using friendly name, direction, and URL context."""
+	parsed = urlparse(entry.url)
 	host = (parsed.hostname or "url").replace(" ", "-")
-	first_path = (parsed.path.strip("/") or "path").split("/")[0]
-	first_path = first_path.replace(" ", "-") or "path"
-	digest = hashlib.sha1(url.encode("utf-8")).hexdigest()[:8]
-	return f"{index + 1}-{host}-{first_path}-{digest}"
+	path_parts = [p.replace(" ", "-") for p in parsed.path.split("/") if p]
+	path_part = "-".join(path_parts[:3]) if path_parts else "root"
+	query_hint = ""
+	if parsed.query:
+		query_hint = f"-q{hashlib.sha1(parsed.query.encode('utf-8')).hexdigest()[:6]}"
+	digest = hashlib.sha1(entry.url.encode("utf-8")).hexdigest()[:6]
+	name_part = clean_segment(entry.name)
+	dir_part = clean_segment(entry.direction)
+	return f"{index + 1}-{name_part}-{dir_part}-{host}-{path_part}{query_hint}-{digest}"
 
 
-def write_outputs_for_result(result: Dict[str, Optional[str]], slug: str, timestamp: str) -> None:
-	"""Write per-URL JSON (timestamped) and CSV (append-only) outputs."""
-	OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-	ts_safe = timestamp.replace(":", "-")
+def parse_duration_minutes(duration_text: Optional[str]) -> Optional[float]:
+	"""Convert duration strings like '1 hr 5 min' or '45 min' to total minutes."""
+	if not duration_text:
+		return None
 
-	json_path = OUTPUT_DIR / f"{slug}_{ts_safe}.json"
-	json_path.write_text(json.dumps(result, indent=2))
+	tokens = duration_text.lower().replace("hrs", "hr").replace("mins", "min").split()
+	hours = 0
+	minutes = 0
 
-	csv_path = OUTPUT_DIR / f"{slug}.csv"
-	fieldnames = sorted(result.keys())
+	for idx, token in enumerate(tokens):
+		if token.isdigit():
+			next_token = tokens[idx + 1] if idx + 1 < len(tokens) else ""
+			if next_token.startswith("hr"):
+				hours += int(token)
+			elif next_token.startswith("min"):
+				minutes += int(token)
+
+	total_minutes = hours * 60 + minutes
+	return total_minutes if total_minutes > 0 else None
+
+
+def write_url_manifest(entries: List[UrlEntry], slugs: List[str], timestamp: str) -> None:
+	"""Deprecated: per-run manifests removed in favor of per-URL histories."""
+	raise NotImplementedError("Manifest writing is disabled; use per-URL CSVs instead.")
+
+
+
+def write_outputs_for_result(result: Dict[str, Optional[Any]], entry: UrlEntry, slug: str) -> None:
+	"""Append per-URL CSV (single rolling file) grouped by name/direction."""
+	name_part = clean_segment(entry.name)
+	dir_part = clean_segment(entry.direction)
+	output_base = OUTPUT_DIR / name_part / dir_part
+	output_base.mkdir(parents=True, exist_ok=True)
+
+	csv_path = output_base / f"{slug}.csv"
 	write_header = not csv_path.exists()
 	with csv_path.open("a", newline="") as f:
-		writer = csv.DictWriter(f, fieldnames=fieldnames)
+		writer = csv.DictWriter(f, fieldnames=OUTPUT_FIELDS)
 		if write_header:
 			writer.writeheader()
-		writer.writerow(result)
+		writer.writerow({field: result.get(field) for field in OUTPUT_FIELDS})
 
 
-def scrape_page(page: Page, url: str, selectors: Dict[str, str]) -> Dict[str, Optional[str]]:
+def scrape_page(page: Page, url: str, selectors: Dict[str, Union[str, List[str]]]) -> Dict[str, Optional[Any]]:
 	"""Navigate and extract text for each named selector."""
 	# Longer timeout because Google Maps can be slow; fall back to page load
 	page.goto(url, wait_until="load", timeout=60_000)
@@ -151,8 +248,10 @@ def main() -> None:
 
 	urls = load_urls()
 
-	results: List[Dict[str, Optional[str]]] = []
-	timestamp = datetime.now(timezone.utc).isoformat()
+	results: List[Dict[str, Optional[Any]]] = []
+	now_utc = datetime.now(timezone.utc)
+	timestamp_utc = now_utc.isoformat()
+	timestamp_local = now_utc.astimezone(LOCAL_TZ).isoformat()
 
 	with sync_playwright() as p:
 		browser = p.chromium.launch(headless=HEADLESS)
@@ -168,32 +267,26 @@ def main() -> None:
 		})
 		page.set_default_timeout(60_000)
 
-		for idx, url in enumerate(urls):
-			result = scrape_page(page, url, selectors)
-			result["timestamp"] = timestamp
-			slug = safe_slug(url, idx)
-			write_outputs_for_result(result, slug, timestamp)
+		url_slugs: List[str] = []
+		for idx, entry in enumerate(urls):
+			slug = safe_slug(entry, idx)
+			url_slugs.append(slug)
+			result = scrape_page(page, entry.url, selectors)
+			result["timestamp_utc"] = timestamp_utc
+			result["timestamp_local"] = timestamp_local
+			result["slug"] = slug
+			result["name"] = entry.name
+			result["direction"] = entry.direction
+			result["duration_minutes"] = parse_duration_minutes(result.get("duration"))
+			result["duration_text"] = result.pop("duration", None)
+			write_outputs_for_result(result, entry, slug)
 			results.append(result)
 
 		browser.close()
 
-	# Still emit a combined snapshot for convenience per run.
-	OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-	json_path = OUTPUT_DIR / "scrape_output.json"
-	json_path.write_text(json.dumps(results, indent=2))
+	# Per-run combined outputs and manifests removed; history lives in per-URL CSVs only.
 
-	csv_path = OUTPUT_DIR / "scrape_output.csv"
-	fieldnames = sorted(results[0].keys()) if results else []
-	write_header = not csv_path.exists()
-	with csv_path.open("a", newline="") as f:
-		writer = csv.DictWriter(f, fieldnames=fieldnames)
-		if write_header:
-			writer.writeheader()
-		writer.writerows(results)
-
-	print(
-		f"Wrote {len(results)} rows (per-URL files + aggregate {json_path.resolve()} and {csv_path.resolve()})"
-	)
+	print(f"Wrote {len(results)} rows (per-URL CSV histories only)")
 
 
 if __name__ == "__main__":
