@@ -47,14 +47,10 @@ LOCAL_TZ = get_local_tz()
 
 # Keep a stable field order for CSV-friendly outputs.
 OUTPUT_FIELDS = [
-	"timestamp_utc",
 	"timestamp_local",
+	"day_of_week",
 	"name",
-	"direction",
-	"slug",
-	"url",
 	"page_title",
-	"duration_text",
 	"duration_minutes",
 ]
 
@@ -260,8 +256,9 @@ def main() -> None:
 
 	results: List[Dict[str, Optional[Any]]] = []
 	now_utc = datetime.now(timezone.utc)
-	timestamp_utc = now_utc.isoformat()
-	timestamp_local = now_utc.astimezone(LOCAL_TZ).isoformat()
+	local_dt = now_utc.astimezone(LOCAL_TZ)
+	timestamp_local = local_dt.isoformat()
+	day_of_week = local_dt.strftime("%A")
 
 	with sync_playwright() as p:
 		browser = p.chromium.launch(headless=HEADLESS)
@@ -282,13 +279,11 @@ def main() -> None:
 			slug = safe_slug(entry, idx)
 			url_slugs.append(slug)
 			result = scrape_page(page, entry.url, selectors)
-			result["timestamp_utc"] = timestamp_utc
 			result["timestamp_local"] = timestamp_local
-			result["slug"] = slug
+			result["day_of_week"] = day_of_week
 			result["name"] = entry.name
-			result["direction"] = entry.direction
 			result["duration_minutes"] = parse_duration_minutes(result.get("duration"))
-			result["duration_text"] = result.pop("duration", None)
+			result.pop("duration", None)
 			write_outputs_for_result(result, entry, slug)
 			results.append(result)
 
