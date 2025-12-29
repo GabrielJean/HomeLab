@@ -32,6 +32,8 @@ from playwright.sync_api import Page, sync_playwright
 
 HEADLESS = True  # set to False to watch the browser
 OUTPUT_DIR = Path("data_runs")
+LOG_PATH = OUTPUT_DIR / "logs.txt"
+SNAPSHOT_LOG_PATH = OUTPUT_DIR / "snapshots.log"
 ENV_PATH = Path(".env")
 ENV_URL_KEY = "URLS"
 def get_local_tz(key: str = "America/Toronto") -> tzinfo:
@@ -155,6 +157,25 @@ def clean_segment(text: str) -> str:
 	return cleaned or "default"
 
 
+def log_message(message: str) -> None:
+	"""Append a timestamped log line to the host-mounted logs file."""
+	LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+	now = datetime.now(timezone.utc).astimezone(LOCAL_TZ).isoformat()
+	with LOG_PATH.open("a", encoding="utf-8") as f:
+		f.write(f"{now}\t{message}\n")
+
+
+def log_snapshot(entry: UrlEntry, message: str) -> None:
+	"""Append a timestamped line to a per-URL snapshot log file for easier navigation."""
+	base = OUTPUT_DIR / "snapshots" / clean_segment(entry.name) / clean_segment(entry.direction)
+	base.mkdir(parents=True, exist_ok=True)
+	date_str = datetime.now(LOCAL_TZ).strftime("%Y-%m-%d")
+	file_path = base / f"{date_str}.log"
+	now = datetime.now(timezone.utc).astimezone(LOCAL_TZ).isoformat()
+	with file_path.open("a", encoding="utf-8") as f:
+		f.write(f"{now}\t{message}\n")
+
+
 def safe_slug(entry: UrlEntry, index: int) -> str:
 	"""Create a stable, filename-safe slug using friendly name, direction, and URL context."""
 	parsed = urlparse(entry.url)
@@ -189,6 +210,30 @@ def parse_duration_minutes(duration_text: Optional[str]) -> Optional[float]:
 
 	total_minutes = hours * 60 + minutes
 	return total_minutes if total_minutes > 0 else None
+
+
+def scrape_duration_value(page: Page, selector: Union[str, List[str]]) -> Optional[str]:
+	"""Fetch a duration string using primary/fallback selectors."""
+	selector_list = selector if isinstance(selector, list) else [selector]
+	for sel in selector_list:
+		node = page.query_selector(sel)
+		if node:
+			text = (node.inner_text() or "").strip()
+			if text:
+				return text
+	return None
+
+
+def snapshot_text(page: Page) -> str:
+	"""Capture a lightweight text snapshot from the first route card (fallback to body)."""
+	for sel in ["#section-directions-trip-0", "body"]:
+		node = page.query_selector(sel)
+		if node:
+			text = (node.inner_text() or "").strip()
+			if text:
+				flat = " ".join(text.split())
+				return flat[:800]
+	return ""
 
 
 def write_url_manifest(entries: List[UrlEntry], slugs: List[str], timestamp: str) -> None:
@@ -278,11 +323,35 @@ def main() -> None:
 		for idx, entry in enumerate(urls):
 			slug = safe_slug(entry, idx)
 			url_slugs.append(slug)
-			result = scrape_page(page, entry.url, selectors)
+			try:
+				result = scrape_page(page, entry.url, selectors)
+			except Exception as exc:
+				log_message(f"Exception while scraping '{entry.name}' ({entry.direction}) url={entry.url}: {exc}")
+				raise
 			result["timestamp_local"] = timestamp_local
 			result["day_of_week"] = day_of_week
 			result["name"] = entry.name
-			result["duration_minutes"] = parse_duration_minutes(result.get("duration"))
+			duration_text = result.get("duration")
+			duration_minutes = parse_duration_minutes(duration_text)
+			retry_duration_text: Optional[str] = None
+			if duration_minutes is None:
+				log_message(
+					f"Missing duration (first pass) for '{entry.name}' ({entry.direction}) url={entry.url}; "
+					f"selectors={selectors.get('duration')} raw_value={duration_text}"
+				)
+				page.wait_for_timeout(3000)
+				retry_duration_text = scrape_duration_value(page, selectors.get("duration", []))
+				if retry_duration_text:
+					duration_text = retry_duration_text
+					duration_minutes = parse_duration_minutes(duration_text)
+				if duration_minutes is None:
+					snap = snapshot_text(page)
+					log_snapshot(
+						entry,
+						f"Missing duration after retry for '{entry.name}' ({entry.direction}) url={entry.url}; "
+						f"raw_first={result.get('duration')} raw_retry={retry_duration_text} snapshot='{snap}'"
+					)
+			result["duration_minutes"] = duration_minutes
 			result.pop("duration", None)
 			write_outputs_for_result(result, entry, slug)
 			results.append(result)
