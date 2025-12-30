@@ -20,6 +20,7 @@ import csv
 import hashlib
 import json
 import os
+import re
 from datetime import datetime, timezone, tzinfo
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pathlib import Path
@@ -212,6 +213,20 @@ def parse_duration_minutes(duration_text: Optional[str]) -> Optional[float]:
 	return total_minutes if total_minutes > 0 else None
 
 
+def extract_duration_fragment(text: str) -> Optional[str]:
+	"""Pull a plausible duration fragment (e.g., '1 hr 5 min' or '38 min') from free text."""
+	patterns = [
+		r"(\d+\s*hr\s*\d+\s*min)",
+		r"(\d+\s*hr)",
+		r"(\d+\s*min)",
+	]
+	for pat in patterns:
+		match = re.search(pat, text, re.IGNORECASE)
+		if match:
+			return match.group(1)
+	return None
+
+
 def scrape_duration_value(page: Page, selector: Union[str, List[str]]) -> Optional[str]:
 	"""Fetch a duration string using primary/fallback selectors."""
 	selector_list = selector if isinstance(selector, list) else [selector]
@@ -222,6 +237,27 @@ def scrape_duration_value(page: Page, selector: Union[str, List[str]]) -> Option
 			if text:
 				return text
 	return None
+
+
+def route_card_text(page: Page) -> Optional[str]:
+	"""Return flattened text from the first route card if present."""
+	node = page.query_selector("#section-directions-trip-0")
+	if node:
+		text = (node.inner_text() or "").strip()
+		if text:
+			return " ".join(text.split())
+	return None
+
+
+def route_cards_texts(page: Page) -> List[str]:
+	"""Return flattened texts for all visible route cards (ordered)."""
+	nodes = page.query_selector_all("[id^='section-directions-trip-']")
+	texts: List[str] = []
+	for node in nodes:
+		text = (node.inner_text() or "").strip()
+		if text:
+			texts.append(" ".join(text.split()))
+	return texts
 
 
 def snapshot_text(page: Page) -> str:
@@ -345,12 +381,34 @@ def main() -> None:
 					duration_text = retry_duration_text
 					duration_minutes = parse_duration_minutes(duration_text)
 				if duration_minutes is None:
-					snap = snapshot_text(page)
-					log_snapshot(
-						entry,
-						f"Missing duration after retry for '{entry.name}' ({entry.direction}) url={entry.url}; "
-						f"raw_first={result.get('duration')} raw_retry={retry_duration_text} snapshot='{snap}'"
-					)
+					card_text = route_card_text(page)
+					derived_fragment = extract_duration_fragment(card_text or "") if card_text else None
+					if derived_fragment:
+						duration_text = derived_fragment
+						duration_minutes = parse_duration_minutes(duration_text)
+					if duration_minutes is None:
+						all_cards = route_cards_texts(page)
+						fragments: List[str] = []
+						minutes_list: List[float] = []
+						for card in all_cards:
+							frag = extract_duration_fragment(card)
+							if frag:
+								val = parse_duration_minutes(frag)
+								if val is not None:
+									fragments.append(frag)
+									minutes_list.append(val)
+						if minutes_list:
+							best_idx = minutes_list.index(min(minutes_list))
+							duration_minutes = minutes_list[best_idx]
+							duration_text = fragments[best_idx]
+					if duration_minutes is None:
+						snap = snapshot_text(page)
+						log_snapshot(
+							entry,
+							f"Missing duration after retry for '{entry.name}' ({entry.direction}) url={entry.url}; "
+							f"raw_first={result.get('duration')} raw_retry={retry_duration_text} "
+							f"card_text_fragment={derived_fragment} snapshot='{snap}'"
+						)
 			result["duration_minutes"] = duration_minutes
 			result.pop("duration", None)
 			write_outputs_for_result(result, entry, slug)
