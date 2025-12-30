@@ -12,7 +12,7 @@ resources:
 # Centralize controller image version here for both per-node Deployments
 images:
   - name: registry.k8s.io/ingress-nginx/controller
-    newTag: v1.13.1
+    newTag: v1.14.1
 
 # Remove upstream single-controller resources that would conflict with your per-node setup
 patches:
