@@ -337,36 +337,97 @@ def weekday_medians(points: List[Tuple[datetime, float]]) -> Dict[str, float]:
 	return {day: statistics.median(values) for day, values in by_day.items() if values}
 
 
+def daily_median_series(points: List[Tuple[datetime, float]]) -> List[Tuple[datetime, float]]:
+	"""Collapse to one median point per calendar day for long-range readability."""
+	by_date: Dict[datetime.date, List[float]] = defaultdict(list)
+	for ts, duration in points:
+		by_date[ts.date()].append(duration)
+	series: List[Tuple[datetime, float]] = []
+	for day, values in by_date.items():
+		series.append((datetime.combine(day, datetime.min.time(), tzinfo=LOCAL_TZ), statistics.median(values)))
+	return sorted(series, key=lambda p: p[0])
+
+
+# Define peak/off-peak buckets (local time, 24h). Adjust as needed.
+PEAK_BUCKETS: List[Tuple[str, int, int]] = [
+	("AM peak", 7, 9),   # 07:00-09:00
+	("PM peak", 15, 17), # 15:00-17:00
+]
+OFFPEAK_BUCKETS: List[Tuple[str, int, int]] = [
+	("Late night", 22, 24),
+	("Early", 0, 5),
+]
+
+
+def in_range(hour: int, start: int, end: int) -> bool:
+	"""Return True if hour is within [start, end) handling wrap at midnight."""
+	if start <= end:
+		return start <= hour < end
+	return hour >= start or hour < end
+
+
+def bucket_medians(points: List[Tuple[datetime, float]]) -> Dict[str, float]:
+	"""Median per time-of-day bucket (peaks/off-peak)."""
+	by_bucket: Dict[str, List[float]] = defaultdict(list)
+	for ts, duration in points:
+		hour = ts.astimezone(LOCAL_TZ).hour
+		for name, start, end in PEAK_BUCKETS + OFFPEAK_BUCKETS:
+			if in_range(hour, start, end):
+				by_bucket[name].append(duration)
+	return {name: statistics.median(vals) for name, vals in by_bucket.items() if vals}
+
+
 def generate_graph(csv_path: Path) -> Optional[Path]:
 	"""Create/overwrite a PNG for the given CSV; returns image path."""
 	points = load_csv_points(csv_path)
 	if not points:
 		return None
 	medians = weekday_medians(points)
+	daily = daily_median_series(points)
+	buckets = bucket_medians(points)
 
 	x_vals, y_vals = zip(*points)
 	img_path = csv_path.with_suffix(".png")
 
 	fig, ax = plt.subplots(figsize=(10, 4))
-	ax.plot(x_vals, y_vals, marker="o", linewidth=2, markersize=4)
+	fig.subplots_adjust(right=0.8)  # leave room on the right for stats
+	primary_color = "#1f77b4"
+	trend_color = "#d62728"
+
+	ax.plot(x_vals, y_vals, linewidth=1.3, color=primary_color, alpha=0.6)
+	if daily:
+		dx, dy = zip(*daily)
+		ax.plot(dx, dy, linewidth=2.0, color=trend_color, alpha=0.9, label="Daily median")
+
 	ax.set_title(csv_path.stem.replace("-", " "))
 	ax.set_ylabel("Minutes")
 	ax.set_xlabel("Local time")
-	ax.grid(True, linewidth=0.5, alpha=0.3)
+	ax.grid(True, linewidth=0.5, alpha=0.25)
 
+	stats_blocks: List[str] = []
+	if buckets:
+		peak_lines = [f"{name}: {val:.1f}" for name, val in buckets.items() if "peak" in name.lower()]
+		off_lines = [f"{name}: {val:.1f}" for name, val in buckets.items() if "peak" not in name.lower()]
+		if peak_lines:
+			stats_blocks.append("Peak medians\n" + "\n".join(sorted(peak_lines)))
+		if off_lines:
+			stats_blocks.append("Off-peak medians\n" + "\n".join(sorted(off_lines)))
 	if medians:
-		lines = [f"{day[:3]}: {val:.1f}" for day, val in sorted(medians.items())]
-		stats_text = "Weekday medians\n" + "\n".join(lines)
-		ax.text(
-			0.99,
-			0.01,
-			stats_text,
-			transform=ax.transAxes,
+		weekday_lines = [f"{day[:3]}: {val:.1f}" for day, val in sorted(medians.items())]
+		stats_blocks.append("Weekday medians\n" + "\n".join(weekday_lines))
+	if stats_blocks:
+		fig.text(
+			0.98,
+			0.5,
+			"\n\n".join(stats_blocks),
+			va="center",
 			ha="right",
-			va="bottom",
 			fontsize=9,
-			bbox={"facecolor": "white", "alpha": 0.7, "edgecolor": "none"},
+			bbox={"facecolor": "white", "alpha": 0.9, "edgecolor": "none"},
+			transform=fig.transFigure,
 		)
+	if daily:
+		ax.legend(loc="upper left", framealpha=0.8)
 
 	locator = mdates.AutoDateLocator(minticks=4, maxticks=10)
 	formatter = mdates.ConciseDateFormatter(locator)
