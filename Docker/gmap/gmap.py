@@ -21,6 +21,8 @@ import hashlib
 import json
 import os
 import re
+import statistics
+from collections import defaultdict
 from datetime import datetime, timezone, tzinfo
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pathlib import Path
@@ -327,11 +329,20 @@ def load_csv_points(csv_path: Path) -> List[Tuple[datetime, float]]:
 	return sorted(points, key=lambda p: p[0])
 
 
+def weekday_medians(points: List[Tuple[datetime, float]]) -> Dict[str, float]:
+	"""Compute median duration per weekday name."""
+	by_day: Dict[str, List[float]] = defaultdict(list)
+	for ts, duration in points:
+		by_day[ts.strftime("%A")].append(duration)
+	return {day: statistics.median(values) for day, values in by_day.items() if values}
+
+
 def generate_graph(csv_path: Path) -> Optional[Path]:
 	"""Create/overwrite a PNG for the given CSV; returns image path."""
 	points = load_csv_points(csv_path)
 	if not points:
 		return None
+	medians = weekday_medians(points)
 
 	x_vals, y_vals = zip(*points)
 	img_path = csv_path.with_suffix(".png")
@@ -342,6 +353,20 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 	ax.set_ylabel("Minutes")
 	ax.set_xlabel("Local time")
 	ax.grid(True, linewidth=0.5, alpha=0.3)
+
+	if medians:
+		lines = [f"{day[:3]}: {val:.1f}" for day, val in sorted(medians.items())]
+		stats_text = "Weekday medians\n" + "\n".join(lines)
+		ax.text(
+			0.99,
+			0.01,
+			stats_text,
+			transform=ax.transAxes,
+			ha="right",
+			va="bottom",
+			fontsize=9,
+			bbox={"facecolor": "white", "alpha": 0.7, "edgecolor": "none"},
+		)
 
 	locator = mdates.AutoDateLocator(minticks=4, maxticks=10)
 	formatter = mdates.ConciseDateFormatter(locator)
