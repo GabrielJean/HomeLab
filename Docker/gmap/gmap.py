@@ -25,9 +25,13 @@ from datetime import datetime, timezone, tzinfo
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
+import matplotlib
+matplotlib.use("Agg")  # headless-safe backend for PNG output
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
 from playwright.sync_api import Page, sync_playwright
 
 
@@ -295,6 +299,73 @@ def write_outputs_for_result(result: Dict[str, Optional[Any]], entry: UrlEntry, 
 		writer.writerow({field: result.get(field) for field in OUTPUT_FIELDS})
 
 
+def parse_timestamp(value: str) -> Optional[datetime]:
+	"""Parse ISO timestamps while tolerating missing timezone info."""
+	if not value:
+		return None
+	try:
+		dt = datetime.fromisoformat(value)
+		dt = dt.astimezone(LOCAL_TZ) if dt.tzinfo else dt.replace(tzinfo=LOCAL_TZ)
+		return dt
+	except Exception:
+		return None
+
+
+def load_csv_points(csv_path: Path) -> List[Tuple[datetime, float]]:
+	"""Return sorted (timestamp, duration_minutes) tuples for plotting."""
+	points: List[Tuple[datetime, float]] = []
+	with csv_path.open() as f:
+		reader = csv.DictReader(f)
+		for row in reader:
+			ts = parse_timestamp(row.get("timestamp_local", ""))
+			try:
+				duration = float(row.get("duration_minutes", ""))
+			except (TypeError, ValueError):
+				duration = None
+			if ts and duration is not None:
+				points.append((ts, duration))
+	return sorted(points, key=lambda p: p[0])
+
+
+def generate_graph(csv_path: Path) -> Optional[Path]:
+	"""Create/overwrite a PNG for the given CSV; returns image path."""
+	points = load_csv_points(csv_path)
+	if not points:
+		return None
+
+	x_vals, y_vals = zip(*points)
+	img_path = csv_path.with_suffix(".png")
+
+	fig, ax = plt.subplots(figsize=(10, 4))
+	ax.plot(x_vals, y_vals, marker="o", linewidth=2, markersize=4)
+	ax.set_title(csv_path.stem.replace("-", " "))
+	ax.set_ylabel("Minutes")
+	ax.set_xlabel("Local time")
+	ax.grid(True, linewidth=0.5, alpha=0.3)
+
+	locator = mdates.AutoDateLocator(minticks=4, maxticks=10)
+	formatter = mdates.ConciseDateFormatter(locator)
+	ax.xaxis.set_major_locator(locator)
+	ax.xaxis.set_major_formatter(formatter)
+	fig.autofmt_xdate()
+
+	fig.tight_layout()
+	img_path.parent.mkdir(parents=True, exist_ok=True)
+	fig.savefig(img_path, dpi=120)
+	plt.close(fig)
+	return img_path
+
+
+def generate_all_graphs(output_dir: Path = OUTPUT_DIR) -> None:
+	"""Generate/refresh PNG graphs for every per-URL CSV."""
+	csv_paths: Iterable[Path] = output_dir.glob("*/*/*.csv")
+	for csv_path in csv_paths:
+		try:
+			generate_graph(csv_path)
+		except Exception as exc:
+			log_message(f"Graph generation failed for {csv_path}: {exc}")
+
+
 def scrape_page(page: Page, url: str, selectors: Dict[str, Union[str, List[str]]]) -> Dict[str, Optional[Any]]:
 	"""Navigate and extract text for each named selector."""
 	# Longer timeout because Google Maps can be slow; fall back to page load
@@ -417,6 +488,8 @@ def main() -> None:
 		browser.close()
 
 	# Per-run combined outputs and manifests removed; history lives in per-URL CSVs only.
+
+	generate_all_graphs()
 
 	print(f"Wrote {len(results)} rows (per-URL CSV histories only)")
 
