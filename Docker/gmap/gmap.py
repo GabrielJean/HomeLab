@@ -390,7 +390,8 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 	img_path = csv_path.with_suffix(".png")
 
 	fig, ax = plt.subplots(figsize=(10, 4))
-	fig.subplots_adjust(right=0.8)  # leave room on the right for stats
+	right_margin = 0.75
+	fig.subplots_adjust(right=right_margin)  # leave room on the right for stats
 	primary_color = "#1f77b4"
 	trend_color = "#d62728"
 
@@ -435,7 +436,7 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 	ax.xaxis.set_major_formatter(formatter)
 	fig.autofmt_xdate()
 
-	fig.tight_layout()
+	fig.tight_layout(rect=[0, 0, right_margin - 0.02, 1])
 	img_path.parent.mkdir(parents=True, exist_ok=True)
 	fig.savefig(img_path, dpi=120)
 	plt.close(fig)
