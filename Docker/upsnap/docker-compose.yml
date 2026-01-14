@@ -2,7 +2,6 @@ services:
   upsnap:
     container_name: upsnap
     image: ghcr.io/seriousm4x/upsnap:5
-    network_mode: host
     restart: unless-stopped
     volumes:
       - ./data:/app/pb_data
@@ -22,3 +21,9 @@ services:
       - "traefik.http.routers.upsnap-insecure.middlewares=redirect-to-https"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
       - "traefik.http.services.upsnap.loadbalancer.server.scheme=http"
+    networks:
+      - traefik_default
+
+networks:
+  traefik_default:
+    external: true
