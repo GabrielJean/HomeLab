@@ -2,10 +2,14 @@ services:
   upsnap:
     container_name: upsnap
     image: ghcr.io/seriousm4x/upsnap:5
+    network_mode: host
     restart: unless-stopped
     volumes:
       - /Apps/upsnap/:/app/pb_data
     entrypoint: /bin/sh -c "./upsnap serve --http 0.0.0.0:5000"
+    healthcheck:
+      test: curl -fs "http://localhost:5000/api/health" || exit 1
+      interval: 10s
     labels:
       - "traefik.enable=true"
       - "traefik.http.services.upsnap.loadbalancer.server.port=5000"
@@ -18,9 +22,3 @@ services:
       - "traefik.http.routers.upsnap-insecure.middlewares=redirect-to-https"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
       - "traefik.http.services.upsnap.loadbalancer.server.scheme=http"
-    networks:
-      - traefik_default
-
-networks:
-  traefik_default:
-    external: true
