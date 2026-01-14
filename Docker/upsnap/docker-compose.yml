@@ -4,7 +4,7 @@ services:
     image: ghcr.io/seriousm4x/upsnap:5
     restart: unless-stopped
     volumes:
-      - ./data:/app/pb_data
+      - /Apps/upsnap/:/app/pb_data
     entrypoint: /bin/sh -c "./upsnap serve --http 0.0.0.0:5000"
     healthcheck:
       test: curl -fs "http://localhost:5000/api/health" || exit 1
