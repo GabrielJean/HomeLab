@@ -1,6 +1,7 @@
 - hosts: linux_vms
   order: sorted
   become: true
+  ignore_unreachable: true
 
   vars:
     main_user: gabriel
