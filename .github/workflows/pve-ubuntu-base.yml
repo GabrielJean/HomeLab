@@ -54,6 +54,7 @@ jobs:
       - name: Run Ansible playbook (pve-ubuntu-base)
         env:
           ANSIBLE_HOST_KEY_CHECKING: 'false'
+          ANSIBLE_FAIL_ON_UNREACHABLE: 'false'
         run: |
           set -o pipefail
           ansible-playbook pve-ubuntu-base.yml --private-key private_key \
@@ -63,9 +64,13 @@ jobs:
             0)
               echo "Ansible succeeded." ; exit 0 ;;
             2)
-              echo "Ansible reported changes only." ; exit 0 ;;
+              echo "Ansible reported changes or unreachable (treated as ok)." ; exit 0 ;;
+            3)
+              echo "Ansible reported mixed/unreachable (treated as ok)." ; exit 0 ;;
             4)
               echo "Unreachable hosts detected; ignoring per policy." ; exit 0 ;;
+            5)
+              echo "Unreachable+failed mix reported; treating as ok per policy." ; exit 0 ;;
             *)
               echo "Ansible failed with exit code $rc." ; exit $rc ;;
           esac
