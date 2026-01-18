@@ -17,6 +17,7 @@
         pkg:
           - qemu-guest-agent
           - prometheus-node-exporter
+          - curl
         state: present
 
     - name: "Ensure group 'docker' exists"
@@ -112,6 +113,27 @@
         state: present
         create: yes
       become: false
+
+    - name: "Ensure ~/.local/bin is in PATH for ZSH"
+      ansible.builtin.lineinfile:
+        path: "/home/{{ main_user }}/.zshrc"
+        line: 'export PATH="$PATH:$HOME/.local/bin"'
+        state: present
+        create: yes
+      become: false
+
+    - name: "Install GitHub Copilot CLI for {{ main_user }}"
+      ansible.builtin.shell: |
+        set -euo pipefail
+        curl -fsSL https://gh.io/copilot-install | bash
+      args:
+        executable: /bin/bash
+        creates: "/home/{{ main_user }}/.local/bin/copilot"
+      environment:
+        PREFIX: "/home/{{ main_user }}/.local"
+        PATH: "/home/{{ main_user }}/.local/bin:{{ ansible_env.PATH }}"
+      become: true
+      become_user: "{{ main_user }}"
 
     - name: "Change default shell to ZSH for {{ main_user }}"
       ansible.builtin.user:

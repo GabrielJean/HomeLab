@@ -1,0 +1,58 @@
+name: Deploy PVE Ubuntu Base
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Ansible/pve-ubuntu-base.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-pve-ubuntu-base-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run-playbook:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Grace period for cancel
+        run: sleep 10
+
+      - name: Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Install Ansible
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible
+
+      - name: Create ansible_vault_password_file
+        run: echo "${{ secrets.ANSIBLE_VAULT_DOCKER }}" > .vault_pass.txt
+        working-directory: Ansible
+
+      - name: Decrypt inventory.ini
+        run: ansible-vault decrypt --vault-password-file .vault_pass.txt inventory.ini
+        working-directory: Ansible
+
+      - name: Retrieve SSH private key
+        run: echo "${{ secrets.CI_PRIVATE_KEY }}" > private_key
+        working-directory: Ansible
+
+      - name: Set permissions for private key
+        run: chmod 600 private_key
+        working-directory: Ansible
+
+      - name: Run Ansible playbook (pve-ubuntu-base)
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: 'false'
+        run: ansible-playbook pve-ubuntu-base.yml --private-key private_key -i inventory.ini --extra-vars "ansible_user=ci" --vault-password-file .vault_pass.txt
+        working-directory: Ansible
