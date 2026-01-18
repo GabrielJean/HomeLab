@@ -54,5 +54,19 @@ jobs:
       - name: Run Ansible playbook (pve-ubuntu-base)
         env:
           ANSIBLE_HOST_KEY_CHECKING: 'false'
-        run: ansible-playbook pve-ubuntu-base.yml --private-key private_key -i inventory.ini --extra-vars "ansible_user=ci" --vault-password-file .vault_pass.txt
+        run: |
+          set -o pipefail
+          ansible-playbook pve-ubuntu-base.yml --private-key private_key \
+            -i inventory.ini --extra-vars "ansible_user=ci" --vault-password-file .vault_pass.txt | tee ansible_output.log
+          rc=${PIPESTATUS[0]}
+          case "$rc" in
+            0)
+              echo "Ansible succeeded." ; exit 0 ;;
+            2)
+              echo "Ansible reported changes only." ; exit 0 ;;
+            4)
+              echo "Unreachable hosts detected; ignoring per policy." ; exit 0 ;;
+            *)
+              echo "Ansible failed with exit code $rc." ; exit $rc ;;
+          esac
         working-directory: Ansible

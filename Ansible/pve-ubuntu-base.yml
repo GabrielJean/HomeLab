@@ -93,7 +93,10 @@
         zsh -c 'git clone --recursive https://github.com/sorin-ionescu/prezto.git "${ZDOTDIR:-$HOME}/.zprezto"'
       args:
         chdir: "/home/{{ main_user }}"
-      when: prezto_dir.stat.exists == False
+      when:
+        - prezto_dir is defined
+        - prezto_dir.stat is defined
+        - prezto_dir.stat.exists == False
       become: false
 
     - name: "Set up prezto runcoms"
@@ -105,7 +108,10 @@
       args:
         chdir: "/home/{{ main_user }}"
       become: false
-      when: prezto_dir.stat.exists == False
+      when:
+        - prezto_dir is defined
+        - prezto_dir.stat is defined
+        - prezto_dir.stat.exists == False
 
     - name: "Enable bash completion in ~/.zshrc"
       ansible.builtin.lineinfile:
