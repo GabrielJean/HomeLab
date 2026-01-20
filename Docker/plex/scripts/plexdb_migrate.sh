@@ -14,7 +14,7 @@ Usage:
 Notes:
   - Target DB must already exist with Plex schema.
   - Added dates are matched by GUID + metadata_type.
-  - Accounts are synced by name into the target DB before watch history import.
+  - Accounts are synced by id+name into the target DB before watch history import.
   - Watch history is inserted with account name mapping; if an account name
     is missing, it falls back to the first non-empty account in the target DB.
 EOF
@@ -135,10 +135,10 @@ SQL
 
 echo "Exporting accounts from source DB..."
 "$plex_sqlite" "$source_db" <<SQL
-.headers on
+.headers off
 .mode csv
 .output $accounts_csv
-SELECT name
+SELECT id, name
 FROM accounts
 WHERE name IS NOT NULL AND TRIM(name) != '';
 .output stdout
@@ -148,17 +148,18 @@ echo "Syncing accounts into target DB..."
 "$plex_sqlite" "$target_db" <<SQL
 BEGIN;
 DROP TABLE IF EXISTS temp_accounts;
-CREATE TEMP TABLE temp_accounts (name TEXT);
+CREATE TEMP TABLE temp_accounts (id INTEGER, name TEXT);
 .mode csv
 .import $accounts_csv temp_accounts
 
-INSERT INTO accounts (name)
-SELECT DISTINCT t.name
+INSERT OR REPLACE INTO accounts (id, name)
+SELECT DISTINCT t.id, t.name
 FROM temp_accounts t
-WHERE t.name IS NOT NULL AND TRIM(t.name) != ''
-  AND NOT EXISTS (
-    SELECT 1 FROM accounts a WHERE a.name = t.name
-  );
+WHERE t.id IS NOT NULL
+  AND t.name IS NOT NULL
+  AND TRIM(t.name) != '';
+
+DELETE FROM accounts WHERE name = 'name';
 
 DROP TABLE temp_accounts;
 COMMIT;
@@ -217,6 +218,7 @@ DROP TABLE IF EXISTS temp_watch_mapped;
 CREATE TEMP TABLE temp_watch_mapped AS
 SELECT
   COALESCE(
+    (SELECT id FROM accounts WHERE id = w.account_id),
     tgt.id,
     (SELECT id FROM accounts WHERE name IS NOT NULL AND TRIM(name) != '' ORDER BY id LIMIT 1)
   ) AS account_id,

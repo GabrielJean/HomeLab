@@ -43,6 +43,14 @@ This workspace contains a recovery workflow for migrating watch history and adde
   - `metadata_item_settings` (per-user watched status)
 - Updates `metadata_items.added_at` in the NEW DB.
 
+## Managed users (Plex Home)
+Managed users use stable Plex account IDs. The script now syncs `accounts` by **id + name** and prefers the old `account_id` when mapping watch history.
+
+If a managed user still shows no watched items:
+1. Confirm the managed user exists on the new server (Plex Home).
+2. Re-run the migration script.
+3. Restart Plex.
+
 ## Notes
 - If libraries were not fully scanned yet, mapping can fail until metadata is refreshed.
 - If you use multiple users, verify accounts exist in the NEW DB after migration.
