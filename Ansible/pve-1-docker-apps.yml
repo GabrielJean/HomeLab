@@ -22,7 +22,7 @@
             - { name: monitoring, restart: true, online: true }
             - { name: portainer, online: true }
             - { name: upsnap, online: true }
-            # - { name: homeassistant, online: false }
+            - { name: homeassistant, online: false }
             - { name: dns-update, restart: true, pull_latest: true, build: true, online: true }
             - { name: open-webui, online: true }
             - { name: joke-de-jean, restart: true, pull_latest: true, online: true }
