@@ -11,11 +11,11 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.shellngn.rule=Host(`shellngn.docker-1.gwebs.ca`)"
+      - "traefik.http.routers.shellngn.rule=Host(`shellngn.docker-1.gwebs.ca`) || Host(`shellngn.docker-2.gwebs.ca`)"
       - "traefik.http.routers.shellngn.entrypoints=websecure"
       - "traefik.http.routers.shellngn.tls=true"
       - "traefik.http.routers.shellngn.tls.certresolver=le"
-      - "traefik.http.routers.shellngn-insecure.rule=Host(`shellngn.docker-1.gwebs.ca`)"
+      - "traefik.http.routers.shellngn-insecure.rule=Host(`shellngn.docker-1.gwebs.ca`) || Host(`shellngn.docker-2.gwebs.ca`)"
       - "traefik.http.routers.shellngn-insecure.entrypoints=web"
       - "traefik.http.routers.shellngn-insecure.middlewares=redirect-to-https"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"

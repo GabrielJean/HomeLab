@@ -16,6 +16,7 @@
             - { name: homeassistant, online: true }
             - { name: portainer, online: true }
             - { name: upsnap, online: true }
+            - { name: shellngn, online: true }
           DNS-2:
             - { name: adguardhome, online: true }
 
