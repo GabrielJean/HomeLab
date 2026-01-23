@@ -66,4 +66,4 @@
   ansible.builtin.command: docker compose stop
   args:
     chdir: /home/gabriel/{{ application }}/
-  when: not app_online and compose_file.stat.exists
+  when: not app_online and (compose_file.stat.exists | default(false))
