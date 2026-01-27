@@ -23,7 +23,7 @@ import os
 import re
 import statistics
 from collections import defaultdict
-from datetime import datetime, timezone, tzinfo
+from datetime import datetime, timezone, tzinfo, timedelta, date
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pathlib import Path
 from dataclasses import dataclass
@@ -360,12 +360,29 @@ def weekday_peak_bucket_medians(points: List[Tuple[datetime, float]]) -> Dict[st
 
 def daily_median_series(points: List[Tuple[datetime, float]]) -> List[Tuple[datetime, float]]:
 	"""Collapse to one median point per calendar day for long-range readability."""
-	by_date: Dict[datetime.date, List[float]] = defaultdict(list)
+	by_date: Dict[date, List[float]] = defaultdict(list)
 	for ts, duration in points:
 		by_date[ts.date()].append(duration)
 	series: List[Tuple[datetime, float]] = []
 	for day, values in by_date.items():
 		series.append((datetime.combine(day, datetime.min.time(), tzinfo=LOCAL_TZ), statistics.median(values)))
+	return sorted(series, key=lambda p: p[0])
+
+
+def weekly_median_series(points: List[Tuple[datetime, float]]) -> List[Tuple[datetime, float]]:
+	"""Collapse to one median point per ISO week for multi-month readability."""
+	by_week: Dict[Tuple[int, int], List[float]] = defaultdict(list)
+	week_start: Dict[Tuple[int, int], datetime] = {}
+	for ts, duration in points:
+		iso_year, iso_week, iso_weekday = ts.isocalendar()
+		key = (iso_year, iso_week)
+		by_week[key].append(duration)
+		if key not in week_start:
+			start = (ts - timedelta(days=iso_weekday - 1)).date()
+			week_start[key] = datetime.combine(start, datetime.min.time(), tzinfo=LOCAL_TZ)
+	series: List[Tuple[datetime, float]] = []
+	for key, values in by_week.items():
+		series.append((week_start[key], statistics.median(values)))
 	return sorted(series, key=lambda p: p[0])
 
 
@@ -403,6 +420,49 @@ def offpeak_median(points: List[Tuple[datetime, float]]) -> Optional[float]:
 	return statistics.median(values) if values else None
 
 
+def percentile(values: List[float], pct: float) -> Optional[float]:
+	"""Return percentile (0-100) using linear interpolation."""
+	if not values:
+		return None
+	sorted_vals = sorted(values)
+	if pct <= 0:
+		return sorted_vals[0]
+	if pct >= 100:
+		return sorted_vals[-1]
+	k = (len(sorted_vals) - 1) * (pct / 100)
+	f = int(k)
+	c = min(f + 1, len(sorted_vals) - 1)
+	if f == c:
+		return sorted_vals[f]
+	d0 = sorted_vals[f] * (c - k)
+	d1 = sorted_vals[c] * (k - f)
+	return d0 + d1
+
+
+def daily_percentile_band(
+	points: List[Tuple[datetime, float]],
+	low_pct: float,
+	high_pct: float,
+) -> Tuple[List[datetime], List[float], List[float]]:
+	"""Return daily percentile bands (low/high) for each day."""
+	by_date: Dict[date, List[float]] = defaultdict(list)
+	for ts, duration in points:
+		by_date[ts.date()].append(duration)
+	dates: List[datetime] = []
+	low_vals: List[float] = []
+	high_vals: List[float] = []
+	for day in sorted(by_date.keys()):
+		vals = by_date[day]
+		low = percentile(vals, low_pct)
+		high = percentile(vals, high_pct)
+		if low is None or high is None:
+			continue
+		dates.append(datetime.combine(day, datetime.min.time(), tzinfo=LOCAL_TZ))
+		low_vals.append(low)
+		high_vals.append(high)
+	return dates, low_vals, high_vals
+
+
 def generate_graph(csv_path: Path) -> Optional[Path]:
 	"""Create/overwrite a PNG for the given CSV; returns image path."""
 	points = load_csv_points(csv_path)
@@ -411,70 +471,151 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 	weekday_peaks = weekday_peak_medians(points)
 	weekday_peak_buckets = weekday_peak_bucket_medians(points)
 	daily = daily_median_series(points)
+	weekly = weekly_median_series(points)
+	band_dates, band_low, band_high = daily_percentile_band(points, 5, 95)
 	peak_buckets = bucket_medians(points, PEAK_BUCKETS)
 	offpeak_value = offpeak_median(points)
 
 	x_vals, y_vals = zip(*points)
 	img_path = csv_path.with_suffix(".png")
 
-	fig, ax = plt.subplots(figsize=(10, 4))
-	right_margin = 0.75
-	fig.subplots_adjust(right=right_margin)  # leave room on the right for stats
+	# Build a rolling median to reduce noise (window ~ 2 days or 20 samples min)
+	roll_points: List[Tuple[datetime, float]] = []
+	window = max(20, min(240, len(points) // 12))
+	for idx in range(len(points)):
+		start = max(0, idx - window + 1)
+		chunk = [p[1] for p in points[start : idx + 1]]
+		if chunk:
+			roll_points.append((points[idx][0], statistics.median(chunk)))
+
+	# Decimate raw samples for long ranges (keep trends without overplotting)
+	max_points = 5000
+	if len(points) > max_points:
+		step = max(1, len(points) // max_points)
+		decimated = points[::step]
+	else:
+		decimated = points
+	x_vals, y_vals = zip(*decimated)
+
+	fig = plt.figure(figsize=(11.5, 6.2))
+	gs = fig.add_gridspec(2, 1, height_ratios=[3, 1], hspace=0.18)
+	ax = fig.add_subplot(gs[0, 0])
+	ax2 = fig.add_subplot(gs[1, 0])
+	fig.suptitle(csv_path.stem.replace("-", " "))
+
 	primary_color = "#1f77b4"
 	trend_color = "#d62728"
+	roll_color = "#2ca02c"
+	weekly_color = "#9467bd"
 
-	ax.plot(x_vals, y_vals, linewidth=1.3, color=primary_color, alpha=0.6)
+	# Main time series
+	ax.plot(x_vals, y_vals, linewidth=1.0, color=primary_color, alpha=0.25, label="Samples (decimated)")
+	if band_dates:
+		ax.fill_between(
+			band_dates,
+			band_low,  # type: ignore[arg-type]
+			band_high,  # type: ignore[arg-type]
+			color="#bdbdbd",
+			alpha=0.25,
+			label="Daily 5–95% band",
+		)
 	if daily:
 		dx, dy = zip(*daily)
-		ax.plot(dx, dy, linewidth=2.0, color=trend_color, alpha=0.9, label="Daily median")
+		ax.plot(dx, dy, linewidth=2.1, color=trend_color, alpha=0.9, label="Daily median")
+	if weekly:
+		wx, wy = zip(*weekly)
+		ax.plot(wx, wy, linewidth=2.3, color=weekly_color, alpha=0.9, label="Weekly median")
+	if roll_points:
+		rx, ry = zip(*roll_points)
+		ax.plot(rx, ry, linewidth=1.6, color=roll_color, alpha=0.9, label="Rolling median")
 
-	ax.set_title(csv_path.stem.replace("-", " "))
+	# Highlight extremes (top outliers)
+	values = [p[1] for p in points]
+	p98 = percentile(values, 98)
+	if p98 is not None:
+		extreme_points = [(ts, val) for ts, val in points if val >= p98]
+		if extreme_points:
+			ex, ey = zip(*extreme_points)
+			ax.scatter(ex, ey, s=14, color="#e41a1c", alpha=0.7, label="Extreme samples")
+
+	# Median reference lines
+	all_median = statistics.median([p[1] for p in points])
+	ax.axhline(all_median, color="#555555", linewidth=0.8, linestyle="--", alpha=0.6)
+	if offpeak_value is not None:
+		ax.axhline(offpeak_value, color="#999999", linewidth=0.8, linestyle=":", alpha=0.6)
+
 	ax.set_ylabel("Minutes")
-	ax.set_xlabel("Local time")
 	ax.grid(True, linewidth=0.5, alpha=0.25)
+	ax.legend(loc="upper left", framealpha=0.85, ncol=2)
 
+	locator = mdates.AutoDateLocator(minticks=6, maxticks=10)
+	formatter = mdates.DateFormatter("%b %d")
+	ax.xaxis.set_major_locator(locator)
+	ax.xaxis.set_major_formatter(formatter)
+
+	# Bottom panel: weekday peak medians (AM/PM bars) or single peak median
+	weekday_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+	weekday_labels = [d[:3] for d in weekday_order]
+	indices = list(range(len(weekday_order)))
+
+	if weekday_peak_buckets:
+		am_vals = [weekday_peak_buckets.get(day, {}).get("AM peak") for day in weekday_order]
+		pm_vals = [weekday_peak_buckets.get(day, {}).get("PM peak") for day in weekday_order]
+		width = 0.38
+		ax2.bar(
+			[i - width / 2 for i in indices],
+			[v if v is not None else 0 for v in am_vals],
+			width=width,
+			color="#8da0cb",
+			label="AM peak",
+		)
+		ax2.bar(
+			[i + width / 2 for i in indices],
+			[v if v is not None else 0 for v in pm_vals],
+			width=width,
+			color="#fc8d62",
+			label="PM peak",
+		)
+		ax2.legend(loc="upper left", framealpha=0.85, ncol=2)
+	elif weekday_peaks:
+		vals = [weekday_peaks.get(day) for day in weekday_order]
+		ax2.bar(indices, [v if v is not None else 0 for v in vals], color="#9ecae1", label="Peak median")
+		ax2.legend(loc="upper left", framealpha=0.85)
+
+	ax2.set_xticks(indices)
+	ax2.set_xticklabels(weekday_labels)
+	ax2.set_ylabel("Peak min")
+	ax2.grid(True, axis="y", linewidth=0.5, alpha=0.25)
+
+	# Right-side stats panel
 	stats_blocks: List[str] = []
 	if peak_buckets:
 		peak_lines = [f"{name}: {val:.1f}" for name, val in sorted(peak_buckets.items())]
 		stats_blocks.append("Peak medians\n" + "\n".join(peak_lines))
+	stats_blocks.append(f"All median: {all_median:.1f}")
+	p95 = percentile(values, 95)
+	max_val = max(values) if values else None
+	if p95 is not None:
+		stats_blocks.append(f"P95: {p95:.1f}")
+	if max_val is not None:
+		stats_blocks.append(f"Max: {max_val:.1f}")
 	if offpeak_value is not None:
-		stats_blocks.append(f"Off-peak median\nAll off-peak: {offpeak_value:.1f}")
-	if weekday_peak_buckets:
-		lines: List[str] = []
-		for day in sorted(weekday_peak_buckets.keys()):
-			parts = []
-			for name, val in sorted(weekday_peak_buckets[day].items()):
-				parts.append(f"{name.split()[0]} {val:.1f}")
-			if parts:
-				lines.append(f"{day[:3]}: {' / '.join(parts)}")
-		if lines:
-			stats_blocks.append("Weekday peak medians\n" + "\n".join(lines))
-	elif weekday_peaks:
-		weekday_lines = [f"{day[:3]}: {val:.1f}" for day, val in sorted(weekday_peaks.items())]
-		stats_blocks.append("Weekday peak medians\n" + "\n".join(weekday_lines))
+		stats_blocks.append(f"Off-peak median: {offpeak_value:.1f}")
 	if stats_blocks:
 		fig.text(
-			0.98,
-			0.5,
+			0.985,
+			0.52,
 			"\n\n".join(stats_blocks),
 			va="center",
 			ha="right",
 			fontsize=9,
 			bbox={"facecolor": "white", "alpha": 0.9, "edgecolor": "none"},
-			transform=fig.transFigure,
+			transform=fig.transFigure,  # type: ignore[attr-defined]
 		)
-	if daily:
-		ax.legend(loc="upper left", framealpha=0.8)
 
-	locator = mdates.AutoDateLocator(minticks=6, maxticks=14)
-	formatter = mdates.DateFormatter("%b %d\n%H:%M")
-	ax.xaxis.set_major_locator(locator)
-	ax.xaxis.set_major_formatter(formatter)
-	fig.autofmt_xdate(rotation=0)
-
-	fig.tight_layout(rect=[0, 0, right_margin - 0.02, 1])
+	fig.tight_layout(rect=(0.02, 0.02, 0.94, 0.95))
 	img_path.parent.mkdir(parents=True, exist_ok=True)
-	fig.savefig(img_path, dpi=120)
+	fig.savefig(str(img_path), dpi=140)
 	plt.close(fig)
 	return img_path
 
