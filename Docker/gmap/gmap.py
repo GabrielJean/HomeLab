@@ -497,8 +497,8 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 		decimated = points
 	x_vals, y_vals = zip(*decimated)
 
-	fig = plt.figure(figsize=(11.5, 9.6))
-	gs = fig.add_gridspec(4, 1, height_ratios=[3, 2, 2, 2], hspace=0.22)
+	fig = plt.figure(figsize=(12.0, 11.2))
+	gs = fig.add_gridspec(4, 1, height_ratios=[3, 2, 2, 2], hspace=0.38)
 	ax_raw = fig.add_subplot(gs[0, 0])
 	ax_trend = fig.add_subplot(gs[1, 0], sharex=ax_raw)
 	ax_band = fig.add_subplot(gs[2, 0], sharex=ax_raw)
@@ -525,7 +525,7 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 			ax_raw.scatter(ex, ey, s=14, color="#e41a1c", alpha=0.75, label="Extreme samples")
 	ax_raw.set_ylabel("Minutes")
 	ax_raw.grid(True, linewidth=0.5, alpha=0.25)
-	ax_raw.legend(loc="upper center", bbox_to_anchor=(0.5, -0.18), framealpha=0.9, ncol=2)
+	ax_raw.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), framealpha=0.9, ncol=2)
 
 	# Panel 2: trend lines only
 	if daily:
@@ -543,7 +543,7 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 		ax_trend.axhline(offpeak_value, color="#999999", linewidth=0.8, linestyle=":", alpha=0.6)
 	ax_trend.set_ylabel("Trend min")
 	ax_trend.grid(True, linewidth=0.5, alpha=0.25)
-	ax_trend.legend(loc="upper center", bbox_to_anchor=(0.5, -0.18), framealpha=0.9, ncol=3)
+	ax_trend.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), framealpha=0.9, ncol=3)
 
 	# Panel 3: daily percentile band
 	if band_dates:
@@ -560,7 +560,7 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 		ax_band.plot(dx, dy, linewidth=1.6, color=trend_color, alpha=0.9, label="Daily median")
 	ax_band.set_ylabel("Daily band")
 	ax_band.grid(True, linewidth=0.5, alpha=0.25)
-	ax_band.legend(loc="upper center", bbox_to_anchor=(0.5, -0.18), framealpha=0.9, ncol=2)
+	ax_band.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), framealpha=0.9, ncol=2)
 
 	locator = mdates.AutoDateLocator(minticks=6, maxticks=10)
 	formatter = mdates.DateFormatter("%b %d")
@@ -592,11 +592,11 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 			color="#fc8d62",
 			label="PM peak",
 		)
-		ax_week.legend(loc="upper center", bbox_to_anchor=(0.5, -0.18), framealpha=0.9, ncol=2)
+		ax_week.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), framealpha=0.9, ncol=2)
 	elif weekday_peaks:
 		vals = [weekday_peaks.get(day) for day in weekday_order]
 		ax_week.bar(indices, [v if v is not None else 0 for v in vals], color="#9ecae1", label="Peak median")
-		ax_week.legend(loc="upper center", bbox_to_anchor=(0.5, -0.18), framealpha=0.9)
+		ax_week.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), framealpha=0.9)
 
 	ax_week.set_xticks(indices)
 	ax_week.set_xticklabels(weekday_labels)
@@ -619,27 +619,25 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 		stats_blocks.append(f"Off-peak median: {offpeak_value:.1f}")
 	if stats_blocks:
 		fig.text(
-			0.985,
-			0.78,
+			0.84,
+			0.90,
 			"\n\n".join(stats_blocks),
 			va="top",
-			ha="right",
+			ha="left",
 			fontsize=9,
 			bbox={"facecolor": "white", "alpha": 0.9, "edgecolor": "none"},
 			transform=fig.transFigure,  # type: ignore[attr-defined]
 		)
 
 	interpretation = (
-		"How to read: "
-		"(1) Raw samples = every 15‑minute result; red dots are unusually slow times. "
-		"(2) Trends = smoothed lines: daily median (typical day), weekly median (typical week), "
-		"rolling median = a moving typical value that updates each point to show the short‑term trend without noise. "
-		"(3) Daily band = the usual range for each day (most values fall inside). "
+		"How to read: (1) Raw samples = every 15‑minute result; red dots are unusually slow times. "
+		"(2) Trends = daily/weekly/rolling medians; rolling median is a moving typical value that shows short‑term trend.\n"
+		"(3) Daily band = usual range for each day (most values fall inside). "
 		"(4) Weekday bars = typical AM/PM peak times by day."
 	)
-	fig.text(0.02, 0.015, interpretation, ha="left", va="bottom", fontsize=9)
+	fig.text(0.02, 0.02, interpretation, ha="left", va="bottom", fontsize=8)
 
-	fig.tight_layout(rect=(0.02, 0.08, 0.94, 0.96))
+	fig.tight_layout(rect=(0.02, 0.12, 0.80, 0.96))
 	img_path.parent.mkdir(parents=True, exist_ok=True)
 	fig.savefig(str(img_path), dpi=140)
 	plt.close(fig)
