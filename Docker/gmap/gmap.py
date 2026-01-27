@@ -532,12 +532,21 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 		decimated = points
 	x_vals, y_vals = zip(*decimated)
 
-	fig = plt.figure(figsize=(12.0, 11.2))
-	gs = fig.add_gridspec(4, 1, height_ratios=[3, 2, 2, 2], hspace=0.38)
+	fig = plt.figure(figsize=(13.2, 11.2))
+	gs = fig.add_gridspec(
+		4,
+		2,
+		width_ratios=[7, 2.2],
+		height_ratios=[3, 2, 2, 2],
+		wspace=0.35,
+		hspace=0.38,
+	)
 	ax_raw = fig.add_subplot(gs[0, 0])
 	ax_trend = fig.add_subplot(gs[1, 0], sharex=ax_raw)
 	ax_band = fig.add_subplot(gs[2, 0], sharex=ax_raw)
 	ax_week = fig.add_subplot(gs[3, 0])
+	stats_ax = fig.add_subplot(gs[:, 1])
+	stats_ax.axis("off")
 	fig.suptitle(csv_path.stem.replace("-", " "))
 	min_dt = points[0][0]
 	max_dt = points[-1][0]
@@ -639,7 +648,7 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 	ax_week.set_ylabel("Pic (min)")
 	ax_week.grid(True, axis="y", linewidth=0.5, alpha=0.25)
 
-	# Compact stats panel (top-right)
+	# Compact stats panel (dedicated column)
 	stats_blocks: List[str] = []
 	if peak_buckets:
 		peak_lines = [f"{name}: {val:.1f}" for name, val in sorted(peak_buckets.items())]
@@ -654,15 +663,15 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 	if offpeak_value is not None:
 		stats_blocks.append(f"Médiane hors pointe : {offpeak_value:.1f}")
 	if stats_blocks:
-		fig.text(
-			0.83,
-			0.62,
+		stats_ax.text(
+			0.0,
+			1.0,
 			"\n\n".join(stats_blocks),
-			va="center",
+			va="top",
 			ha="left",
 			fontsize=8,
 			bbox={"facecolor": "white", "alpha": 0.9, "edgecolor": "none"},
-			transform=fig.transFigure,  # type: ignore[attr-defined]
+			transform=stats_ax.transAxes,
 		)
 
 	interpretation = (
@@ -671,9 +680,9 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 		"(3) Bande quotidienne = plage habituelle de la journée (la plupart des valeurs sont dedans). "
 		"(4) Barres par jour = pics matin/après-midi typiques."
 	)
-	fig.text(0.02, 0.02, interpretation, ha="left", va="bottom", fontsize=8)
+	fig.text(0.02, 0.035, interpretation, ha="left", va="bottom", fontsize=8)
 
-	fig.tight_layout(rect=(0.02, 0.12, 0.80, 0.96))
+	fig.tight_layout(rect=(0.02, 0.16, 0.78, 0.96))
 	img_path.parent.mkdir(parents=True, exist_ok=True)
 	fig.savefig(str(img_path), dpi=140)
 	plt.close(fig)
