@@ -34,6 +34,7 @@ import matplotlib
 matplotlib.use("Agg")  # headless-safe backend for PNG output
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 from playwright.sync_api import Page, sync_playwright
 
 
@@ -61,6 +62,33 @@ OUTPUT_FIELDS = [
 	"name",
 	"page_title",
 	"duration_minutes",
+]
+
+FRENCH_WEEKDAYS_FULL = [
+	"Lundi",
+	"Mardi",
+	"Mercredi",
+	"Jeudi",
+	"Vendredi",
+	"Samedi",
+	"Dimanche",
+]
+
+FRENCH_WEEKDAYS_SHORT = [day[:3] for day in FRENCH_WEEKDAYS_FULL]
+
+FRENCH_MONTH_ABBR = [
+	"janv.",
+	"févr.",
+	"mars",
+	"avr.",
+	"mai",
+	"juin",
+	"juil.",
+	"août",
+	"sept.",
+	"oct.",
+	"nov.",
+	"déc.",
 ]
 
 
@@ -335,24 +363,24 @@ def is_peak(ts: datetime) -> bool:
 	return any(in_range(hour, start, end) for _, start, end in PEAK_BUCKETS)
 
 
-def weekday_peak_medians(points: List[Tuple[datetime, float]]) -> Dict[str, float]:
+def weekday_peak_medians(points: List[Tuple[datetime, float]]) -> Dict[int, float]:
 	"""Compute median duration per weekday using any peak sample (AM or PM)."""
-	by_day: Dict[str, List[float]] = defaultdict(list)
+	by_day: Dict[int, List[float]] = defaultdict(list)
 	for ts, duration in points:
 		if is_peak(ts):
-			by_day[ts.strftime("%A")].append(duration)
+			by_day[ts.weekday()].append(duration)
 	return {day: statistics.median(values) for day, values in by_day.items() if values}
 
 
-def weekday_peak_bucket_medians(points: List[Tuple[datetime, float]]) -> Dict[str, Dict[str, float]]:
+def weekday_peak_bucket_medians(points: List[Tuple[datetime, float]]) -> Dict[int, Dict[str, float]]:
 	"""Compute median per weekday, split by each peak bucket (e.g., AM/PM)."""
-	by_day_bucket: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
+	by_day_bucket: Dict[int, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
 	for ts, duration in points:
 		hour = ts.astimezone(LOCAL_TZ).hour
 		for name, start, end in PEAK_BUCKETS:
 			if in_range(hour, start, end):
-				by_day_bucket[ts.strftime("%A")][name].append(duration)
-	result: Dict[str, Dict[str, float]] = {}
+				by_day_bucket[ts.weekday()][name].append(duration)
+	result: Dict[int, Dict[str, float]] = {}
 	for day, bucket_map in by_day_bucket.items():
 		result[day] = {bucket: statistics.median(vals) for bucket, vals in bucket_map.items() if vals}
 	return result
@@ -388,8 +416,8 @@ def weekly_median_series(points: List[Tuple[datetime, float]]) -> List[Tuple[dat
 
 # Define peak buckets (local time, 24h). Adjust as needed.
 PEAK_BUCKETS: List[Tuple[str, int, int]] = [
-	("AM peak", 7, 9),   # 07:00-09:00
-	("PM peak", 15, 17), # 15:00-17:00
+	("Pic matin", 7, 9),   # 07:00-09:00
+	("Pic après-midi", 15, 17), # 15:00-17:00
 ]
 
 
@@ -463,6 +491,13 @@ def daily_percentile_band(
 	return dates, low_vals, high_vals
 
 
+def format_date_fr(x: float, _: Optional[int] = None) -> str:
+	"""Return a French day-month label regardless of system locale."""
+	dt = mdates.num2date(x, tz=LOCAL_TZ)
+	month_label = FRENCH_MONTH_ABBR[dt.month - 1]
+	return f"{dt.day:02d} {month_label}"
+
+
 def generate_graph(csv_path: Path) -> Optional[Path]:
 	"""Create/overwrite a PNG for the given CSV; returns image path."""
 	points = load_csv_points(csv_path)
@@ -506,7 +541,7 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 	fig.suptitle(csv_path.stem.replace("-", " "))
 	min_dt = points[0][0]
 	max_dt = points[-1][0]
-	range_label = f"Range: {min_dt.strftime('%Y-%m-%d')} → {max_dt.strftime('%Y-%m-%d')}"
+	range_label = f"Période : {min_dt.strftime('%Y-%m-%d')} → {max_dt.strftime('%Y-%m-%d')}"
 	fig.text(0.02, 0.975, range_label, ha="left", va="top", fontsize=9)
 
 	primary_color = "#1f77b4"
@@ -515,14 +550,14 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 	weekly_color = "#9467bd"
 
 	# Panel 1: raw samples + extremes
-	ax_raw.plot(x_vals, y_vals, linewidth=1.0, color=primary_color, alpha=0.35, label="Samples (decimated)")
+	ax_raw.plot(x_vals, y_vals, linewidth=1.0, color=primary_color, alpha=0.35, label="Échantillons (décimés)")
 	values = [p[1] for p in points]
 	p98 = percentile(values, 98)
 	if p98 is not None:
 		extreme_points = [(ts, val) for ts, val in points if val >= p98]
 		if extreme_points:
 			ex, ey = zip(*extreme_points)
-			ax_raw.scatter(ex, ey, s=14, color="#e41a1c", alpha=0.75, label="Extreme samples")
+			ax_raw.scatter(ex, ey, s=14, color="#e41a1c", alpha=0.75, label="Valeurs extrêmes")
 	ax_raw.set_ylabel("Minutes")
 	ax_raw.grid(True, linewidth=0.5, alpha=0.25)
 	ax_raw.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), framealpha=0.9, ncol=2)
@@ -530,18 +565,18 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 	# Panel 2: trend lines only
 	if daily:
 		dx, dy = zip(*daily)
-		ax_trend.plot(dx, dy, linewidth=2.1, color=trend_color, alpha=0.9, label="Daily median")
+		ax_trend.plot(dx, dy, linewidth=2.1, color=trend_color, alpha=0.9, label="Médiane quotidienne")
 	if weekly:
 		wx, wy = zip(*weekly)
-		ax_trend.plot(wx, wy, linewidth=2.3, color=weekly_color, alpha=0.9, label="Weekly median")
+		ax_trend.plot(wx, wy, linewidth=2.3, color=weekly_color, alpha=0.9, label="Médiane hebdomadaire")
 	if roll_points:
 		rx, ry = zip(*roll_points)
-		ax_trend.plot(rx, ry, linewidth=1.6, color=roll_color, alpha=0.9, label="Rolling median")
+		ax_trend.plot(rx, ry, linewidth=1.6, color=roll_color, alpha=0.9, label="Médiane glissante")
 	all_median = statistics.median(values)
 	ax_trend.axhline(all_median, color="#555555", linewidth=0.8, linestyle="--", alpha=0.6)
 	if offpeak_value is not None:
 		ax_trend.axhline(offpeak_value, color="#999999", linewidth=0.8, linestyle=":", alpha=0.6)
-	ax_trend.set_ylabel("Trend min")
+	ax_trend.set_ylabel("Tendance (min)")
 	ax_trend.grid(True, linewidth=0.5, alpha=0.25)
 	ax_trend.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), framealpha=0.9, ncol=3)
 
@@ -553,87 +588,88 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 			band_high,  # type: ignore[arg-type]
 			color="#bdbdbd",
 			alpha=0.35,
-			label="Daily 5–95% band",
+			label="Bande quotidienne 5–95 %",
 		)
 	if daily:
 		dx, dy = zip(*daily)
-		ax_band.plot(dx, dy, linewidth=1.6, color=trend_color, alpha=0.9, label="Daily median")
-	ax_band.set_ylabel("Daily band")
+		ax_band.plot(dx, dy, linewidth=1.6, color=trend_color, alpha=0.9, label="Médiane quotidienne")
+	ax_band.set_ylabel("Bande quotidienne")
 	ax_band.grid(True, linewidth=0.5, alpha=0.25)
 	ax_band.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), framealpha=0.9, ncol=2)
 
 	locator = mdates.AutoDateLocator(minticks=6, maxticks=10)
-	formatter = mdates.DateFormatter("%b %d")
+	formatter = FuncFormatter(format_date_fr)
 	for axis in (ax_raw, ax_trend, ax_band):
 		axis.xaxis.set_major_locator(locator)
 		axis.xaxis.set_major_formatter(formatter)
 		axis.label_outer()  # type: ignore[attr-defined]
 
 	# Panel 4: weekday peak medians (AM/PM bars) or single peak median
-	weekday_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-	weekday_labels = [d[:3] for d in weekday_order]
+	weekday_order = list(range(7))
+	weekday_labels = FRENCH_WEEKDAYS_SHORT
 	indices = list(range(len(weekday_order)))
+	morning_label, afternoon_label = PEAK_BUCKETS[0][0], PEAK_BUCKETS[1][0]
 
 	if weekday_peak_buckets:
-		am_vals = [weekday_peak_buckets.get(day, {}).get("AM peak") for day in weekday_order]
-		pm_vals = [weekday_peak_buckets.get(day, {}).get("PM peak") for day in weekday_order]
+		am_vals = [weekday_peak_buckets.get(day, {}).get(morning_label) for day in weekday_order]
+		pm_vals = [weekday_peak_buckets.get(day, {}).get(afternoon_label) for day in weekday_order]
 		width = 0.38
 		ax_week.bar(
 			[i - width / 2 for i in indices],
 			[v if v is not None else 0 for v in am_vals],
 			width=width,
 			color="#8da0cb",
-			label="AM peak",
+			label=morning_label,
 		)
 		ax_week.bar(
 			[i + width / 2 for i in indices],
 			[v if v is not None else 0 for v in pm_vals],
 			width=width,
 			color="#fc8d62",
-			label="PM peak",
+			label=afternoon_label,
 		)
 		ax_week.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), framealpha=0.9, ncol=2)
 	elif weekday_peaks:
 		vals = [weekday_peaks.get(day) for day in weekday_order]
-		ax_week.bar(indices, [v if v is not None else 0 for v in vals], color="#9ecae1", label="Peak median")
+		ax_week.bar(indices, [v if v is not None else 0 for v in vals], color="#9ecae1", label="Médiane du pic")
 		ax_week.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12), framealpha=0.9)
 
 	ax_week.set_xticks(indices)
 	ax_week.set_xticklabels(weekday_labels)
-	ax_week.set_ylabel("Peak min")
+	ax_week.set_ylabel("Pic (min)")
 	ax_week.grid(True, axis="y", linewidth=0.5, alpha=0.25)
 
 	# Compact stats panel (top-right)
 	stats_blocks: List[str] = []
 	if peak_buckets:
 		peak_lines = [f"{name}: {val:.1f}" for name, val in sorted(peak_buckets.items())]
-		stats_blocks.append("Peak medians\n" + "\n".join(peak_lines))
-	stats_blocks.append(f"All median: {all_median:.1f}")
+		stats_blocks.append("Médianes des pics\n" + "\n".join(peak_lines))
+	stats_blocks.append(f"Médiane globale : {all_median:.1f}")
 	p95 = percentile(values, 95)
 	max_val = max(values) if values else None
 	if p95 is not None:
-		stats_blocks.append(f"P95: {p95:.1f}")
+		stats_blocks.append(f"P95 : {p95:.1f}")
 	if max_val is not None:
-		stats_blocks.append(f"Max: {max_val:.1f}")
+		stats_blocks.append(f"Max : {max_val:.1f}")
 	if offpeak_value is not None:
-		stats_blocks.append(f"Off-peak median: {offpeak_value:.1f}")
+		stats_blocks.append(f"Médiane hors pointe : {offpeak_value:.1f}")
 	if stats_blocks:
 		fig.text(
-			0.84,
-			0.90,
+			0.83,
+			0.62,
 			"\n\n".join(stats_blocks),
-			va="top",
+			va="center",
 			ha="left",
-			fontsize=9,
+			fontsize=8,
 			bbox={"facecolor": "white", "alpha": 0.9, "edgecolor": "none"},
 			transform=fig.transFigure,  # type: ignore[attr-defined]
 		)
 
 	interpretation = (
-		"How to read: (1) Raw samples = every 15‑minute result; red dots are unusually slow times. "
-		"(2) Trends = daily/weekly/rolling medians; rolling median is a moving typical value that shows short‑term trend.\n"
-		"(3) Daily band = usual range for each day (most values fall inside). "
-		"(4) Weekday bars = typical AM/PM peak times by day."
+		"Comment lire : (1) Échantillons = un résultat toutes les 15 min ; points rouges = délais anormalement longs. "
+		"(2) Tendances = médianes quotid./hebdo./glissante ; la médiane glissante montre la tendance à court terme.\n"
+		"(3) Bande quotidienne = plage habituelle de la journée (la plupart des valeurs sont dedans). "
+		"(4) Barres par jour = pics matin/après-midi typiques."
 	)
 	fig.text(0.02, 0.02, interpretation, ha="left", va="bottom", fontsize=8)
 
