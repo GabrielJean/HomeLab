@@ -497,10 +497,12 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 		decimated = points
 	x_vals, y_vals = zip(*decimated)
 
-	fig = plt.figure(figsize=(11.5, 6.2))
-	gs = fig.add_gridspec(2, 1, height_ratios=[3, 1], hspace=0.18)
-	ax = fig.add_subplot(gs[0, 0])
-	ax2 = fig.add_subplot(gs[1, 0])
+	fig = plt.figure(figsize=(11.5, 9.6))
+	gs = fig.add_gridspec(4, 1, height_ratios=[3, 2, 2, 2], hspace=0.22)
+	ax_raw = fig.add_subplot(gs[0, 0])
+	ax_trend = fig.add_subplot(gs[1, 0], sharex=ax_raw)
+	ax_band = fig.add_subplot(gs[2, 0], sharex=ax_raw)
+	ax_week = fig.add_subplot(gs[3, 0])
 	fig.suptitle(csv_path.stem.replace("-", " "))
 
 	primary_color = "#1f77b4"
@@ -508,52 +510,62 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 	roll_color = "#2ca02c"
 	weekly_color = "#9467bd"
 
-	# Main time series
-	ax.plot(x_vals, y_vals, linewidth=1.0, color=primary_color, alpha=0.25, label="Samples (decimated)")
-	if band_dates:
-		ax.fill_between(
-			band_dates,
-			band_low,  # type: ignore[arg-type]
-			band_high,  # type: ignore[arg-type]
-			color="#bdbdbd",
-			alpha=0.25,
-			label="Daily 5–95% band",
-		)
-	if daily:
-		dx, dy = zip(*daily)
-		ax.plot(dx, dy, linewidth=2.1, color=trend_color, alpha=0.9, label="Daily median")
-	if weekly:
-		wx, wy = zip(*weekly)
-		ax.plot(wx, wy, linewidth=2.3, color=weekly_color, alpha=0.9, label="Weekly median")
-	if roll_points:
-		rx, ry = zip(*roll_points)
-		ax.plot(rx, ry, linewidth=1.6, color=roll_color, alpha=0.9, label="Rolling median")
-
-	# Highlight extremes (top outliers)
+	# Panel 1: raw samples + extremes
+	ax_raw.plot(x_vals, y_vals, linewidth=1.0, color=primary_color, alpha=0.35, label="Samples (decimated)")
 	values = [p[1] for p in points]
 	p98 = percentile(values, 98)
 	if p98 is not None:
 		extreme_points = [(ts, val) for ts, val in points if val >= p98]
 		if extreme_points:
 			ex, ey = zip(*extreme_points)
-			ax.scatter(ex, ey, s=14, color="#e41a1c", alpha=0.7, label="Extreme samples")
+			ax_raw.scatter(ex, ey, s=14, color="#e41a1c", alpha=0.75, label="Extreme samples")
+	ax_raw.set_ylabel("Minutes")
+	ax_raw.grid(True, linewidth=0.5, alpha=0.25)
+	ax_raw.legend(loc="upper left", framealpha=0.85, ncol=2)
 
-	# Median reference lines
-	all_median = statistics.median([p[1] for p in points])
-	ax.axhline(all_median, color="#555555", linewidth=0.8, linestyle="--", alpha=0.6)
+	# Panel 2: trend lines only
+	if daily:
+		dx, dy = zip(*daily)
+		ax_trend.plot(dx, dy, linewidth=2.1, color=trend_color, alpha=0.9, label="Daily median")
+	if weekly:
+		wx, wy = zip(*weekly)
+		ax_trend.plot(wx, wy, linewidth=2.3, color=weekly_color, alpha=0.9, label="Weekly median")
+	if roll_points:
+		rx, ry = zip(*roll_points)
+		ax_trend.plot(rx, ry, linewidth=1.6, color=roll_color, alpha=0.9, label="Rolling median")
+	all_median = statistics.median(values)
+	ax_trend.axhline(all_median, color="#555555", linewidth=0.8, linestyle="--", alpha=0.6)
 	if offpeak_value is not None:
-		ax.axhline(offpeak_value, color="#999999", linewidth=0.8, linestyle=":", alpha=0.6)
+		ax_trend.axhline(offpeak_value, color="#999999", linewidth=0.8, linestyle=":", alpha=0.6)
+	ax_trend.set_ylabel("Trend min")
+	ax_trend.grid(True, linewidth=0.5, alpha=0.25)
+	ax_trend.legend(loc="upper left", framealpha=0.85, ncol=3)
 
-	ax.set_ylabel("Minutes")
-	ax.grid(True, linewidth=0.5, alpha=0.25)
-	ax.legend(loc="upper left", framealpha=0.85, ncol=2)
+	# Panel 3: daily percentile band
+	if band_dates:
+		ax_band.fill_between(
+			band_dates,
+			band_low,  # type: ignore[arg-type]
+			band_high,  # type: ignore[arg-type]
+			color="#bdbdbd",
+			alpha=0.35,
+			label="Daily 5–95% band",
+		)
+	if daily:
+		dx, dy = zip(*daily)
+		ax_band.plot(dx, dy, linewidth=1.6, color=trend_color, alpha=0.9, label="Daily median")
+	ax_band.set_ylabel("Daily band")
+	ax_band.grid(True, linewidth=0.5, alpha=0.25)
+	ax_band.legend(loc="upper left", framealpha=0.85, ncol=2)
 
 	locator = mdates.AutoDateLocator(minticks=6, maxticks=10)
 	formatter = mdates.DateFormatter("%b %d")
-	ax.xaxis.set_major_locator(locator)
-	ax.xaxis.set_major_formatter(formatter)
+	for axis in (ax_raw, ax_trend, ax_band):
+		axis.xaxis.set_major_locator(locator)
+		axis.xaxis.set_major_formatter(formatter)
+		axis.label_outer()  # type: ignore[attr-defined]
 
-	# Bottom panel: weekday peak medians (AM/PM bars) or single peak median
+	# Panel 4: weekday peak medians (AM/PM bars) or single peak median
 	weekday_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 	weekday_labels = [d[:3] for d in weekday_order]
 	indices = list(range(len(weekday_order)))
@@ -562,32 +574,32 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 		am_vals = [weekday_peak_buckets.get(day, {}).get("AM peak") for day in weekday_order]
 		pm_vals = [weekday_peak_buckets.get(day, {}).get("PM peak") for day in weekday_order]
 		width = 0.38
-		ax2.bar(
+		ax_week.bar(
 			[i - width / 2 for i in indices],
 			[v if v is not None else 0 for v in am_vals],
 			width=width,
 			color="#8da0cb",
 			label="AM peak",
 		)
-		ax2.bar(
+		ax_week.bar(
 			[i + width / 2 for i in indices],
 			[v if v is not None else 0 for v in pm_vals],
 			width=width,
 			color="#fc8d62",
 			label="PM peak",
 		)
-		ax2.legend(loc="upper left", framealpha=0.85, ncol=2)
+		ax_week.legend(loc="upper left", framealpha=0.85, ncol=2)
 	elif weekday_peaks:
 		vals = [weekday_peaks.get(day) for day in weekday_order]
-		ax2.bar(indices, [v if v is not None else 0 for v in vals], color="#9ecae1", label="Peak median")
-		ax2.legend(loc="upper left", framealpha=0.85)
+		ax_week.bar(indices, [v if v is not None else 0 for v in vals], color="#9ecae1", label="Peak median")
+		ax_week.legend(loc="upper left", framealpha=0.85)
 
-	ax2.set_xticks(indices)
-	ax2.set_xticklabels(weekday_labels)
-	ax2.set_ylabel("Peak min")
-	ax2.grid(True, axis="y", linewidth=0.5, alpha=0.25)
+	ax_week.set_xticks(indices)
+	ax_week.set_xticklabels(weekday_labels)
+	ax_week.set_ylabel("Peak min")
+	ax_week.grid(True, axis="y", linewidth=0.5, alpha=0.25)
 
-	# Right-side stats panel
+	# Compact stats panel (top-right)
 	stats_blocks: List[str] = []
 	if peak_buckets:
 		peak_lines = [f"{name}: {val:.1f}" for name, val in sorted(peak_buckets.items())]
@@ -604,16 +616,16 @@ def generate_graph(csv_path: Path) -> Optional[Path]:
 	if stats_blocks:
 		fig.text(
 			0.985,
-			0.52,
+			0.78,
 			"\n\n".join(stats_blocks),
-			va="center",
+			va="top",
 			ha="right",
 			fontsize=9,
 			bbox={"facecolor": "white", "alpha": 0.9, "edgecolor": "none"},
 			transform=fig.transFigure,  # type: ignore[attr-defined]
 		)
 
-	fig.tight_layout(rect=(0.02, 0.02, 0.94, 0.95))
+	fig.tight_layout(rect=(0.02, 0.02, 0.94, 0.96))
 	img_path.parent.mkdir(parents=True, exist_ok=True)
 	fig.savefig(str(img_path), dpi=140)
 	plt.close(fig)
