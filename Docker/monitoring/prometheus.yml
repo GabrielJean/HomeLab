@@ -46,18 +46,18 @@ scrape_configs:
 
   - job_name: 'cadvisor'
     static_configs:
-      - targets: ['192.168.10.5:8090']
+      - targets: ['192.168.10.5:8091']
         labels:
           instance: 'DNS-1'
-      - targets: ['100.65.192.93:8090']
+      - targets: ['100.65.192.93:8091']
         labels:
           instance: 'DNS-2'
-      - targets: ['192.168.10.13:8090']
+      - targets: ['192.168.10.13:8091']
         labels:
           instance: 'Plex-1'
-      - targets: ['192.168.10.11:8090']
+      - targets: ['192.168.10.11:8091']
         labels:
           instance: 'Docker-1'
-      - targets: ['100.125.127.90:8090']
+      - targets: ['100.125.127.90:8091']
         labels:
           instance: 'Docker-2'

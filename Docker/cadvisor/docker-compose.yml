@@ -4,7 +4,7 @@ services:
     container_name: cadvisor
     privileged: true
     ports:
-      - "8090:8080"
+      - "8091:8080"
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
