@@ -1,0 +1,28 @@
+services:
+  termix:
+    image: ghcr.io/lukegus/termix:release-1.11.0
+    container_name: termix
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - /Apps/termix:/app/data
+    environment:
+      PORT: "8080"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.termix.rule=Host(`termix.docker-1.gwebs.ca`) || Host(`termix.docker-2.gwebs.ca`)"
+      - "traefik.http.routers.termix.entrypoints=websecure"
+      - "traefik.http.routers.termix.tls=true"
+      - "traefik.http.routers.termix.tls.certresolver=le"
+      - "traefik.http.routers.termix-insecure.rule=Host(`termix.docker-1.gwebs.ca`) || Host(`termix.docker-2.gwebs.ca`)"
+      - "traefik.http.routers.termix-insecure.entrypoints=web"
+      - "traefik.http.routers.termix-insecure.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.services.termix.loadbalancer.server.port=8080"
+    networks:
+      - traefik_default
+
+networks:
+  traefik_default:
+    external: true
