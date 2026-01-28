@@ -27,7 +27,6 @@
             - { name: open-webui, online: true }
             - { name: joke-de-jean, restart: true, pull_latest: true, online: true }
             - { name: code-server, online: true }
-            - { name: shellngn, online: true }
             - { name: termix, online: true }
           DNS-1:
             - { name: adguardhome, online: true }
