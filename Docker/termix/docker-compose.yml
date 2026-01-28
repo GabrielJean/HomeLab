@@ -18,7 +18,7 @@ services:
       - "traefik.http.routers.termix-insecure.entrypoints=web"
       - "traefik.http.routers.termix-insecure.middlewares=redirect-to-https"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-      - "traefik.http.services.termix.loadbalancer.server.port=8014"
+      - "traefik.http.services.termix.loadbalancer.server.port=8080"
     networks:
       - traefik_default
 
