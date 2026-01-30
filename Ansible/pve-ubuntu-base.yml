@@ -5,6 +5,9 @@
 
   vars:
     main_user: gabriel
+    ci_user: ci
+    main_user_authorized_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDpRej6BHMw/6qH5zmyzE4mI6skbjSowAeqUPBpOP8sR gabri@Gwebs-PC-1'
+    ci_user_authorized_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJsHP1ihWUwQOSIrUackHvv5PR9DI3VWHM2cF0Gh6wMA gabriel@Gwebs-PC-1'
 
   tasks:
 
@@ -32,6 +35,20 @@
         groups: docker
         append: yes
 
+    - name: "Create .ssh directory for {{ main_user }} user"
+      ansible.builtin.file:
+        path: "/home/{{ main_user }}/.ssh"
+        state: directory
+        owner: "{{ main_user }}"
+        group: "{{ main_user }}"
+        mode: '0700'
+
+    - name: "Ensure authorized key is present for {{ main_user }} user"
+      ansible.posix.authorized_key:
+        user: "{{ main_user }}"
+        state: present
+        key: "{{ main_user_authorized_key }}"
+
     - name: "Allow 'sudo' group to have passwordless sudo"
       ansible.builtin.lineinfile:
         dest: /etc/sudoers
@@ -40,41 +57,34 @@
         line: '%sudo ALL=(ALL) NOPASSWD: ALL'
         validate: 'visudo -cf %s'
 
-    - name: "Ensure ci user exists (with sudo and docker groups, bash shell)"
+    - name: "Ensure {{ ci_user }} user exists (with sudo and docker groups, bash shell)"
       ansible.builtin.user:
-        name: ci
+        name: "{{ ci_user }}"
         state: present
         shell: /bin/bash
         groups: sudo,docker
         append: yes
 
-    - name: "Create .ssh directory for ci user"
+    - name: "Create .ssh directory for {{ ci_user }} user"
       ansible.builtin.file:
-        path: "/home/ci/.ssh"
+        path: "/home/{{ ci_user }}/.ssh"
         state: directory
-        owner: ci
-        group: ci
+        owner: "{{ ci_user }}"
+        group: "{{ ci_user }}"
         mode: '0700'
 
-    - name: "Remove all existing authorized keys for ci user (WARNING: this deletes ALL keys!)"
-      ansible.builtin.file:
-        path: "/home/ci/.ssh/authorized_keys"
-        state: absent
-        owner: ci
-        group: ci
-
-    - name: "Set authorized key for ci user"
+    - name: "Ensure authorized key is present for {{ ci_user }} user"
       ansible.posix.authorized_key:
-        user: ci
+        user: "{{ ci_user }}"
         state: present
-        key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJsHP1ihWUwQOSIrUackHvv5PR9DI3VWHM2cF0Gh6wMA"
+        key: "{{ ci_user_authorized_key }}"
 
-    - name: "Set permissions for the home directory of ci user"
+    - name: "Set permissions for the home directory of {{ ci_user }} user"
       ansible.builtin.file:
-        path: "/home/ci"
+        path: "/home/{{ ci_user }}"
         state: directory
-        owner: ci
-        group: ci
+        owner: "{{ ci_user }}"
+        group: "{{ ci_user }}"
         mode: '0755'
 
     - name: "Install ZSH"

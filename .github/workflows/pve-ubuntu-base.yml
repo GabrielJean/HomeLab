@@ -45,7 +45,9 @@ jobs:
         working-directory: Ansible
 
       - name: Retrieve SSH private key
-        run: echo "${{ secrets.CI_PRIVATE_KEY }}" > private_key
+        run: |
+          umask 077
+          printf '%s' "${{ secrets.CI_PRIVATE_KEY }}" > private_key
         working-directory: Ansible
 
       - name: Set permissions for private key
