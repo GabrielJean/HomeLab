@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'Ansible/pve-ubuntu-base.yml'
+      - 'Ansible/inventory.ini'
   workflow_dispatch:
 
 concurrency:
