@@ -35,6 +35,7 @@
           - qemu-guest-agent
           - prometheus-node-exporter
           - curl
+          - git
         state: present
 
     - name: "Ensure group 'docker' exists"
@@ -123,7 +124,8 @@
       ansible.builtin.stat:
         path: "/home/{{ main_user }}/.zprezto"
       register: prezto_dir
-      become: false
+      become: true
+      become_user: "{{ main_user }}"
 
     - name: "Clone prezto if it doesn't exist"
       shell: >
@@ -134,7 +136,8 @@
         - prezto_dir is defined
         - prezto_dir.stat is defined
         - prezto_dir.stat.exists == False
-      become: false
+      become: true
+      become_user: "{{ main_user }}"
 
     - name: "Set up prezto runcoms"
       shell: >
@@ -144,7 +147,8 @@
         done'
       args:
         chdir: "/home/{{ main_user }}"
-      become: false
+      become: true
+      become_user: "{{ main_user }}"
       when:
         - prezto_dir is defined
         - prezto_dir.stat is defined
@@ -156,7 +160,8 @@
         line: "autoload -U +X bashcompinit && bashcompinit"
         state: present
         create: yes
-      become: false
+      become: true
+      become_user: "{{ main_user }}"
 
     - name: "Ensure ~/.local/bin is in PATH for ZSH"
       ansible.builtin.lineinfile:
@@ -164,7 +169,8 @@
         line: 'export PATH="$PATH:$HOME/.local/bin"'
         state: present
         create: yes
-      become: false
+      become: true
+      become_user: "{{ main_user }}"
 
     - name: "Install GitHub Copilot CLI for {{ main_user }}"
       ansible.builtin.shell: |
