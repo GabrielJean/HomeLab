@@ -43,23 +43,13 @@ jobs:
         run: ansible-vault decrypt --vault-password-file .vault_pass.txt inventories/home/inventory.ini
         working-directory: Ansible
 
-      - name: Retrieve SSH private key
-        id: ssh-key
-        run: |
-          umask 077
-          printf '%s' "${{ secrets.CI_PRIVATE_KEY }}" | tr -d '\r' > private_key
-        working-directory: Ansible
-
-      - name: Set permissions for private key
-        run: chmod 600 private_key
-        working-directory: Ansible
-
-      - name: Validate SSH private key format
-        run: ssh-keygen -y -f private_key > /dev/null
-        working-directory: Ansible
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.CI_PRIVATE_KEY }}
 
       - name: Run Ansible updates playbook
         env:
           ANSIBLE_HOST_KEY_CHECKING: 'false'  # Optionally disable host key checking
-        run: ansible-playbook playbooks/updates.yml --private-key private_key -i inventories/home/inventory.ini --extra-vars "ansible_user=ci" --vault-password-file .vault_pass.txt
+        run: ansible-playbook playbooks/updates.yml -i inventories/home/inventory.ini --extra-vars "ansible_user=ci" --vault-password-file .vault_pass.txt
         working-directory: Ansible

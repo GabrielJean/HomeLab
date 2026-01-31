@@ -44,19 +44,10 @@ jobs:
         run: ansible-vault decrypt --vault-password-file .vault_pass.txt inventories/home/inventory.ini
         working-directory: Ansible
 
-      - name: Retrieve SSH private key
-        run: |
-          umask 077
-          printf '%s' "${{ secrets.CI_PRIVATE_KEY }}" | tr -d '\r' > private_key
-        working-directory: Ansible
-
-      - name: Set permissions for private key
-        run: chmod 600 private_key
-        working-directory: Ansible
-
-      - name: Validate SSH private key format
-        run: ssh-keygen -y -f private_key > /dev/null
-        working-directory: Ansible
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.CI_PRIVATE_KEY }}
 
       - name: Run Ansible playbook (pve-ubuntu-base)
         env:
@@ -64,7 +55,7 @@ jobs:
           ANSIBLE_FAIL_ON_UNREACHABLE: 'false'
         run: |
           set -o pipefail
-          ansible-playbook playbooks/pve-ubuntu-base.yml --private-key private_key \
+          ansible-playbook playbooks/pve-ubuntu-base.yml \
             -i inventories/home/inventory.ini --extra-vars "ansible_user=ci" --vault-password-file .vault_pass.txt | tee ansible_output.log
           rc=${PIPESTATUS[0]}
           case "$rc" in

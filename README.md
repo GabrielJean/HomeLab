@@ -107,6 +107,11 @@ cd Ansible
 make pve-ubuntu-base VAULT='--vault-id @prompt'
 ```
 
+CI note: GitHub Actions SSH keys
+
+- `CI_PRIVATE_KEY` must be an *unencrypted* private key (no passphrase) and must include the full `BEGIN ... PRIVATE KEY` / `END ... PRIVATE KEY` block.
+- If you store it in GitHub Secrets as a single line, use literal `\n` sequences; the workflow will expand them into real newlines.
+
 Kubernetes ingress refresh:
 
 ```sh
