@@ -2,6 +2,17 @@
   order: sorted
   become: true
   ignore_unreachable: true
+  gather_facts: false
+
+  pre_tasks:
+    - name: "Check host reachability"
+      ansible.builtin.include_tasks: ./Tasks/check_reachability.yml
+
+    - name: "Gather facts"
+      ansible.builtin.setup:
+
+  vars_files:
+    - vars/secrets.yml
 
   vars:
     main_user: gabriel
@@ -28,6 +39,18 @@
       ansible.builtin.group:
         name: docker
         state: present
+
+    - name: "Ensure {{ main_user }} user exists (with sudo and docker groups, bash shell)"
+      ansible.builtin.user:
+        name: "{{ main_user }}"
+        state: present
+        shell: /bin/bash
+        groups: sudo,docker
+        append: yes
+        password: >-
+          {{ (main_user_password is defined)
+             | ternary(main_user_password | password_hash('sha512', main_user_password_salt), omit) }}
+        password_lock: "{{ (main_user_password is not defined) | ternary(true, false) }}"
 
     - name: "Add {{ main_user }} to docker group"
       ansible.builtin.user:
@@ -64,6 +87,8 @@
         shell: /bin/bash
         groups: sudo,docker
         append: yes
+        password: "!"
+        password_lock: true
 
     - name: "Create .ssh directory for {{ ci_user }} user"
       ansible.builtin.file:
@@ -159,3 +184,39 @@
 
     - name: "Vacuum journal logs older than 14 days"
       ansible.builtin.command: journalctl --vacuum-time=14d
+
+    - name: "Set static route for LAN A hosts"
+      ansible.builtin.set_fact:
+        tailscale_route_to: "192.168.15.0/24"
+        tailscale_route_via: "192.168.10.7"
+      when: ansible_default_ipv4.address is match('^192\\.168\\.10\\.')
+
+    - name: "Set static route for LAN B hosts"
+      ansible.builtin.set_fact:
+        tailscale_route_to: "192.168.10.0/24"
+        tailscale_route_via: "192.168.15.8"
+      when: ansible_default_ipv4.address is match('^192\\.168\\.15\\.')
+
+    - name: "Configure netplan static route for site-to-site"
+      ansible.builtin.copy:
+        dest: /etc/netplan/99-tailscale-routes.yaml
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          network:
+            version: 2
+            ethernets:
+              {{ ansible_default_ipv4.interface }}:
+                routes:
+                  - to: {{ tailscale_route_to }}
+                    via: {{ tailscale_route_via }}
+      when:
+        - tailscale_route_to is defined
+        - tailscale_route_via is defined
+
+    - name: "Apply netplan"
+      ansible.builtin.command: netplan apply
+      when:
+        - tailscale_route_to is defined
+        - tailscale_route_via is defined

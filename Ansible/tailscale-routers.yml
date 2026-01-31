@@ -1,0 +1,136 @@
+---
+- name: Configure Tailscale site-to-site router
+  hosts: tailscale_routers
+  become: true
+  gather_facts: true
+
+  vars:
+    sysctl_conf: /etc/sysctl.d/99-tailscale-forward.conf
+    lan_interface: "{{ ansible_default_ipv4.interface }}"
+
+  vars_files:
+    - vars/ts.yml
+
+  tasks:
+    - name: Check if tailscaled is already installed
+      stat:
+        path: /usr/sbin/tailscaled
+      register: tailscaled_binary
+
+    - name: Ensure required packages are installed
+      apt:
+        name:
+          - curl
+          - iptables
+        state: present
+        update_cache: true
+
+    - name: Enable IPv4 forwarding (runtime)
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: "1"
+        state: present
+        reload: yes
+
+    - name: Disable rp_filter globally (runtime)
+      sysctl:
+        name: "{{ item }}"
+        value: "0"
+        state: present
+        reload: yes
+      loop:
+        - net.ipv4.conf.all.rp_filter
+        - net.ipv4.conf.default.rp_filter
+
+    - name: Persist IPv4 forwarding
+      copy:
+        dest: "{{ sysctl_conf }}"
+        content: |
+          net.ipv4.ip_forward=1
+          net.ipv4.conf.all.rp_filter=0
+          net.ipv4.conf.default.rp_filter=0
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Install Tailscale
+      shell: |
+        curl -fsSL https://tailscale.com/install.sh | sh
+      args:
+        creates: /usr/sbin/tailscaled
+      when: not tailscaled_binary.stat.exists
+
+    - name: Enable and start tailscaled
+      systemd:
+        name: tailscaled
+        enabled: true
+        state: started
+
+    - name: Check Tailscale status
+      command: tailscale status --json
+      register: tailscale_status
+      changed_when: false
+      failed_when: false
+
+    - name: Determine if Tailscale needs auth
+      set_fact:
+        tailscale_needs_auth: >-
+          {{ (tailscale_status.rc != 0)
+             or ((tailscale_status.stdout | default('{}') | from_json).BackendState | default('NeedsLogin')
+                 in ['NeedsLogin', 'NeedsMachineAuth', 'Stopped']) }}
+
+    - name: Bring up Tailscale and advertise subnet
+      command: >
+        tailscale up
+        {% if tailscale_needs_auth %}--authkey={{ tailscale_auth_key }}{% endif %}
+        --advertise-routes={{ advertised_subnet }}
+        --accept-routes
+        --accept-dns=false
+        --ssh
+      register: tailscale_up
+      changed_when: "'Success.' in tailscale_up.stdout or tailscale_up.rc == 0"
+      failed_when: false
+
+    - name: Set iptables FORWARD policy to ACCEPT
+      iptables:
+        chain: FORWARD
+        policy: ACCEPT
+
+    - name: Check interface sysctl paths
+      stat:
+        path: "/proc/sys/net/ipv4/conf/{{ item }}/rp_filter"
+      register: rp_filter_paths
+      loop:
+        - tailscale0
+        - "{{ lan_interface }}"
+
+    - name: Allow forwarding from tailscale0
+      iptables:
+        chain: FORWARD
+        in_interface: tailscale0
+        jump: ACCEPT
+
+    - name: Allow forwarding to tailscale0
+      iptables:
+        chain: FORWARD
+        out_interface: tailscale0
+        jump: ACCEPT
+
+    - name: Allow forwarding between LAN and tailscale0
+      iptables:
+        chain: FORWARD
+        in_interface: "{{ item.in }}"
+        out_interface: "{{ item.out }}"
+        jump: ACCEPT
+      loop:
+        - { in: "{{ lan_interface }}", out: tailscale0 }
+        - { in: tailscale0, out: "{{ lan_interface }}" }
+
+    - name: Disable rp_filter for LAN and tailscale (runtime)
+      sysctl:
+        name: "net.ipv4.conf.{{ item.item }}.rp_filter"
+        value: "0"
+        state: present
+        reload: yes
+      loop: "{{ rp_filter_paths.results }}"
+      when: item.stat.exists

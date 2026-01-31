@@ -3,8 +3,12 @@
   become: true
   strategy: free
   ignore_unreachable: yes
+  gather_facts: false
 
   pre_tasks:
+    - name: Check host reachability
+      ansible.builtin.include_tasks: ./Tasks/check_reachability.yml
+
     - name: Define docker apps by host (without cadvisor)
       set_fact:
         _docker_apps_by_host:

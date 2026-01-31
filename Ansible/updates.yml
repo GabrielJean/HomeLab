@@ -2,15 +2,21 @@
 - name: Update Ubuntu servers
   hosts: linux_vms
   become: true
-  gather_facts: true
+  gather_facts: false
   strategy: free
   ignore_unreachable: true
+
+  pre_tasks:
+    - name: Check host reachability
+      ansible.builtin.include_tasks: ./Tasks/check_reachability.yml
+
+    - name: Gather facts
+      ansible.builtin.setup:
 
   tasks:
     - name: Update apt cache
       ansible.builtin.apt:
         update_cache: true
-      when: ansible_facts is defined
 
     - name: Upgrade all packages
       ansible.builtin.apt:

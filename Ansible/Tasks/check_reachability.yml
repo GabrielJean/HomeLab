@@ -1,0 +1,15 @@
+- name: Check SSH reachability from controller
+  ansible.builtin.wait_for:
+    host: "{{ ansible_host | default(inventory_hostname) }}"
+    port: 22
+    timeout: 1
+    delay: 0
+    state: started
+  delegate_to: localhost
+  become: false
+  register: ssh_reachability
+  ignore_errors: true
+
+- name: Skip host when unreachable
+  ansible.builtin.meta: end_host
+  when: ssh_reachability is failed
