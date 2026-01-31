@@ -197,13 +197,13 @@
       ansible.builtin.set_fact:
         tailscale_route_to: "192.168.15.0/24"
         tailscale_route_via: "192.168.10.7"
-      when: ansible_default_ipv4.address is match('^192\\.168\\.10\\.')
+      when: ansible_facts['default_ipv4']['address'] is match('^192\\.168\\.10\\.')
 
     - name: "Set static route for LAN B hosts"
       ansible.builtin.set_fact:
         tailscale_route_to: "192.168.10.0/24"
         tailscale_route_via: "192.168.15.7"
-      when: ansible_default_ipv4.address is match('^192\\.168\\.15\\.')
+      when: ansible_facts['default_ipv4']['address'] is match('^192\\.168\\.15\\.')
 
     - name: "Configure netplan static route for site-to-site"
       ansible.builtin.copy:
@@ -215,7 +215,7 @@
           network:
             version: 2
             ethernets:
-              {{ ansible_default_ipv4.interface }}:
+              {{ ansible_facts['default_ipv4']['interface'] }}:
                 routes:
                   - to: {{ tailscale_route_to }}
                     via: {{ tailscale_route_via }}
