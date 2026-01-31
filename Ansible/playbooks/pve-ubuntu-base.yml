@@ -50,9 +50,9 @@
         groups: sudo,docker
         append: yes
         password: >-
-          {{ (main_user_password is defined)
-             | ternary(main_user_password | password_hash('sha512', main_user_password_salt), omit) }}
-        password_lock: "{{ (main_user_password is not defined) | ternary(true, false) }}"
+          {{ (main_user_password | password_hash('sha512', main_user_password_salt))
+             if (main_user_password is defined) else omit }}
+        password_lock: "{{ main_user_password is not defined }}"
 
     - name: "Add {{ main_user }} to docker group"
       ansible.builtin.user:
