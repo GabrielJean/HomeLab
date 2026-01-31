@@ -5,8 +5,8 @@ on:
     branches:
       - main
     paths:
-      - 'Ansible/pve-ubuntu-base.yml'
-      - 'Ansible/inventory.ini'
+      - 'Ansible/playbooks/pve-ubuntu-base.yml'
+      - 'Ansible/inventories/home/inventory.ini'
   workflow_dispatch:
 
 concurrency:
@@ -41,7 +41,7 @@ jobs:
         working-directory: Ansible
 
       - name: Decrypt inventory.ini
-        run: ansible-vault decrypt --vault-password-file .vault_pass.txt inventory.ini
+        run: ansible-vault decrypt --vault-password-file .vault_pass.txt inventories/home/inventory.ini
         working-directory: Ansible
 
       - name: Retrieve SSH private key
@@ -60,8 +60,8 @@ jobs:
           ANSIBLE_FAIL_ON_UNREACHABLE: 'false'
         run: |
           set -o pipefail
-          ansible-playbook pve-ubuntu-base.yml --private-key private_key \
-            -i inventory.ini --extra-vars "ansible_user=ci" --vault-password-file .vault_pass.txt | tee ansible_output.log
+          ansible-playbook playbooks/pve-ubuntu-base.yml --private-key private_key \
+            -i inventories/home/inventory.ini --extra-vars "ansible_user=ci" --vault-password-file .vault_pass.txt | tee ansible_output.log
           rc=${PIPESTATUS[0]}
           case "$rc" in
             0)

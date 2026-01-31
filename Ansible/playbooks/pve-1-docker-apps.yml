@@ -1,28 +1,50 @@
-- name: Deploy Docker Applications for PVE-2
+- name: Deploy Docker Applications for PVE-1
   hosts: all
   become: true
   strategy: free
   ignore_unreachable: yes
   gather_facts: false
 
+  vars:
+    homelab_repo_root: "{{ playbook_dir }}/../.."
+
   pre_tasks:
     - name: Check host reachability
-      ansible.builtin.include_tasks: ./Tasks/check_reachability.yml
+      ansible.builtin.import_role:
+        name: common
+        tasks_from: check_reachability
 
     - name: Define docker apps by host (without cadvisor)
       set_fact:
         _docker_apps_by_host:
-          Docker-2:
+          Docker-1:
+            - { name: n8n, online: true, build: true, pull_latest: true }
             - { name: traefik, online: true }
+            # - { name: teamspeak, online: false }
+            - { name: plexapps, online: true }
             # - { name: heimdall, online: false }
-            - { name: homepage-2, restart: true, online: true }
+            - { name: homepage-1, restart: true, online: true }
+            - { name: gitea, online: true }
+            - { name: gmap, build: true, online: true }
             - { name: pdf, online: true }
-            - { name: homeassistant, online: true }
+            - { name: healthchecks, online: true }
+            - { name: monitoring, restart: true, online: true }
             - { name: portainer, online: true }
             - { name: upsnap, online: true }
+            - { name: homeassistant, online: false }
+            - { name: dns-update, restart: true, pull_latest: true, build: true, online: true }
+            - { name: open-webui, online: true }
+            - { name: joke-de-jean, restart: true, pull_latest: true, online: true }
+            - { name: code-server, online: true }
             - { name: termix, online: true }
-          DNS-2:
+          DNS-1:
             - { name: adguardhome, online: true }
+          Plex-1:
+            - { name: plex, online: true }
+          Gaming-1:
+            - { name: satisfactory, online: true }
+            - { name: astroneer, restart: true, online: false }
+            - { name: zomboid, restart: true, online: false }
 
     - name: Initialize docker_apps_by_host
       set_fact:
@@ -52,15 +74,19 @@
 
     - name: Check if host has docker apps
       set_fact:
-        has_docker_apps: "{{ inventory_hostname in docker_apps_by_host and docker_apps_by_host[inventory_hostname] | length > 0 }}"
+        has_docker_apps: "{{ inventory_hostname in docker_apps_by_host and docker_apps_by_host[inventory_hostname]|length > 0 }}"
       when: not (ansible_unreachable is defined and ansible_unreachable)
 
     - name: Ensure Docker is installed (only if needed)
-      include_tasks: ./Tasks/install_docker.yml
+      ansible.builtin.import_role:
+        name: docker_apps
+        tasks_from: install_docker
       when: has_docker_apps | default(false)
 
     - name: Deploy docker apps (only if host has apps)
-      include_tasks: ./Tasks/docker.yml
+      ansible.builtin.include_role:
+        name: docker_apps
+        tasks_from: deploy_app
       loop: "{{ docker_apps_by_host[inventory_hostname] | default([]) }}"
       loop_control:
         loop_var: item
@@ -69,6 +95,8 @@
         application: "{{ item.name }}"
         restart: "{{ item.restart | default(omit) }}"
         pull_latest: "{{ item.pull_latest | default(omit) }}"
+        # Use per-item build flag; if absent, fall back to global extra var build_default (not 'build' to avoid recursion)
+        build: "{{ item.build | default(build_default | default(false)) }}"
         online: "{{ item.online | default(true) }}"
 
     - name: Wait for all docker compose jobs to finish
@@ -82,7 +110,9 @@
       when: has_docker_apps | default(false) and (compose_job_ids | default([])) | length > 0
 
     - name: Cleanup orphan app directories not declared for this host
-      include_tasks: ./Tasks/cleanup_orphans.yml
+      ansible.builtin.import_role:
+        name: docker_apps
+        tasks_from: cleanup_orphans
       when: has_docker_apps | default(false)
       vars:
         declared_apps: "{{ docker_apps_by_host[inventory_hostname] | default([]) | map(attribute='name') | list }}"

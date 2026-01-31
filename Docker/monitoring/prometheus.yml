@@ -34,15 +34,15 @@ scrape_configs:
       - targets: ['100.80.8.22:9100']
         labels:
           instance: 'PSC-PBS-VM1'
-      - targets: ['192.168.10.20:9100']
-        labels:
-          instance: 'k8s-master-1'
-      - targets: ['192.168.10.21:9100']
-        labels:
-          instance: 'k8s-worker-1'
-      - targets: ['192.168.15.22:9100']
-        labels:
-          instance: 'k8s-worker-2'
+#      - targets: ['192.168.10.20:9100']
+#        labels:
+#          instance: 'k8s-master-1'
+#      - targets: ['192.168.10.21:9100']
+#        labels:
+#          instance: 'k8s-worker-1'
+#      - targets: ['192.168.15.22:9100']
+ #       labels:
+#          instance: 'k8s-worker-2'
 
   - job_name: 'cadvisor'
     static_configs:

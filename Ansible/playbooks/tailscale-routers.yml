@@ -9,7 +9,7 @@
     lan_interface: "{{ ansible_default_ipv4.interface }}"
 
   vars_files:
-    - vars/ts.yml
+    - ../vars/ts.yml
 
   tasks:
     - name: Check if tailscaled is already installed

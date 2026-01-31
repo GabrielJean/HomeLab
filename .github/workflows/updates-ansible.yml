@@ -40,7 +40,7 @@ jobs:
 
 
       - name: Decrypt inventory.ini
-        run: ansible-vault decrypt --vault-password-file .vault_pass.txt inventory.ini
+        run: ansible-vault decrypt --vault-password-file .vault_pass.txt inventories/home/inventory.ini
         working-directory: Ansible
 
       - name: Retrieve SSH private key
@@ -55,5 +55,5 @@ jobs:
       - name: Run Ansible updates playbook
         env:
           ANSIBLE_HOST_KEY_CHECKING: 'false'  # Optionally disable host key checking
-        run: ansible-playbook updates.yml --private-key private_key -i inventory.ini --extra-vars "ansible_user=ci" --vault-password-file .vault_pass.txt
+        run: ansible-playbook playbooks/updates.yml --private-key private_key -i inventories/home/inventory.ini --extra-vars "ansible_user=ci" --vault-password-file .vault_pass.txt
         working-directory: Ansible

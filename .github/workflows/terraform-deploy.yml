@@ -221,7 +221,7 @@ jobs:
       - name: Run Ansible playbook (pve-ubuntu-base)
         run: |
           ansible-playbook \
-            -i ../Ansible/inventory.ini \
-            ../Ansible/pve-ubuntu-base.yml \
+            -i ../Ansible/inventories/home/inventory.ini \
+            ../Ansible/playbooks/pve-ubuntu-base.yml \
             --vault-password-file .vault_pass.txt
 

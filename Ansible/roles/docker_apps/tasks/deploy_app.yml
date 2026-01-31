@@ -1,4 +1,4 @@
-# Tasks/docker.yml
+# roles/docker_apps/tasks/deploy_app.yml
 
 - name: Determine desired online state for {{ application }}
   ansible.builtin.set_fact:
@@ -14,7 +14,7 @@
 
 - name: Copy application folder for {{ application }} only if different
   ansible.builtin.copy:
-    src: ../Docker/{{ application }}/
+    src: "{{ homelab_repo_root }}/Docker/{{ application }}/"
     dest: /home/gabriel/{{ application }}
     decrypt: true
     mode: '0755'

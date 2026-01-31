@@ -5,8 +5,9 @@
   become: true
   gather_facts: true
   vars_files:
-    - vars/ts.yml
+    - ../vars/ts.yml
   vars:
+    homelab_repo_root: "{{ playbook_dir }}/../.."
     ubuntu_codename: "{{ ansible_distribution_release }}"
   tasks:
     - name: Ensure apt dependencies
@@ -58,7 +59,9 @@
   become: true
   gather_facts: false
   vars_files:
-    - vars/ts.yml
+    - ../vars/ts.yml
+  vars:
+    homelab_repo_root: "{{ playbook_dir }}/../.."
   tasks:
     - name: Get master's LAN IP from Ansible facts
       set_fact:
@@ -157,7 +160,7 @@
     - name: Fetch kubeconfig with LAN IP to control machine
       fetch:
         src: /etc/rancher/rke2/rke2.yaml
-        dest: "../K8s/kubeconfigs/rke2-{{ inventory_hostname }}.yaml"
+        dest: "{{ homelab_repo_root }}/K8s/kubeconfigs/rke2-{{ inventory_hostname }}.yaml"
         flat: yes
     - name: Grab join token
       command: cat /var/lib/rancher/rke2/server/node-token
@@ -204,7 +207,7 @@
   become: true
   gather_facts: false
   vars_files:
-    - vars/ts.yml
+    - ../vars/ts.yml
   tasks:
     - name: Wait for Master facts
       wait_for:

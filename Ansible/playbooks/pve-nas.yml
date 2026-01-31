@@ -5,6 +5,9 @@
   order: sorted
   become: true
 
+  vars:
+    homelab_repo_root: "{{ playbook_dir }}/../.."
+
   tasks:
 
     - name: Install ACL
@@ -39,7 +42,7 @@
 
     - name: Copy sanoid.conf
       ansible.builtin.copy:
-        src: ../etc/sanoid/sanoid.conf
+        src: "{{ homelab_repo_root }}/etc/sanoid/sanoid.conf"
         dest: /etc/sanoid/sanoid.conf
 
     - name: Enable and start sanoid.timer
@@ -50,5 +53,5 @@
 
     - name: Copy smb.conf
       ansible.builtin.copy:
-        src: ../etc/samba/smb.conf
+        src: "{{ homelab_repo_root }}/etc/samba/smb.conf"
         dest: /etc/samba/smb.conf

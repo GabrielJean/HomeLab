@@ -6,13 +6,15 @@
 
   pre_tasks:
     - name: "Check host reachability"
-      ansible.builtin.include_tasks: ./Tasks/check_reachability.yml
+      ansible.builtin.import_role:
+        name: common
+        tasks_from: check_reachability
 
     - name: "Gather facts"
       ansible.builtin.setup:
 
   vars_files:
-    - vars/secrets.yml
+    - ../vars/secrets.yml
 
   vars:
     main_user: gabriel
