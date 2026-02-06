@@ -1,7 +1,6 @@
 services:
   gmap:
-    build: .
-    env_file: .env
+    image: gitea.docker-1.gwebs.ca/gabriel/gmap:latest
     container_name: gmap
     volumes:
       - /Apps/gmap:/app/data_runs

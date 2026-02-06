@@ -25,7 +25,7 @@
             # - { name: heimdall, online: false }
             - { name: homepage-1, restart: true, online: true }
             - { name: gitea, online: true }
-            - { name: gmap, build: true, online: true }
+            - { name: gmap, restart: true, pull_latest: true, online: true }
             - { name: pdf, online: true }
             - { name: healthchecks, online: true }
             - { name: monitoring, restart: true, online: true }
