@@ -18,11 +18,9 @@
       set_fact:
         _docker_apps_by_host:
           Docker-1:
-            - { name: n8n, online: true, build: true, pull_latest: true }
+            - { name: n8n, online: false, build: true, pull_latest: true }
             - { name: traefik, online: true }
-            # - { name: teamspeak, online: false }
             - { name: plexapps, online: true }
-            # - { name: heimdall, online: false }
             - { name: homepage-1, restart: true, online: true }
             - { name: gitea, online: true }
             - { name: gmap, restart: true, pull_latest: true, online: true }
@@ -35,7 +33,6 @@
             - { name: dns-update, restart: true, pull_latest: true, build: true, online: true }
             - { name: open-webui, online: true }
             - { name: joke-de-jean, restart: true, pull_latest: true, online: true }
-            - { name: code-server, online: true }
             - { name: termix, online: true }
           DNS-1:
             - { name: adguardhome, online: true }
