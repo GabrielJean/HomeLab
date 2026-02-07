@@ -2,6 +2,25 @@ services:
   gmap:
     image: gitea.docker-1.gwebs.ca/gabriel/gmap:latest
     container_name: gmap
+    ports:
+      - "5051:5000"
     volumes:
       - /Apps/gmap:/app/data_runs
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gmap.rule=Host(`gmap.docker-1.gwebs.ca`)"
+      - "traefik.http.routers.gmap.entrypoints=websecure"
+      - "traefik.http.routers.gmap.tls=true"
+      - "traefik.http.routers.gmap.tls.certresolver=le"
+      - "traefik.http.routers.gmap-insecure.rule=Host(`gmap.docker-1.gwebs.ca`)"
+      - "traefik.http.routers.gmap-insecure.entrypoints=web"
+      - "traefik.http.routers.gmap-insecure.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.services.gmap.loadbalancer.server.port=5000"
+    networks:
+      - traefik_default
     restart: unless-stopped
+
+networks:
+  traefik_default:
+    external: true
