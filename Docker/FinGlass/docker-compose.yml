@@ -1,0 +1,24 @@
+services:
+  finglass:
+    image: gitea.docker-1.gwebs.ca/gabriel/finglass:latest
+    container_name: finglass
+    volumes:
+      - /Apps/FinGlass:/app/data
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.finglass.rule=Host(`finglass.docker-1.gwebs.ca`)"
+      - "traefik.http.routers.finglass.entrypoints=websecure"
+      - "traefik.http.routers.finglass.tls=true"
+      - "traefik.http.routers.finglass.tls.certresolver=le"
+      - "traefik.http.routers.finglass-insecure.rule=Host(`finglass.docker-1.gwebs.ca`)"
+      - "traefik.http.routers.finglass-insecure.entrypoints=web"
+      - "traefik.http.routers.finglass-insecure.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.services.finglass.loadbalancer.server.port=8000"
+    networks:
+      - traefik_default
+
+networks:
+  traefik_default:
+    external: true
