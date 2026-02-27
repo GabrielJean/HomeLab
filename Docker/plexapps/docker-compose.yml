@@ -199,6 +199,8 @@ services:
     image: lscr.io/linuxserver/qbittorrent:latest
     container_name: qbittorrent
     network_mode: "service:gluetun"
+    depends_on:
+      - gluetun
     environment:
       - PUID=950
       - PGID=950
@@ -228,8 +230,8 @@ services:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
-    # volumes:
-    #   - ./gluetun:/gluetun
+    volumes:
+      - /Apps/gluetun:/gluetun
     ports:
       - 8087:8087
       - 6881:6881
@@ -240,6 +242,9 @@ services:
       - OPENVPN_USER=${OPENVPN_USERNAME}
       - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
       - SERVER_REGIONS=Bahamas
+      - PORT_FORWARD_ONLY=true
+      - VPN_PORT_FORWARDING=on
+      - VPN_PORT_FORWARDING_STATUS_FILE=/gluetun/forwarded_port
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.qbittorent.rule=Host(`qbittorent.docker-1.gwebs.ca`)"

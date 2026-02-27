@@ -1,15 +1,51 @@
 ---
-# 1. Ensure base dependencies on all RKE2 hosts
-- name: Ensure dependencies on all RKE2 hosts
+# 1. Ensure dependencies, Tailscale, and get Tailscale IPs
+- name: Ensure dependencies and Tailscale on all RKE2 hosts
   hosts: rke_cluster
   become: true
   gather_facts: true
+  vars_files:
+    - ../vars/ts.yml
+  vars:
+    homelab_repo_root: "{{ playbook_dir }}/../.."
+    ubuntu_codename: "{{ ansible_distribution_release }}"
   tasks:
     - name: Ensure apt dependencies
       apt:
         name: [curl, gnupg]
         state: present
         update_cache: yes
+    - name: Setup Tailscale apt signing key and repo
+      apt_key:
+        url: "https://pkgs.tailscale.com/stable/ubuntu/{{ ubuntu_codename }}.noarmor.gpg"
+        state: present
+      when: ansible_distribution == "Ubuntu"
+    - name: Add Tailscale apt repository
+      apt_repository:
+        repo: "deb https://pkgs.tailscale.com/stable/ubuntu {{ ubuntu_codename }} main"
+        state: present
+        update_cache: yes
+      when: ansible_distribution == "Ubuntu"
+    - name: Install Tailscale
+      apt:
+        name: tailscale
+        state: present
+    - name: Ensure Tailscale daemon is running
+      systemd:
+        name: tailscaled
+        enabled: yes
+        state: started
+    - name: Authenticate Tailscale if needed
+      shell: "tailscale status || tailscale up --authkey {{ tailscale_auth_key }}"
+      args:
+        executable: /bin/bash
+    - name: Get Tailscale IPv4 address
+      command: tailscale ip -4
+      register: ts_ip
+      changed_when: false
+    - name: Set Tailscale IP as a fact for later use
+      set_fact:
+        tailscale_ipv4: "{{ ts_ip.stdout }}"
     - name: Ensure RKE2 config directory exists
       file:
         path: /etc/rancher/rke2
@@ -22,6 +58,8 @@
   hosts: k8s-master
   become: true
   gather_facts: false
+  vars_files:
+    - ../vars/ts.yml
   vars:
     homelab_repo_root: "{{ playbook_dir }}/../.."
   tasks:
@@ -42,17 +80,19 @@
       command: snap install kubectl --classic
       args:
         creates: /snap/bin/kubectl
-    - name: Write RKE2 server config (LAN-based)
+    - name: Write RKE2 server config (Tailscale advertise, Canal over mesh)
       copy:
         content: |
-          advertise-address: {{ master_lan_ip.stdout }}
+          advertise-address: {{ tailscale_ipv4 }}
           bind-address: 0.0.0.0
-          node-ip: {{ master_lan_ip.stdout }}
+          node-ip: {{ tailscale_ipv4 }}
           node-external-ip: {{ master_lan_ip.stdout }}
           tls-san:
+            - {{ tailscale_ipv4 }}
             - {{ master_lan_ip.stdout }}
             - localhost
             - 127.0.0.1
+            - 0.0.0.0
           disable:
             - rke2-ingress-nginx
         dest: /etc/rancher/rke2/config.yaml
@@ -73,6 +113,27 @@
       wait_for:
         path: /etc/rancher/rke2/rke2.yaml
         timeout: 120
+    - name: Create RKE2 Canal config to use Tailscale interface
+      copy:
+        content: |
+          ---
+          apiVersion: helm.cattle.io/v1
+          kind: HelmChartConfig
+          metadata:
+            name: rke2-canal
+            namespace: kube-system
+          spec:
+            valuesContent: |-
+              flannel:
+                iface: "tailscale0"
+                backend: "vxlan"
+        dest: /var/lib/rancher/rke2/server/manifests/rke2-canal-config.yaml
+        owner: root
+        group: root
+        mode: 0644
+    - name: Wait for Canal to restart with new config
+      wait_for:
+        timeout: 30
     - name: Create local kubeconfig copy for server operations
       copy:
         src: /etc/rancher/rke2/rke2.yaml
@@ -86,11 +147,16 @@
         path: /etc/rancher/rke2/rke2-local.yaml
         regexp: "server: https://.*:6443"
         replace: "server: https://127.0.0.1:6443"
-    - name: Replace API server address in external kubeconfig with master LAN IP
+    - name: Replace 127.0.0.1 or tailscale IP in external kubeconfig with master LAN IP
       replace:
         path: /etc/rancher/rke2/rke2.yaml
         regexp: "server: https://.*:6443"
         replace: "server: https://{{ master_lan_ip.stdout }}:6443"
+    - name: Restart Canal daemonset to apply new configuration
+      shell: |
+        export KUBECONFIG=/etc/rancher/rke2/rke2-local.yaml
+        /var/lib/rancher/rke2/bin/kubectl rollout restart ds rke2-canal -n kube-system
+      ignore_errors: yes
     - name: Fetch kubeconfig with LAN IP to control machine
       fetch:
         src: /etc/rancher/rke2/rke2.yaml
@@ -103,6 +169,7 @@
     - name: Set join token fact for worker hosts
       set_fact:
         rke2_join_token: "{{ join_token.stdout }}"
+        rke2_master_ip: "{{ tailscale_ipv4 }}"
         rke2_master_lan_ip: "{{ master_lan_ip.stdout }}"
 
     # --- FIX: Replace API server readiness check (uri) with TCP port wait_for
@@ -113,6 +180,25 @@
         state: started
         timeout: 120
 
+    - name: Pod-to-Tailscale routing for API server connectivity
+      shell: |
+        POD_CIDR="10.42.0.0/16"
+        iptables -C FORWARD -s $POD_CIDR -d 100.64.0.0/10 -j ACCEPT 2>/dev/null || \
+        iptables -I FORWARD -s $POD_CIDR -d 100.64.0.0/10 -j ACCEPT
+        iptables -t nat -C POSTROUTING -s $POD_CIDR -d 100.64.0.0/10 -j MASQUERADE 2>/dev/null || \
+        iptables -t nat -I POSTROUTING -s $POD_CIDR -d 100.64.0.0/10 -j MASQUERADE
+        ip route add 100.64.0.0/10 dev tailscale0 2>/dev/null || true
+      ignore_errors: yes
+    - name: Update Kubernetes service endpoint to use LAN IP for pod connectivity
+      shell: |
+        export KUBECONFIG=/etc/rancher/rke2/rke2-local.yaml
+        MASTER_LAN_IP="{{ master_lan_ip.stdout }}"
+        CURRENT_IP=$(/var/lib/rancher/rke2/bin/kubectl get endpoints kubernetes -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null || echo "")
+        if [[ "$CURRENT_IP" != "$MASTER_LAN_IP" ]]; then
+          /var/lib/rancher/rke2/bin/kubectl patch endpoints kubernetes --type='merge' -p='{"subsets":[{"addresses":[{"ip":"'$MASTER_LAN_IP'"}],"ports":[{"name":"https","port":6443,"protocol":"TCP"}]}]}'
+        fi
+      ignore_errors: yes
+
 ###############################################
 # WORKER NODES
 ###############################################
@@ -120,6 +206,8 @@
   hosts: k8s-worker
   become: true
   gather_facts: false
+  vars_files:
+    - ../vars/ts.yml
   tasks:
     - name: Wait for Master facts
       wait_for:
@@ -127,6 +215,7 @@
     - name: Gather join token and master IPs from master
       set_fact:
         rke2_token: "{{ hostvars[groups['k8s-master'][0]].rke2_join_token }}"
+        rke2_master_ip: "{{ hostvars[groups['k8s-master'][0]].rke2_master_ip }}"
         rke2_master_lan_ip: "{{ hostvars[groups['k8s-master'][0]].rke2_master_lan_ip }}"
     - name: Download and install RKE2 agent if not present
       stat:
@@ -141,12 +230,12 @@
       set_fact:
         worker_lan_ip:
           stdout: "{{ ansible_default_ipv4.address }}"
-    - name: Write RKE2 agent config (LAN-based)
+    - name: Write RKE2 agent config (Canal over mesh)
       copy:
         content: |
-          server: https://{{ rke2_master_lan_ip }}:9345
+          server: https://{{ rke2_master_ip }}:9345
           token: {{ rke2_token }}
-          node-ip: {{ worker_lan_ip.stdout }}
+          node-ip: {{ tailscale_ipv4 }}
           node-external-ip: {{ worker_lan_ip.stdout }}
           disable:
             - rke2-ingress-nginx
@@ -160,6 +249,15 @@
         enabled: yes
         state: started
         daemon_reload: yes
+    - name: Pod-to-Tailscale routing on worker nodes
+      shell: |
+        POD_CIDR="10.42.0.0/16"
+        iptables -C FORWARD -s $POD_CIDR -d 100.64.0.0/10 -j ACCEPT 2>/dev/null || \
+        iptables -I FORWARD -s $POD_CIDR -d 100.64.0.0/10 -j ACCEPT
+        iptables -t nat -C POSTROUTING -s $POD_CIDR -d 100.64.0.0/10 -j MASQUERADE 2>/dev/null || \
+        iptables -t nat -I POSTROUTING -s $POD_CIDR -d 100.64.0.0/10 -j MASQUERADE
+        ip route add 100.64.0.0/10 dev tailscale0 2>/dev/null || true
+      ignore_errors: yes
 
 ###############################################
 # FINAL VERIFICATION - Cluster Node Readiness
