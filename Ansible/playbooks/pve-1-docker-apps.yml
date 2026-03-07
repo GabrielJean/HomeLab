@@ -25,14 +25,13 @@
             - { name: gitea, online: true }
             - { name: gmap, restart: true, pull_latest: true, online: true }
             - { name: pdf, online: true }
-            - { name: healthchecks, online: true }
             - { name: monitoring, restart: true, online: true }
             - { name: portainer, online: true }
             - { name: upsnap, online: true }
             - { name: homeassistant, online: false }
             - { name: dns-update, restart: true, pull_latest: true, build: true, online: true }
             - { name: FinGlass, online: true }
-            - { name: open-webui, online: true }
+            - { name: open-webui, online: false }
             - { name: joke-de-jean, restart: true, pull_latest: true, online: true }
             - { name: termix, online: true }
           DNS-1:
