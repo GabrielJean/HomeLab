@@ -253,8 +253,6 @@ services:
       - /Apps/gluetun:/gluetun
     ports:
       - 8087:8087
-      - 6881:6881
-      - 6881:6881/udp
     environment:
       - PUID=1000
       - PGID=100
@@ -266,7 +264,6 @@ services:
       - SERVER_REGIONS=Bahamas
       - PRIVATE_INTERNET_ACCESS_VPN_PORT_FORWARDING=on
       - PRIVATE_INTERNET_ACCESS_VPN_PORT_FORWARDING_STATUS_FILE=/gluetun/forwarded_port
-      - FIREWALL_VPN_INPUT_PORTS=6881
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.docker-1.gwebs.ca`)"
