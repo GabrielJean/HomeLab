@@ -213,15 +213,15 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.qbittorent.rule=Host(`qbittorent.docker-1.gwebs.ca`)"
-      - "traefik.http.routers.qbittorent.entrypoints=websecure"
-      - "traefik.http.routers.qbittorent.tls=true"
-      - "traefik.http.routers.qbittorent.tls.certresolver=le"
-      - "traefik.http.routers.qbittorent-insecure.rule=Host(`qbittorent.docker-1.gwebs.ca`)"
-      - "traefik.http.routers.qbittorent-insecure.entrypoints=web"
-      - "traefik.http.routers.qbittorent-insecure.middlewares=redirect-to-https"
+      - "traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.docker-1.gwebs.ca`)"
+      - "traefik.http.routers.qbittorrent.entrypoints=websecure"
+      - "traefik.http.routers.qbittorrent.tls=true"
+      - "traefik.http.routers.qbittorrent.tls.certresolver=le"
+      - "traefik.http.routers.qbittorrent-insecure.rule=Host(`qbittorrent.docker-1.gwebs.ca`)"
+      - "traefik.http.routers.qbittorrent-insecure.entrypoints=web"
+      - "traefik.http.routers.qbittorrent-insecure.middlewares=redirect-to-https"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-      - "traefik.http.services.qbittorent.loadbalancer.server.port=8087"
+      - "traefik.http.services.qbittorrent.loadbalancer.server.port=8087"
 
   gluetun:
     image: qmcgaw/gluetun
@@ -241,21 +241,20 @@ services:
       - VPN_SERVICE_PROVIDER=private internet access
       - OPENVPN_USER=${OPENVPN_USERNAME}
       - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
+      - OPENVPN_PROTOCOL=udp
+      - PRIVATE_INTERNET_ACCESS_OPENVPN_ENCRYPTION_PRESET=strong
       - SERVER_REGIONS=Bahamas
-      - PORT_FORWARD_ONLY=true
-      - VPN_PORT_FORWARDING=on
-      - VPN_PORT_FORWARDING_STATUS_FILE=/gluetun/forwarded_port
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.qbittorent.rule=Host(`qbittorent.docker-1.gwebs.ca`)"
-      - "traefik.http.routers.qbittorent.entrypoints=websecure"
-      - "traefik.http.routers.qbittorent.tls=true"
-      - "traefik.http.routers.qbittorent.tls.certresolver=le"
-      - "traefik.http.routers.qbittorent-insecure.rule=Host(`qbittorent.docker-1.gwebs.ca`)"
-      - "traefik.http.routers.qbittorent-insecure.entrypoints=web"
-      - "traefik.http.routers.qbittorent-insecure.middlewares=redirect-to-https"
+      - "traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.docker-1.gwebs.ca`)"
+      - "traefik.http.routers.qbittorrent.entrypoints=websecure"
+      - "traefik.http.routers.qbittorrent.tls=true"
+      - "traefik.http.routers.qbittorrent.tls.certresolver=le"
+      - "traefik.http.routers.qbittorrent-insecure.rule=Host(`qbittorrent.docker-1.gwebs.ca`)"
+      - "traefik.http.routers.qbittorrent-insecure.entrypoints=web"
+      - "traefik.http.routers.qbittorrent-insecure.middlewares=redirect-to-https"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-      - "traefik.http.services.qbittorent.loadbalancer.server.port=8087"
+      - "traefik.http.services.qbittorrent.loadbalancer.server.port=8087"
     networks:
       - traefik_default
 
