@@ -196,7 +196,7 @@ services:
       - traefik_default
 
   qbittorrent:
-    image: binhex/arch-qbittorrentvpn:latest
+    image: binhex/arch-qbittorrentvpn:latest-
     container_name: qbittorrent
     cap_add:
       - NET_ADMIN
