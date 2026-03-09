@@ -223,7 +223,6 @@ services:
       - PGID=950
       - TZ=Etc/UTC
       - WEBUI_PORT=8087
-      - TORRENTING_PORT=6881
     volumes:
       - /Apps/qbittorrent:/config/qBittorrent
       - medias:/medias
