@@ -205,7 +205,7 @@ services:
       - gluetun
     environment:
       - QBT_USERNAME=${QBT_USERNAME:-admin}
-      - QBT_PASSWORD=${QBT_PASSWORD:-adminPassword}
+      - QBT_PASSWORD=${QBT_PASSWORD:-adminadmin}
       - QBT_ADDR=http://qbittorrent:8087
       - PORT_FILE=/gluetun/forwarded_port
     volumes:
