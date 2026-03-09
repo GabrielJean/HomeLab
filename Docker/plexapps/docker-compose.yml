@@ -195,6 +195,23 @@ services:
     networks:
       - traefik_default
 
+  gluetun-qbittorrent-portfw:
+    build:
+      context: ./qbittorrent-port-forward
+      dockerfile: Dockerfile
+    container_name: gluetun-qbittorrent-portfw
+    depends_on:
+      - qbittorrent
+      - gluetun
+    environment:
+      - QBT_USERNAME=${QBT_USERNAME:-admin}
+      - QBT_PASSWORD=${QBT_PASSWORD:-adminPassword}
+      - QBT_ADDR=http://qbittorrent:8087
+      - PORT_FILE=/gluetun/forwarded_port
+    volumes:
+      - /Apps/gluetun:/gluetun:ro
+    restart: unless-stopped
+
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:latest
     container_name: qbittorrent
@@ -226,6 +243,7 @@ services:
   gluetun:
     image: qmcgaw/gluetun
     container_name: gluetun
+    hostname: gluetun
     cap_add:
       - NET_ADMIN
     devices:
@@ -236,14 +254,18 @@ services:
       - 8087:8087
       - 6881:6881
       - 6881:6881/udp
-
     environment:
+      - PUID=1000
+      - PGID=100
       - VPN_SERVICE_PROVIDER=private internet access
       - OPENVPN_USER=${OPENVPN_USERNAME}
       - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
       - OPENVPN_PROTOCOL=udp
       - PRIVATE_INTERNET_ACCESS_OPENVPN_ENCRYPTION_PRESET=strong
       - SERVER_REGIONS=Bahamas
+      - PRIVATE_INTERNET_ACCESS_VPN_PORT_FORWARDING=on
+      - PRIVATE_INTERNET_ACCESS_VPN_PORT_FORWARDING_STATUS_FILE=/gluetun/forwarded_port
+      - FIREWALL_VPN_INPUT_PORTS=6881
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.docker-1.gwebs.ca`)"
