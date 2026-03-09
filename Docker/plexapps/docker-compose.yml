@@ -206,11 +206,13 @@ services:
     environment:
       - QBT_USERNAME=${QBT_USERNAME:-admin}
       - QBT_PASSWORD=${QBT_PASSWORD:-adminadmin}
-      - QBT_ADDR=http://qbittorrent:8087
+      - QBT_ADDR=http://gluetun:8087
       - PORT_FILE=/gluetun/forwarded_port
     volumes:
       - /Apps/gluetun:/gluetun:ro
     restart: unless-stopped
+    networks:
+      - traefik_default
 
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:latest
