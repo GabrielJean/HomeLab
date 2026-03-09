@@ -41,7 +41,7 @@
     msg: "Orphan app dirs to clean: {{ orphan_app_dirs }}"
 
 - name: Bring down orphan apps before cleanup
-  ansible.builtin.command: docker compose down --remove-orphans
+  ansible.builtin.command: docker compose down
   args:
     chdir: "{{ item }}"
   loop: "{{ orphan_app_dirs }}"
