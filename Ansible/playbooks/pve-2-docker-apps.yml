@@ -50,6 +50,10 @@
           }}
       with_dict: "{{ _docker_apps_by_host }}"
 
+    - name: Save full declared docker apps by host for cleanup
+      set_fact:
+        full_docker_apps_by_host: "{{ docker_apps_by_host }}"
+
     - name: Normalize target app filter
       set_fact:
         target_apps_filter: "{{ target_apps_csv | default('') | split(',') | map('trim') | reject('equalto', '') | list }}"
@@ -114,6 +118,6 @@
       ansible.builtin.import_role:
         name: docker_apps
         tasks_from: cleanup_orphans
-      when: has_docker_apps | default(false)
+      when: inventory_hostname in full_docker_apps_by_host and (cleanup_orphans_enabled | default(true) | bool)
       vars:
-        declared_apps: "{{ docker_apps_by_host[inventory_hostname] | default([]) | map(attribute='name') | list }}"
+        declared_apps: "{{ full_docker_apps_by_host[inventory_hostname] | default([]) | map(attribute='name') | list }}"
