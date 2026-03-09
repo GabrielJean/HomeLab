@@ -32,7 +32,7 @@
 - name: Build docker compose command for {{ application }} (only when online)
   ansible.builtin.set_fact:
     docker_compose_command: >-
-      docker compose up -d
+      docker compose up -d --remove-orphans
       {% if (restart | default(false)) | bool %} --force-recreate{% endif %}
       {% if (pull_latest | default(false)) | bool %} --pull always{% endif %}
       {% if (build | default(false)) | bool %} --build{% endif %}
