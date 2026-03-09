@@ -195,75 +195,35 @@ services:
     networks:
       - traefik_default
 
-  gluetun-qbittorrent-portfw:
-    build:
-      context: ./qbittorrent-port-forward
-      dockerfile: Dockerfile
-    container_name: gluetun-qbittorrent-portfw
-    depends_on:
-      - qbittorrent
-      - gluetun
-    environment:
-      - QBT_USERNAME=${QBT_USERNAME:-admin}
-      - QBT_PASSWORD=${QBT_PASSWORD:-adminadmin}
-      - QBT_ADDR=http://gluetun:8087
-      - PORT_FILE=/gluetun/forwarded_port
-    volumes:
-      - /Apps/gluetun:/gluetun:ro
-    restart: unless-stopped
-    networks:
-      - traefik_default
-
   qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:latest
+    image: binhex/arch-qbittorrentvpn:latest
     container_name: qbittorrent
-    network_mode: "service:gluetun"
-    depends_on:
-      - gluetun
-    environment:
-      - PUID=950
-      - PGID=950
-      - TZ=Etc/UTC
-      - WEBUI_PORT=8087
-    volumes:
-      - /Apps/qbittorrent:/config/qBittorrent
-      - medias:/medias
-    restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.docker-1.gwebs.ca`)"
-      - "traefik.http.routers.qbittorrent.entrypoints=websecure"
-      - "traefik.http.routers.qbittorrent.tls=true"
-      - "traefik.http.routers.qbittorrent.tls.certresolver=le"
-      - "traefik.http.routers.qbittorrent-insecure.rule=Host(`qbittorrent.docker-1.gwebs.ca`)"
-      - "traefik.http.routers.qbittorrent-insecure.entrypoints=web"
-      - "traefik.http.routers.qbittorrent-insecure.middlewares=redirect-to-https"
-      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
-      - "traefik.http.services.qbittorrent.loadbalancer.server.port=8087"
-
-  gluetun:
-    image: qmcgaw/gluetun
-    container_name: gluetun
-    hostname: gluetun
     cap_add:
       - NET_ADMIN
-    devices:
-      - /dev/net/tun:/dev/net/tun
-    volumes:
-      - /Apps/gluetun:/gluetun
     ports:
       - 8087:8087
+      - 8118:8118
     environment:
-      - PUID=1000
-      - PGID=100
-      - VPN_SERVICE_PROVIDER=private internet access
-      - OPENVPN_USER=${OPENVPN_USERNAME}
-      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
-      - OPENVPN_PROTOCOL=udp
-      - PRIVATE_INTERNET_ACCESS_OPENVPN_ENCRYPTION_PRESET=strong
-      - SERVER_REGIONS=Bahamas
-      - PRIVATE_INTERNET_ACCESS_VPN_PORT_FORWARDING=on
-      - PRIVATE_INTERNET_ACCESS_VPN_PORT_FORWARDING_STATUS_FILE=/gluetun/forwarded_port
+      - VPN_ENABLED=yes
+      - VPN_PROV=pia
+      - VPN_CLIENT=openvpn
+      - VPN_USER=${OPENVPN_USERNAME}
+      - VPN_PASS=${OPENVPN_PASSWORD}
+      - STRICT_PORT_FORWARD=yes
+      - ENABLE_PRIVOXY=yes
+      - LAN_NETWORK=192.168.10.0/24
+      - NAME_SERVERS=1.1.1.1,1.0.0.1
+      - VPN_INPUT_PORTS=
+      - VPN_OUTPUT_PORTS=
+      - DEBUG=false
+      - WEBUI_PORT=8087
+      - PUID=950
+      - PGID=950
+      - UMASK=002
+    volumes:
+      - /Apps/qbittorrent:/config
+      - medias:/data
+    restart: unless-stopped
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.docker-1.gwebs.ca`)"
