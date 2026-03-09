@@ -223,6 +223,7 @@ services:
     volumes:
       - /Apps/qbittorrent:/config
       - medias:/data
+      - ./bahamas-aes-128-cbc-udp-dns.ovpn:/config/openvpn/bahamas-aes-128-cbc-udp-dns.ovpn:ro
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
