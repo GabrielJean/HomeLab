@@ -50,6 +50,26 @@
           }}
       with_dict: "{{ _docker_apps_by_host }}"
 
+    - name: Normalize target app filter
+      set_fact:
+        target_apps_filter: "{{ target_apps_csv | default('') | split(',') | map('trim') | reject('equalto', '') | list }}"
+
+    - name: Initialize filtered docker apps map
+      set_fact:
+        filtered_docker_apps_by_host: {}
+      when: target_apps_filter | length > 0
+
+    - name: Keep only requested docker apps by host
+      set_fact:
+        filtered_docker_apps_by_host: "{{ filtered_docker_apps_by_host | combine({ item.key: (item.value | selectattr('name', 'in', target_apps_filter) | list) }) }}"
+      with_dict: "{{ docker_apps_by_host }}"
+      when: target_apps_filter | length > 0
+
+    - name: Apply filtered docker apps map
+      set_fact:
+        docker_apps_by_host: "{{ filtered_docker_apps_by_host }}"
+      when: target_apps_filter | length > 0
+
   tasks:
     - name: Skip all tasks if host is unreachable
       meta: end_host

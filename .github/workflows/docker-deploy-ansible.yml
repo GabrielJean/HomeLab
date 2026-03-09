@@ -13,11 +13,115 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run_pve_1: ${{ steps.detect.outputs.run_pve_1 }}
+      run_pve_2: ${{ steps.detect.outputs.run_pve_2 }}
+      pve_1_apps_csv: ${{ steps.detect.outputs.pve_1_apps_csv }}
+      pve_2_apps_csv: ${{ steps.detect.outputs.pve_2_apps_csv }}
+      full_deploy: ${{ steps.detect.outputs.full_deploy }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed docker apps
+        id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          full_deploy=false
+          run_pve_1=false
+          run_pve_2=false
+          pve_1_apps_csv=""
+          pve_2_apps_csv=""
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            full_deploy=true
+            run_pve_1=true
+            run_pve_2=true
+          else
+            before_sha="${{ github.event.before }}"
+            after_sha="${{ github.sha }}"
+
+            if [[ -z "$before_sha" || "$before_sha" == "0000000000000000000000000000000000000000" ]]; then
+              changed_files="$(git diff-tree --no-commit-id --name-only -r "$after_sha")"
+            else
+              changed_files="$(git diff --name-only "$before_sha" "$after_sha")"
+            fi
+
+            declare -A changed_apps=()
+            declare -A pve_1_known=(
+              [n8n]=1 [traefik]=1 [plexapps]=1 [homepage-1]=1 [gitea]=1 [gmap]=1 [pdf]=1 [monitoring]=1 [portainer]=1 [upsnap]=1 [homeassistant]=1 [dns-update]=1 [FinGlass]=1 [open-webui]=1 [joke-de-jean]=1 [termix]=1 [adguardhome]=1 [plex]=1 [satisfactory]=1 [astroneer]=1 [zomboid]=1 [cadvisor]=1
+            )
+            declare -A pve_2_known=(
+              [traefik]=1 [homepage-2]=1 [pdf]=1 [homeassistant]=1 [portainer]=1 [upsnap]=1 [termix]=1 [adguardhome]=1 [cadvisor]=1
+            )
+
+            while IFS= read -r file; do
+              [[ -z "$file" ]] && continue
+
+              if [[ "$file" =~ ^Docker/([^/]+)/ ]]; then
+                app_name="${BASH_REMATCH[1]}"
+                changed_apps["$app_name"]=1
+              elif [[ "$file" == Docker/* ]]; then
+                # Docker root-level files (for example Docker/update.sh) can affect all apps.
+                full_deploy=true
+              else
+                # Any non-app docker-related file change falls back to full deploy.
+                full_deploy=true
+              fi
+            done <<< "$changed_files"
+
+            if [[ "$full_deploy" == "true" ]]; then
+              run_pve_1=true
+              run_pve_2=true
+            else
+              pve_1_changed=()
+              pve_2_changed=()
+
+              for app_name in "${!changed_apps[@]}"; do
+                if [[ -n "${pve_1_known[$app_name]:-}" ]]; then
+                  pve_1_changed+=("$app_name")
+                fi
+                if [[ -n "${pve_2_known[$app_name]:-}" ]]; then
+                  pve_2_changed+=("$app_name")
+                fi
+              done
+
+              if (( ${#pve_1_changed[@]} > 0 )); then
+                run_pve_1=true
+                pve_1_apps_csv="$(IFS=,; echo "${pve_1_changed[*]}")"
+              fi
+
+              if (( ${#pve_2_changed[@]} > 0 )); then
+                run_pve_2=true
+                pve_2_apps_csv="$(IFS=,; echo "${pve_2_changed[*]}")"
+              fi
+            fi
+          fi
+
+          echo "run_pve_1=$run_pve_1" >> "$GITHUB_OUTPUT"
+          echo "run_pve_2=$run_pve_2" >> "$GITHUB_OUTPUT"
+          echo "pve_1_apps_csv=$pve_1_apps_csv" >> "$GITHUB_OUTPUT"
+          echo "pve_2_apps_csv=$pve_2_apps_csv" >> "$GITHUB_OUTPUT"
+          echo "full_deploy=$full_deploy" >> "$GITHUB_OUTPUT"
+
   run-pve-1:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run_pve_1 == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+
+      - name: Show deploy scope for PVE-1
+        run: |
+          echo "Full deploy: ${{ needs.detect-changes.outputs.full_deploy }}"
+          echo "Target apps: ${{ needs.detect-changes.outputs.pve_1_apps_csv || 'all' }}"
 
       - name: Grace period for cancel
         run: sleep 10
@@ -53,7 +157,7 @@ jobs:
         run: |
           set -o pipefail
           ansible-playbook playbooks/pve-1-docker-apps.yml \
-            -i inventories/home/inventory.ini --extra-vars "ansible_user=ci" --vault-password-file .vault_pass.txt | tee ansible_output.log
+            -i inventories/home/inventory.ini --extra-vars "ansible_user=ci target_apps_csv=${{ needs.detect-changes.outputs.pve_1_apps_csv }}" --vault-password-file .vault_pass.txt | tee ansible_output.log
           rc=${PIPESTATUS[0]}
           if [[ $rc -eq 0 ]]; then
             echo "Ansible succeeded."
@@ -68,10 +172,17 @@ jobs:
         working-directory: Ansible
 
   run-pve-2:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.run_pve_2 == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+
+      - name: Show deploy scope for PVE-2
+        run: |
+          echo "Full deploy: ${{ needs.detect-changes.outputs.full_deploy }}"
+          echo "Target apps: ${{ needs.detect-changes.outputs.pve_2_apps_csv || 'all' }}"
 
       - name: Grace period for cancel
         run: sleep 10
@@ -107,7 +218,7 @@ jobs:
         run: |
           set -o pipefail
           ansible-playbook playbooks/pve-2-docker-apps.yml \
-            -i inventories/home/inventory.ini --extra-vars "ansible_user=ci" --vault-password-file .vault_pass.txt | tee ansible_output.log
+            -i inventories/home/inventory.ini --extra-vars "ansible_user=ci target_apps_csv=${{ needs.detect-changes.outputs.pve_2_apps_csv }}" --vault-password-file .vault_pass.txt | tee ansible_output.log
           rc=${PIPESTATUS[0]}
           if [[ $rc -eq 0 ]]; then
             echo "Ansible succeeded."
