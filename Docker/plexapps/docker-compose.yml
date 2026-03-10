@@ -222,7 +222,7 @@ services:
       - UMASK=002
     volumes:
       - /Apps/qbittorrent:/config
-      - medias:/data
+      - medias:/medias
       - ./bahamas-aes-128-cbc-udp-dns.ovpn:/config/openvpn/bahamas-aes-128-cbc-udp-dns.ovpn
     restart: unless-stopped
     labels:
