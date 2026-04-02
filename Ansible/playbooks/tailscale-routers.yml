@@ -126,6 +126,39 @@
         - { in: "{{ lan_interface }}", out: tailscale0 }
         - { in: tailscale0, out: "{{ lan_interface }}" }
 
+    - name: Allow ICMP fragmentation-needed for PMTU discovery
+      shell: |
+        if iptables -C FORWARD -p icmp --icmp-type fragmentation-needed -j ACCEPT; then
+          echo "exists"
+        else
+          iptables -A FORWARD -p icmp --icmp-type fragmentation-needed -j ACCEPT
+          echo "added"
+        fi
+      register: pmtu_icmp_rule
+      changed_when: "'added' in pmtu_icmp_rule.stdout"
+
+    - name: Clamp TCP MSS to PMTU for flows leaving tailscale0
+      shell: |
+        if iptables -t mangle -C FORWARD -o tailscale0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu; then
+          echo "exists"
+        else
+          iptables -t mangle -A FORWARD -o tailscale0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+          echo "added"
+        fi
+      register: mss_clamp_out_rule
+      changed_when: "'added' in mss_clamp_out_rule.stdout"
+
+    - name: Clamp TCP MSS to PMTU for flows entering from tailscale0
+      shell: |
+        if iptables -t mangle -C FORWARD -i tailscale0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu; then
+          echo "exists"
+        else
+          iptables -t mangle -A FORWARD -i tailscale0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+          echo "added"
+        fi
+      register: mss_clamp_in_rule
+      changed_when: "'added' in mss_clamp_in_rule.stdout"
+
     - name: Disable rp_filter for LAN and tailscale (runtime)
       sysctl:
         name: "net.ipv4.conf.{{ item.item }}.rp_filter"
