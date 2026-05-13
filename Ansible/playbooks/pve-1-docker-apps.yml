@@ -31,7 +31,7 @@
             - { name: homeassistant, online: false }
             - { name: dns-update, restart: true, pull_latest: true, build: true, online: true }
             - { name: FinGlass, online: true }
-            - { name: open-webui, online: false }
+            - { name: open-webui, online: true }
             - { name: joke-de-jean, restart: true, pull_latest: true, online: true }
             - { name: termix, online: true }
           DNS-1:
