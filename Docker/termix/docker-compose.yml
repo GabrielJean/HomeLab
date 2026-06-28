@@ -1,6 +1,6 @@
 services:
   termix:
-    image: ghcr.io/lukegus/termix:release-1.11.0
+    image: ghcr.io/lukegus/termix:2.4.1 
     container_name: termix
     restart: unless-stopped
     user: "0:0"
