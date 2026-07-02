@@ -179,7 +179,7 @@ services:
             max-size: 10m
     ports:
         - '9091:9091'
-    image: haugene/transmission-openvpn:5.3
+    image: haugene/transmission-openvpn:5.4
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
