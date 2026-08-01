@@ -1,6 +1,6 @@
 services:
   projectzomboid:
-    image: indifferentbroccoli/projectzomboid-server-docker
+    image: indifferentbroccoli/projectzomboid-server-docker:latest
     restart: unless-stopped
     container_name: projectzomboid
     stop_grace_period: 30s
