@@ -1,0 +1,30 @@
+services:
+  rust:
+    image: indifferentbroccoli/rust-server-docker:latest
+    container_name: rustserver
+    restart: unless-stopped
+    stop_grace_period: 30s
+    ports:
+      - "${SERVER_PORT:-28015}:${SERVER_PORT:-28015}/tcp"
+      - "${SERVER_PORT:-28015}:${SERVER_PORT:-28015}/udp"
+      - "${RCON_PORT:-28016}:${RCON_PORT:-28016}/tcp"
+      - "${RCON_PORT:-28016}:${RCON_PORT:-28016}/udp"
+      - "${APP_PORT:-28082}:${APP_PORT:-28082}/tcp"
+    environment:
+      GENERATE_SETTINGS: "true"
+      PUID: "${PUID:-1000}"
+      PGID: "${PGID:-1000}"
+      SERVER_NAME: "${SERVER_NAME:-HomeServer Rust}"
+      SERVER_DESCRIPTION: "${SERVER_DESCRIPTION:-Self-hosted Rust server}"
+      SERVER_SEED: "${SERVER_SEED:-12345}"
+      WORLD_SIZE: "${WORLD_SIZE:-3500}"
+      MAX_PLAYERS: "${MAX_PLAYERS:-50}"
+      SERVER_PORT: "${SERVER_PORT:-28015}"
+      RCON_PORT: "${RCON_PORT:-28016}"
+      APP_PORT: "${APP_PORT:-28082}"
+      RCON_PASSWORD: "${RCON_PASSWORD:-change-me}"
+      SERVER_IDENTITY: "${SERVER_IDENTITY:-rustserver}"
+      UPDATE_ON_START: "${UPDATE_ON_START:-true}"
+      STARTUP_ARGUMENTS: "${STARTUP_ARGUMENTS:-+gather.rate dispenser * 3 +gather.rate pickup * 3 +dispenser.scale tree 3 +dispenser.scale ore 3}"
+    volumes:
+      - /Apps/rust/server-files:/steamcmd/rust
