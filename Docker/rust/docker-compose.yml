@@ -10,6 +10,8 @@ services:
       - "${RCON_PORT:-28016}:${RCON_PORT:-28016}/tcp"
       - "${RCON_PORT:-28016}:${RCON_PORT:-28016}/udp"
       - "${APP_PORT:-28082}:${APP_PORT:-28082}/tcp"
+    env_file:
+      - .env
     environment:
       GENERATE_SETTINGS: "true"
       PUID: "${PUID:-1000}"
