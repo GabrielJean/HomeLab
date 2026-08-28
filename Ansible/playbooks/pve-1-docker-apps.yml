@@ -42,7 +42,7 @@
             - { name: satisfactory, online: false }
             - { name: astroneer, restart: true, online: false }
             - { name: zomboid, restart: true, online: false }
-            - { name: rust, restart: true, online: true }
+            - { name: rust, restart: true, online: false }
 
     - name: Initialize docker_apps_by_host
       set_fact:
