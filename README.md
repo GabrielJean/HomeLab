@@ -6,6 +6,8 @@ Personal homelab platform for Proxmox-hosted VMs, host configuration, and servic
 
 ## 🚀 Quickstart
 
+
+
 1. **Install tooling** – Ansible ≥ 2.14, Docker CLI, kubectl, and Azure CLI.
 2. **Configure secrets** – Store host/app secrets inside the `.env` files that live next to every compose project. Ansible inventory is encrypted via Vault ([`Ansible/inventories/home/inventory.ini`](Ansible/inventories/home/inventory.ini)).
 3. **Configure hosts + apps** – `cd Ansible && ansible-playbook playbooks/pve-1-docker-apps.yml --vault-id @prompt` (repeat for `playbooks/pve-2-docker-apps.yml`, `playbooks/pve-plex.yml`, etc.). Plays install Docker when missing, copy the `Docker/<app>` folder, and run `docker compose up -d` with optional `restart`/`pull_latest` flags.
