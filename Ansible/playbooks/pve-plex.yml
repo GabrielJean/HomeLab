@@ -4,17 +4,17 @@
   become: true
 
   tasks:
-    - name: Install nvidia-headless-565-server
+    - name: Install nvidia-headless-580-server
       ansible.builtin.apt:
-        name: nvidia-headless-565-server
+        name: nvidia-headless-580-server
         state: present
 
-    - name: Install nvidia-utils-565-server
+    - name: Install nvidia-utils-580-server
       ansible.builtin.apt:
-        name: nvidia-utils-565-server
+        name: nvidia-utils-580-server
         state: present
 
-    - name: Install libnvidia-encode-565-server
+    - name: Install libnvidia-encode-580-server
       ansible.builtin.apt:
-        name: libnvidia-encode-565-server
+        name: libnvidia-encode-580-server
         state: present
