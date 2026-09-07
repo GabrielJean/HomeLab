@@ -55,7 +55,7 @@ jobs:
 
             declare -A changed_apps=()
             declare -A pve_1_known=(
-              [n8n]=1 [traefik]=1 [plexapps]=1 [homepage-1]=1 [gitea]=1 [gmap]=1 [pdf]=1 [monitoring]=1 [portainer]=1 [upsnap]=1 [homeassistant]=1 [dns-update]=1 [FinGlass]=1 [open-webui]=1 [joke-de-jean]=1 [termix]=1 [adguardhome]=1 [plex]=1 [satisfactory]=1 [astroneer]=1 [zomboid]=1 [cadvisor]=1
+              [traefik]=1 [plexapps]=1 [homepage-1]=1 [gitea]=1 [pdf]=1 [monitoring]=1 [portainer]=1 [upsnap]=1 [homeassistant]=1 [dns-update]=1 [FinGlass]=1 [open-webui]=1 [joke-de-jean]=1 [termix]=1 [adguardhome]=1 [plex]=1 [satisfactory]=1 [zomboid]=1 [cadvisor]=1
             )
             declare -A pve_2_known=(
               [traefik]=1 [homepage-2]=1 [pdf]=1 [homeassistant]=1 [portainer]=1 [upsnap]=1 [termix]=1 [adguardhome]=1 [cadvisor]=1
