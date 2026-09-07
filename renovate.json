@@ -4,6 +4,9 @@
     "config:recommended",
     "docker:enableMajor"
   ],
+  "ignorePaths": [
+    "**/Archives/**"
+  ],
   "packageRules": [
     {
       "matchPackageNames": [
