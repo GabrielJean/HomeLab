@@ -1,214 +1,141 @@
 # HomeLab
 
-Infrastructure-as-code repository for a personal homelab. It manages virtual-machine workloads, Docker Compose applications, host configuration, scheduled maintenance, and deployment automation.
+> A personal infrastructure lab for learning how self-hosted services, automation, observability, networking, and reliable deployments fit together.
 
-This README intentionally uses generic names and examples. Do not add real hostnames, IP addresses, domains, user names, credentials, private keys, VPN profiles, service tokens, or inventory contents to this file.
+This repository documents and automates my homelab environment. It is not intended to be a turnkey deployment guide or a shared operations manual. Configuration is deliberately presented at a high level: private infrastructure details, credentials, addresses, domains, and inventory data are excluded.
 
-## What This Repository Manages
+## Overview
 
-The homelab is organized around the following layers:
+HomeLab is a practical platform for building experience with the systems that support real applications after they leave a developer's laptop. The environment combines virtual machines, Docker Compose workloads, Ansible automation, monitoring, network-facing services, and CI/CD workflows.
 
-| Layer | Responsibility | Primary implementation |
-| --- | --- | --- |
-| Virtualization | Runs the virtual machines that host services. | External hypervisor configuration; historical provisioning material is in `Archives/`. |
-| Configuration management | Applies base configuration, deploys Compose projects, and performs host maintenance. | `Ansible/` |
-| Application workloads | Defines self-contained container stacks and their supporting configuration. | `Docker/<application>/` |
-| Host services | Version-controls selected NAS, SMART, filesystem-snapshot, and scheduled-task configuration. | `etc/` |
-| Automation | Deploys changed application stacks and runs recurring operating-system updates. | `.github/workflows/` |
-
-## Architecture
+The project emphasizes repeatability over one-off configuration. Application definitions live in version control, deployments are performed through Ansible, and routine updates are automated through GitHub Actions.
 
 ```text
-Git repository
+Source control
     |
-    +--> Ansible playbooks ----> managed virtual machines
-    |                                 |
-    |                                 +--> Docker Compose application stacks
+    +--> Ansible automation ---> virtual machines ---> Docker Compose services
     |
-    +--> GitHub Actions -------> authenticated deployment runner
-                                      |
-                                      +--> private network access --> managed virtual machines
+    +--> GitHub Actions ------> deployment and maintenance workflows
 
-Container services --> reverse proxy / DNS --> local clients
-Container metrics  --> monitoring stack --> dashboards
-Media workloads    --> network storage --> media applications
+Services ---> reverse proxy and DNS ---> local clients
+Metrics  ---> monitoring stack -------> dashboards
 ```
 
-Docker applications are deployed per host through Ansible. Each application has a directory under `Docker/`; the deployment role copies that directory to its target host and starts the Compose project when the application is enabled. The Docker-app playbooks also ensure that container metrics collection is deployed alongside declared applications.
+## What I Built
 
-Some application entries can be deliberately disabled. Disabled entries are retained in the deployment map but are stopped rather than started, allowing a stack to remain defined without being active.
-
-## Repository Layout
-
-| Path | Purpose |
+| Area | Implementation |
 | --- | --- |
-| `Ansible/ansible.cfg` | Ansible configuration for this repository. |
-| `Ansible/inventories/` | Encrypted inventory and inventory-related data. Do not expose its contents. |
-| `Ansible/playbooks/` | Playbooks for baseline hosts, Docker workloads, storage, media, networking, and updates. |
-| `Ansible/roles/common/` | Shared tasks, including reachability checks. |
-| `Ansible/roles/docker_apps/` | Docker installation, Compose deployment, and orphan-directory cleanup tasks. |
-| `Ansible/Makefile` | Local shortcuts for the supported playbooks. |
-| `Docker/<application>/` | One Docker Compose project per application, with application configuration and optional helper scripts. |
-| `Docker/update.sh` | Utility used for Docker-related maintenance. |
-| `etc/` | Managed host configuration, including Samba, SMART, snapshotting, and cron settings. |
-| `.github/workflows/` | Continuous deployment and scheduled-maintenance workflows. |
-| `Archives/` | Historical or retired material; not part of the active deployment path unless explicitly restored. |
+| Compute platform | Virtualized service hosts running a mix of application, network, storage, media, and utility workloads. |
+| Configuration management | Ansible playbooks that bootstrap hosts, deploy container stacks, perform maintenance, and handle reachability gracefully. |
+| Container platform | Independent Docker Compose projects for each service, enabling focused changes and isolated configuration. |
+| Deployment automation | GitHub Actions detects changed application directories and deploys only the affected workloads when possible. |
+| Observability | Container and proxy metrics feed a monitoring stack and dashboards for service visibility. |
+| Network services | Reverse proxy, DNS filtering, dynamic DNS, and private-network access support the self-hosted applications. |
+| Data services | Storage, media, and host-maintenance configuration are captured alongside the application infrastructure. |
 
-## Application Categories
+## Technology Stack
 
-The active Docker tree includes services in these broad categories:
-
-| Category | Examples |
+| Category | Technologies |
 | --- | --- |
-| Edge and network services | Reverse proxy, DNS filtering, dynamic DNS updates, uptime/UPS utilities. |
-| Observability | Metrics collection, monitoring, dashboards, and health checks. |
-| Media and automation | Media server, media-management tools, home automation, and game servers. |
-| Developer and productivity tools | Source hosting, browser IDE, document processing, terminal access, and AI interfaces. |
-| Portals and administration | Dashboards and container-management services. |
+| Virtualization | Proxmox-based virtual machine infrastructure |
+| Automation | Ansible and YAML playbooks |
+| Containers | Docker Engine and Docker Compose |
+| Continuous delivery | GitHub Actions |
+| Monitoring | Prometheus, Grafana, and cAdvisor |
+| Networking | Traefik, AdGuard Home, private-network connectivity, and dynamic DNS tooling |
+| Storage and maintenance | NAS services, SMART monitoring, scheduled tasks, and filesystem snapshot configuration |
+| Self-hosted applications | Media, home automation, developer tools, dashboards, document processing, game servers, and administrative services |
 
-The authoritative host-to-application mapping is maintained in the Docker-app playbooks, not in this table. Update the appropriate mapping whenever an application is added, moved, enabled, or retired.
+## Repository Tour
 
-## Prerequisites
-
-Use a trusted administrator workstation with access to the private management network. Typical local requirements are:
-
-- Ansible compatible with the playbooks in `Ansible/`.
-- Docker CLI and Compose plugin for local validation when needed.
-- SSH access to the managed hosts.
-- Access to the Ansible Vault password or vault identity.
-- Any private-network client required by the environment.
-
-GitHub Actions additionally requires repository secrets for the vault, deployment SSH authentication, and private-network authentication. Secret names and values should be configured in the repository settings, never documented or committed here.
-
-## Local Operations
-
-Run Ansible commands from `Ansible/`. The Makefile supplies the supported targets:
-
-```sh
-cd Ansible
-make help
-```
-
-Run a dry run before making infrastructure changes:
-
-```sh
-cd Ansible
-make pve-1-docker-apps CHECK='--check'
-```
-
-Run a deployment with an interactive vault prompt:
-
-```sh
-cd Ansible
-make pve-1-docker-apps VAULT='--vault-id @prompt'
-```
-
-Other available targets include baseline configuration, the second Docker-app group, NAS configuration, media-server configuration, network routing, and operating-system updates. Use `make help` as the source of truth for the current list.
-
-To invoke a playbook directly:
-
-```sh
-cd Ansible
-ansible-playbook playbooks/<playbook>.yml \
-  -i inventories/home/inventory.ini \
-  --vault-id @prompt
-```
-
-### Targeted Docker Deployment
-
-The Docker-app playbooks accept `target_apps_csv` to restrict a run to named application directories. This is useful for validating a single changed stack without deploying unrelated applications.
-
-```sh
-cd Ansible
-ansible-playbook playbooks/pve-1-docker-apps.yml \
-  -i inventories/home/inventory.ini \
-  --vault-id @prompt \
-  --extra-vars 'target_apps_csv=example-app'
-```
-
-The deployment role supports application flags in the playbook mappings:
-
-| Flag | Effect |
+| Path | Description |
 | --- | --- |
-| `online` | Starts the stack when true; stops an existing stack when false. |
-| `restart` | Recreates containers during `docker compose up`. |
-| `pull_latest` | Pulls images before starting the stack. |
-| `build` | Builds the Compose project before starting it. |
+| `Ansible/` | The automation layer. Playbooks describe host setup, Docker application deployment, updates, networking, storage, and media-related configuration. |
+| `Ansible/roles/` | Reusable Ansible tasks for reachability checks, Docker installation, Compose deployment, and deployment cleanup. |
+| `Docker/` | Self-contained Docker Compose projects. Each application owns its Compose definition and non-sensitive supporting configuration. |
+| `.github/workflows/` | CI/CD workflows for selective Docker deployment and scheduled operating-system updates. |
+| `etc/` | Version-controlled host configuration for services such as file sharing, monitoring, snapshotting, and scheduled jobs. |
+| `Archives/` | Historical infrastructure experiments and retired configuration retained for reference. |
 
-By default, the Docker-app playbooks remove deployed application directories that are no longer declared for a host. Review mapping changes carefully. Set `cleanup_orphans_enabled=false` only when a temporary exception is necessary.
+## Deployment Design
 
-## Deployment Automation
+The deployment model is intentionally simple:
 
-The Docker deployment workflow runs when relevant Docker files are pushed to the default branch or when it is manually dispatched. It detects the changed application directories and limits deployments to the applicable host groups where possible; broader changes trigger a full Docker deployment.
+1. Each application is defined in its own directory under `Docker/`.
+2. An Ansible playbook maps application stacks to their intended host groups.
+3. The Docker deployment role copies the requested application definition to the target host.
+4. Docker Compose starts, recreates, pulls, or builds the stack according to its declared deployment options.
+5. Asynchronous Compose jobs allow independent applications to deploy in parallel while Ansible waits for completion.
 
-The updates workflow runs on a schedule and can also be dispatched manually. It uses Ansible to apply the repository's operating-system update playbook.
+This approach keeps the source repository as the desired-state definition without introducing the operational complexity of a full container orchestrator for every workload.
 
-Workflows authenticate with GitHub Actions secrets and access hosts through the private network. Treat workflow logs as potentially sensitive operational output and avoid printing configuration values or credentials from scripts.
+## Continuous Delivery
 
-## Adding or Changing an Application
+The deployment workflow is designed to reduce unnecessary changes:
 
-1. Create or update `Docker/<application>/docker-compose.yml` and the application configuration required by the stack.
-2. Keep credentials in ignored local secret files or an approved secret-management system. Commit only sanitized templates or non-sensitive defaults.
-3. Add or update the application's host mapping in the relevant Docker-app playbook.
-4. If the application must be included in automated changed-app detection, update the corresponding workflow allowlist.
-5. Validate the Compose configuration locally when possible.
-6. Run the targeted Ansible deployment in check mode, then deploy to the intended host group.
-7. Confirm service health through the normal monitoring and administrative interfaces without recording private endpoints in documentation.
+1. A push that changes Docker-related files starts the workflow.
+2. The workflow identifies which application directories changed.
+3. Known application-to-host mappings select the smallest relevant deployment scope.
+4. Broad or shared changes fall back to a full deployment for safety.
+5. Jobs connect through the private network, unlock the encrypted inventory at run time, and execute the matching Ansible playbook.
 
-## Secrets and Sensitive Data
+Scheduled automation also applies operating-system updates through Ansible. This separates application delivery from routine host maintenance while keeping both processes version-controlled.
 
-Sensitive data must not be committed, copied into issues, or added to documentation. This includes:
+## Engineering Decisions
 
-- Passwords, API keys, tokens, certificates, private keys, and vault passwords.
-- Hostnames, IP addresses, DNS zones, internal URLs, and inventory variables.
-- VPN profiles, network-share paths containing credentials, and private topology details.
-- Application database dumps, media metadata, and deployment logs containing configuration values.
+### Compose Per Application
 
-Use these controls:
+Each service is isolated in its own Compose project rather than being collected in a single large file. This makes configuration easier to understand, changes easier to review, and deployments easier to target.
 
-- Store encrypted inventory data in Ansible Vault and provide the vault secret at run time.
-- Keep `.env`, key, certificate, and machine-specific files out of version control. The root `.gitignore` covers common secret-file patterns.
-- Use GitHub Actions secrets for CI/CD credentials.
-- Prefer redacted examples such as `example-app`, `example.internal`, and `REPLACE_ME` in committed configuration and documentation.
-- Before committing, inspect `git diff --check` and `git status`, then review the staged diff for accidental secrets.
+### Ansible as the Control Plane
 
-If a credential is exposed, revoke or rotate it immediately. Removing it from a later commit does not remove it from repository history or workflow logs.
+Ansible connects the repository to the running infrastructure. It installs prerequisites, copies desired application state, starts enabled stacks, stops intentionally disabled stacks, and cleans up application directories that are no longer declared for a host.
 
-## Validation and Troubleshooting
+### Selective Deployments
 
-Start with low-risk checks:
+The CI workflow detects changed application directories and limits deployments accordingly. This reduces the blast radius and feedback time of routine service updates, while retaining a safe full-deployment fallback for shared changes.
 
-```sh
-cd Ansible
-ansible-playbook playbooks/<playbook>.yml \
-  -i inventories/home/inventory.ini \
-  --vault-id @prompt \
-  --check
-```
+### Observability by Default
 
-For a Compose stack, validate its resolved configuration only on a trusted machine with the required local secret files available:
+Metrics collection is treated as part of the platform rather than an afterthought. Application hosts include baseline container metrics, with dashboards and monitoring services providing a consolidated view of the environment.
 
-```sh
-docker compose -f Docker/<application>/docker-compose.yml config
-```
+### Secrets Outside Source Control
 
-When a deployment does not behave as expected:
+Sensitive values are intentionally excluded from the repository. Encrypted inventory data, ignored environment files, and CI secret storage keep credentials and private infrastructure details separate from the code that defines the platform.
 
-1. Confirm access to the private management network and the target host's reachability.
-2. Run the relevant playbook in check mode with a host limit.
-3. Check that the application directory name matches both the `Docker/` path and the playbook mapping.
-4. Review the target host's Compose status and logs without copying sensitive environment values into tickets or commits.
-5. Verify that any expected images, volumes, networks, and external dependencies are available to that host.
+## Skills Demonstrated
 
-## Contribution Guidelines
+- Designing and operating a multi-service self-hosted environment.
+- Automating infrastructure and deployments with Ansible.
+- Structuring Docker Compose applications for independent lifecycle management.
+- Building selective, path-aware deployment workflows with GitHub Actions.
+- Applying secrets-management boundaries across local development, automation, and managed hosts.
+- Operating reverse-proxy, DNS, monitoring, storage, and media workloads together.
+- Documenting infrastructure as code while separating active configuration from archived experiments.
 
-- Keep each Docker application self-contained under `Docker/<application>/`.
-- Make the smallest change that produces the intended operational result.
-- Preserve existing Ansible formatting and use fully qualified module names in new tasks.
-- Test deployment changes with `--check` before applying them to active infrastructure.
-- Do not modify `Archives/` as part of normal operational work unless intentionally restoring a retired component.
-- Never commit sensitive data, even encrypted copies, unless the repository's established vault workflow explicitly requires it.
+## Scope and Safety
 
-## Scope
+This is a personal learning and experimentation environment. It may contain integrations and configuration patterns tailored to my own infrastructure, so it should not be deployed unchanged elsewhere.
 
-This is an operational repository for a private environment, not a turnkey public deployment. Adapting it for another environment requires replacing the inventory, secrets, host mappings, storage integrations, and network configuration with values appropriate for that environment.
+To protect the environment, this repository and README do not publish:
+
+- Credentials, tokens, private keys, certificates, or vault passwords.
+- Host addresses, internal DNS names, network topology, or management endpoints.
+- Private service URLs, personal data, media metadata, or deployment logs.
+- Unredacted environment files or infrastructure inventory values.
+
+## Selected Services
+
+The environment hosts a varied set of services to explore different operational concerns:
+
+| Focus | Examples of capabilities |
+| --- | --- |
+| Platform services | Reverse proxying, DNS, container administration, and service dashboards. |
+| Reliability and visibility | Metrics collection, monitoring dashboards, health checks, and host maintenance. |
+| Personal infrastructure | Home automation, media serving and management, network storage, and backup-oriented configuration. |
+| Developer productivity | Source control, browser-based development, terminal access, document conversion, and AI-assisted tooling. |
+| Learning and recreation | Dedicated game-server workloads and experimental self-hosted applications. |
+
+## Project Status
+
+Active personal project. The repository evolves as services are added, replaced, automated, or retired, with older experiments preserved under `Archives/` when they remain useful as technical reference.
