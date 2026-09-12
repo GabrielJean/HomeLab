@@ -1,0 +1,28 @@
+services:
+  stockbot:
+    image: gitea.docker-1.gwebs.ca/gabriel/stockbot:latest
+    container_name: stockbot
+    env_file:
+      - /Apps/StockBot/.env
+    environment:
+      DATABASE_PATH: /data/db.sqlite3
+    volumes:
+      - /Apps/StockBot:/data
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.stockbot.rule=Host(`stockbot.docker-1.gwebs.ca`)"
+      - "traefik.http.routers.stockbot.entrypoints=websecure"
+      - "traefik.http.routers.stockbot.tls=true"
+      - "traefik.http.routers.stockbot.tls.certresolver=le"
+      - "traefik.http.routers.stockbot-insecure.rule=Host(`stockbot.docker-1.gwebs.ca`)"
+      - "traefik.http.routers.stockbot-insecure.entrypoints=web"
+      - "traefik.http.routers.stockbot-insecure.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.services.stockbot.loadbalancer.server.port=8000"
+    networks:
+      - traefik_default
+
+networks:
+  traefik_default:
+    external: true
