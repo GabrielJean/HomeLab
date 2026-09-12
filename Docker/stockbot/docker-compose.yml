@@ -2,10 +2,6 @@ services:
   stockbot:
     image: gitea.docker-1.gwebs.ca/gabriel/stockbot:latest
     container_name: stockbot
-    env_file:
-      - /Apps/StockBot/.env
-    environment:
-      DATABASE_PATH: /data/db.sqlite3
     volumes:
       - /Apps/StockBot:/data
     restart: unless-stopped
