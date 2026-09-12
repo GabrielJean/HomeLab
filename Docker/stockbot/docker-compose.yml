@@ -2,6 +2,8 @@ services:
   stockbot:
     image: gitea.docker-1.gwebs.ca/gabriel/stockbot:latest
     container_name: stockbot
+    ports:
+      - "5052:8000"
     volumes:
       - /Apps/StockBot:/data
     restart: unless-stopped
