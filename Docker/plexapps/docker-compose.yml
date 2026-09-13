@@ -157,17 +157,21 @@ services:
       traefik.http.routers.qbittorrent.entrypoints: websecure
       traefik.http.routers.qbittorrent.tls: "true"
       traefik.http.routers.qbittorrent.tls.certresolver: le
+      traefik.http.routers.qbittorrent.service: qbittorrent
       traefik.http.routers.qbittorrent-insecure.rule: "Host(`qbittorrent.docker-1.gwebs.ca`)"
       traefik.http.routers.qbittorrent-insecure.entrypoints: web
       traefik.http.routers.qbittorrent-insecure.middlewares: redirect-to-https
+      traefik.http.routers.qbittorrent-insecure.service: qbittorrent
       traefik.http.services.qbittorrent.loadbalancer.server.port: "8087"
       traefik.http.routers.transmission.rule: "Host(`transmission.docker-1.gwebs.ca`)"
       traefik.http.routers.transmission.entrypoints: websecure
       traefik.http.routers.transmission.tls: "true"
       traefik.http.routers.transmission.tls.certresolver: le
+      traefik.http.routers.transmission.service: transmission
       traefik.http.routers.transmission-insecure.rule: "Host(`transmission.docker-1.gwebs.ca`)"
       traefik.http.routers.transmission-insecure.entrypoints: web
       traefik.http.routers.transmission-insecure.middlewares: redirect-to-https
+      traefik.http.routers.transmission-insecure.service: transmission
       traefik.http.middlewares.redirect-to-https.redirectscheme.scheme: https
       traefik.http.services.transmission.loadbalancer.server.port: "9091"
     networks:
