@@ -224,6 +224,10 @@ services:
       - /Apps/qbittorrent:/config
       - medias:/medias
       - ./ca_montreal-ca-aes-128-cbc-udp-dns.ovpn:/config/openvpn/ca_montreal-ca-aes-128-cbc-udp-dns.ovpn
+    configs:
+      - source: qbittorrent-pia-auth
+        target: /config/openvpn/pia-auth.txt
+        mode: 0400
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
@@ -253,3 +257,9 @@ volumes:
         type: cifs
         device: //192.168.10.12/Medias
         o: username=${CIFS_USERNAME},password=${CIFS_PASSWORD},uid=950,gid=950
+
+configs:
+  qbittorrent-pia-auth:
+    content: |
+      ${OPENVPN_USERNAME:?OPENVPN_USERNAME must be set}
+      ${OPENVPN_PASSWORD:?OPENVPN_PASSWORD must be set}
