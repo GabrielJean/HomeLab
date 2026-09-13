@@ -219,9 +219,9 @@ services:
       - VPN_OUTPUT_PORTS=
       - DEBUG=false
       - WEBUI_PORT=8087
-      - PUID=950
-      - PGID=950
-      - UMASK=002
+      - PUID=0
+      - PGID=0
+      - UMASK=077
     volumes:
       - /Apps/qbittorrent:/config
       - medias:/medias
