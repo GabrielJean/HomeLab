@@ -179,7 +179,7 @@ services:
             max-size: 10m
     ports:
         - '9091:9091'
-    image: haugene/transmission-openvpn:5.5
+    image: haugene/transmission-openvpn:5.5.2
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
@@ -196,7 +196,7 @@ services:
       - traefik_default
 
   qbittorrent:
-    image: binhex/arch-qbittorrentvpn:latest-
+    image: binhex/arch-qbittorrentvpn:latest
     container_name: qbittorrent
     cap_add:
       - NET_ADMIN
@@ -223,7 +223,7 @@ services:
     volumes:
       - /Apps/qbittorrent:/config
       - medias:/medias
-      - ./bahamas-aes-128-cbc-udp-dns.ovpn:/config/openvpn/bahamas-aes-128-cbc-udp-dns.ovpn
+      - ./ca_montreal-ca-aes-128-cbc-udp-dns.ovpn:/config/openvpn/ca_montreal-ca-aes-128-cbc-udp-dns.ovpn
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
