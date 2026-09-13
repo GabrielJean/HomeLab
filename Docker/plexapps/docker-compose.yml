@@ -184,8 +184,6 @@ services:
       PUID: "950"
       PGID: "950"
       TZ: America/Toronto
-      TRANSMISSION_DOWNLOAD_DIR: /medias/Torrent
-      TRANSMISSION_INCOMPLETE_DIR_ENABLED: "false"
     volumes:
       - /Apps/Transmission:/config
       - medias:/medias
