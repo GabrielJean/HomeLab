@@ -212,7 +212,7 @@ services:
       - VPN_PASS=${OPENVPN_PASSWORD:?OPENVPN_PASSWORD must be set}
       - STRICT_PORT_FORWARD=yes
       - ENABLE_PRIVOXY=yes
-      - USERSPACE_WIREGUARD=yes
+      - USERSPACE_WIREGUARD=no
       - LAN_NETWORK=192.168.10.0/24
       - NAME_SERVERS=10.0.0.242
       - VPN_INPUT_PORTS=
@@ -221,7 +221,7 @@ services:
       - WEBUI_PORT=8087
       - PUID=0
       - PGID=0
-      - UMASK=077
+      - UMASK=000
     volumes:
       - /Apps/qbittorrent:/config
       - medias:/medias
