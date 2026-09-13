@@ -207,8 +207,8 @@ services:
       - VPN_ENABLED=yes
       - VPN_PROV=pia
       - VPN_CLIENT=openvpn
-      - VPN_USER=${OPENVPN_USERNAME}
-      - VPN_PASS=${OPENVPN_PASSWORD}
+      - VPN_USER=${OPENVPN_USERNAME:?OPENVPN_USERNAME must be set}
+      - VPN_PASS=${OPENVPN_PASSWORD:?OPENVPN_PASSWORD must be set}
       - STRICT_PORT_FORWARD=yes
       - ENABLE_PRIVOXY=yes
       - LAN_NETWORK=192.168.10.0/24

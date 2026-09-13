@@ -19,7 +19,7 @@
         _docker_apps_by_host:
           Docker-1:
             - { name: traefik, online: true }
-            - { name: plexapps, online: true }
+            - { name: plexapps, online: true, restart: true }
             - { name: homepage-1, restart: true, online: true }
             - { name: gitea, online: true }
             - { name: pdf, online: true }
