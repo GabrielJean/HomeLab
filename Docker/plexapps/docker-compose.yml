@@ -198,21 +198,23 @@ services:
   qbittorrent:
     image: binhex/arch-qbittorrentvpn:5.2.3-3-01
     container_name: qbittorrent
-    cap_add:
-      - NET_ADMIN
+    privileged: true
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
     ports:
       - 8087:8087
       - 8118:8118
     environment:
       - VPN_ENABLED=yes
       - VPN_PROV=pia
-      - VPN_CLIENT=openvpn
+      - VPN_CLIENT=wireguard
       - VPN_USER=${OPENVPN_USERNAME:?OPENVPN_USERNAME must be set}
       - VPN_PASS=${OPENVPN_PASSWORD:?OPENVPN_PASSWORD must be set}
       - STRICT_PORT_FORWARD=yes
       - ENABLE_PRIVOXY=yes
+      - USERSPACE_WIREGUARD=no
       - LAN_NETWORK=192.168.10.0/24
-      - NAME_SERVERS=1.1.1.1,1.0.0.1
+      - NAME_SERVERS=10.0.0.242
       - VPN_INPUT_PORTS=
       - VPN_OUTPUT_PORTS=
       - DEBUG=false
@@ -223,11 +225,6 @@ services:
     volumes:
       - /Apps/qbittorrent:/config
       - medias:/medias
-      - ./ca_montreal-ca-aes-128-cbc-udp-dns.ovpn:/config/openvpn/ca_montreal-ca-aes-128-cbc-udp-dns.ovpn
-    configs:
-      - source: qbittorrent-pia-auth
-        target: /config/openvpn/pia-auth.txt
-        mode: 0400
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
@@ -257,9 +254,3 @@ volumes:
         type: cifs
         device: //192.168.10.12/Medias
         o: username=${CIFS_USERNAME},password=${CIFS_PASSWORD},uid=950,gid=950
-
-configs:
-  qbittorrent-pia-auth:
-    content: |
-      ${OPENVPN_USERNAME:?OPENVPN_USERNAME must be set}
-      ${OPENVPN_PASSWORD:?OPENVPN_PASSWORD must be set}
