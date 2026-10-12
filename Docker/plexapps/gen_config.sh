@@ -11,12 +11,60 @@ usage() {
 Usage: $(basename "$0") [-l] [-r REGION_ID]
 
 Generates ./wg0.conf in the current directory.
+Missing Ubuntu packages are installed automatically using apt.
 
 Options:
   -l, --list-regions       List available PIA WireGuard regions and exit.
   -r, --region REGION_ID   Generate a configuration for this PIA region.
   -h, --help               Show this help text.
 EOF
+}
+
+install_dependencies() {
+	local packages=()
+
+	for command in "$@"
+	do
+		if command -v "$command" >/dev/null 2>&1
+		then
+			continue
+		fi
+
+		case "$command" in
+			curl|jq)
+				packages+=("$command")
+				;;
+			wg)
+				packages+=(wireguard-tools)
+				;;
+		esac
+	done
+
+	if [ "${#packages[@]}" -eq 0 ]
+	then
+		return
+	fi
+
+	if ! command -v apt-get >/dev/null 2>&1
+	then
+		echo "Missing required commands: ${packages[*]}" >&2
+		echo "This script can install dependencies automatically on Ubuntu. Install them manually, then run it again." >&2
+		exit 1
+	fi
+
+	echo "Installing required packages: ${packages[*]}"
+	if command -v sudo >/dev/null 2>&1
+	then
+		sudo apt-get update && sudo apt-get install --yes "${packages[@]}" || {
+			echo "Unable to install required packages" >&2
+			exit 1
+		}
+	else
+		apt-get update && apt-get install --yes "${packages[@]}" || {
+			echo "Unable to install required packages" >&2
+			exit 1
+		}
+	fi
 }
 
 require_command() {
@@ -58,6 +106,7 @@ do
 	esac
 done
 
+install_dependencies curl jq
 require_command curl
 require_command jq
 
@@ -82,6 +131,7 @@ then
 	exit 0
 fi
 
+install_dependencies wg
 require_command wg
 require_command shuf
 
