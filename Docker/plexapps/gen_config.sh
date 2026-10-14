@@ -174,15 +174,23 @@ then
 	exit 1
 fi
 
-read -r -p "PIA username: " PIA_USERNAME
+if [ -z "${PIA_USERNAME:-}" ]
+then
+	read -r -p "PIA username: " PIA_USERNAME
+fi
+
 if [ -z "$PIA_USERNAME" ]
 then
 	echo "A PIA username is required" >&2
 	exit 1
 fi
 
-read -r -s -p "PIA password: " PIA_PASSWORD
-echo
+if [ -z "${PIA_PASSWORD:-}" ]
+then
+	read -r -s -p "PIA password: " PIA_PASSWORD
+	echo
+fi
+
 if [ -z "$PIA_PASSWORD" ]
 then
 	echo "A PIA password is required" >&2
@@ -244,6 +252,7 @@ DNS = $DNS_SERVERS
 PublicKey = $SERVER_PUBLIC_KEY
 AllowedIPs = 0.0.0.0/0, ::/0
 Endpoint = $SERVER_IP:$SERVER_PORT
+PersistentKeepalive = 25
 EOF
 
 echo "Generated $WGCONF for $REGION_NAME"

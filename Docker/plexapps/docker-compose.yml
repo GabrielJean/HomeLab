@@ -131,7 +131,9 @@ services:
       - traefik_default
 
   gluetun:
-    image: qmcgaw/gluetun:latest
+    build:
+      context: .
+    image: homelab/gluetun-pia:1
     container_name: gluetun
     cap_add:
       - NET_ADMIN
@@ -140,13 +142,14 @@ services:
     environment:
       VPN_SERVICE_PROVIDER: custom
       VPN_TYPE: wireguard
+      PIA_USERNAME: ${PIA_USERNAME}
+      PIA_PASSWORD: ${PIA_PASSWORD}
+      PIA_REGION: ${PIA_REGION}
       FIREWALL_INPUT_PORTS: 8087,9091
       FIREWALL_OUTBOUND_SUBNETS: 192.168.10.0/24
       TZ: America/Toronto
     volumes:
       - /Apps/Gluetun:/gluetun
-      # Ansible decrypts ./wg0.conf when it copies this application directory.
-      - ./wg0.conf:/gluetun/wireguard/wg0.conf:ro
     ports:
       - "8087:8087"
       - "9091:9091"
