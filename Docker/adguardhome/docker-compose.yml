@@ -1,6 +1,6 @@
 services:
   adguardhome:
-    image: adguard/adguardhome
+    image: adguard/adguardhome:v0.107.79
     container_name: adguardhome
     network_mode: "host"
     ports:
