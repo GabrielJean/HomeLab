@@ -51,6 +51,32 @@ services:
     networks:
       - traefik_default
 
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:2.6.5
+    container_name: prowlarr
+    environment:
+      PUID: "950"
+      PGID: "950"
+      TZ: America/Toronto
+    volumes:
+      - /Apps/Prowlarr:/config
+    ports:
+      - "9696:9696"
+    restart: unless-stopped
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.prowlarr.rule: "Host(`prowlarr.docker-1.gwebs.ca`)"
+      traefik.http.routers.prowlarr.entrypoints: websecure
+      traefik.http.routers.prowlarr.tls: "true"
+      traefik.http.routers.prowlarr.tls.certresolver: le
+      traefik.http.routers.prowlarr-insecure.rule: "Host(`prowlarr.docker-1.gwebs.ca`)"
+      traefik.http.routers.prowlarr-insecure.entrypoints: web
+      traefik.http.routers.prowlarr-insecure.middlewares: redirect-to-https
+      traefik.http.middlewares.redirect-to-https.redirectscheme.scheme: https
+      traefik.http.services.prowlarr.loadbalancer.server.port: "9696"
+    networks:
+      - traefik_default
+
   flaresolverr:
     image: flaresolverr/flaresolverr:v3.5.0
     container_name: flaresolverr
