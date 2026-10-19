@@ -181,7 +181,7 @@ services:
       - traefik_default
 
   transmission:
-    image: lscr.io/linuxserver/transmission:latest
+    image: lscr.io/linuxserver/transmission:4.1.3
     container_name: transmission
     network_mode: service:gluetun
     depends_on:
@@ -197,7 +197,7 @@ services:
     restart: unless-stopped
 
   qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:latest
+    image: lscr.io/linuxserver/qbittorrent:5.2.4
     container_name: qbittorrent
     network_mode: service:gluetun
     depends_on:

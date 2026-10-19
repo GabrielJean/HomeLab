@@ -4,17 +4,87 @@
     "config:recommended",
     "docker:enableMajor"
   ],
+  "timezone": "America/Toronto",
   "ignorePaths": [
     "**/Archives/**"
   ],
+  "minimumReleaseAge": "3 days",
+  "prHourlyLimit": 0,
+  "labels": [
+    "dependencies",
+    "docker"
+  ],
   "packageRules": [
     {
-      "matchPackageNames": [
-        "linuxserver/jackett"
+      "description": "Disable updates for local custom builds and private registry images",
+      "matchDatasources": [
+        "docker"
       ],
+      "matchPackageNames": [
+        "azure-dns-updater",
+        "homelab/*",
+        "gitea.docker-1.gwebs.ca/**"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Group and auto-merge all minor, patch, and digest Docker updates on Saturdays",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "groupName": "all non-major docker images",
+      "groupSlug": "docker-non-major",
       "automerge": true,
       "schedule": [
-        "before 3am on the first day of the month"
+        "before 6am on saturday"
+      ]
+    },
+    {
+      "description": "Hold back major updates for manual PR review on Saturdays",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false,
+      "schedule": [
+        "before 6am on saturday"
+      ]
+    },
+    {
+      "description": "Never auto-merge critical infrastructure, stateful services, databases, or game servers",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "/traefik/",
+        "/adguard/",
+        "/home-assistant/",
+        "/plex/",
+        "gitea/gitea",
+        "portainer/portainer-ce",
+        "qmcgaw/gluetun",
+        "wolveix/satisfactory-server",
+        "indifferentbroccoli/projectzomboid-server-docker",
+        "/postgres/",
+        "/mariadb/",
+        "/mysql/",
+        "/redis/",
+        "/nginx/",
+        "/authentik/",
+        "/authelia/"
+      ],
+      "groupName": null,
+      "automerge": false,
+      "schedule": [
+        "before 6am on saturday"
       ]
     }
   ]

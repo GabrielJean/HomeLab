@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/azure-cli
+FROM mcr.microsoft.com/azure-cli:2.91.0
 
 # Copy the script into the container
 COPY update_dns.sh /usr/local/bin/update_dns.sh
