@@ -3,12 +3,11 @@
 # install-tools.sh - Install or update omnictl and kubectl
 # ==============================================================================
 # Usage:
-#   ./install-tools.sh [INSTALL_DIR]
+#   ./install-tools.sh
 #
-# Examples:
-#   ./install-tools.sh                # Installs to ~/bin (no sudo needed)
-#   sudo ./install-tools.sh           # Installs system-wide to /usr/local/bin
-#   ./install-tools.sh /usr/local/bin # Installs to /usr/local/bin (prompts for sudo)
+# Description:
+#   Installs omnictl and kubectl system-wide to /usr/local/bin.
+#   Uses sudo automatically if write permissions are required.
 # ==============================================================================
 
 set -euo pipefail
@@ -26,29 +25,23 @@ success() { echo -e "${GREEN}${BOLD}[SUCCESS]${NC} $*"; }
 warn()  { echo -e "${YELLOW}${BOLD}[WARN]${NC} $*"; }
 error() { echo -e "${RED}${BOLD}[ERROR]${NC} $*" >&2; exit 1; }
 
-# Determine default installation directory
-if [ -n "${1:-}" ]; then
-  TARGET_DIR="$1"
-elif [ "${EUID}" -eq 0 ]; then
-  TARGET_DIR="/usr/local/bin"
-elif [ -d "$HOME/bin" ]; then
-  TARGET_DIR="$HOME/bin"
-else
-  TARGET_DIR="$HOME/.local/bin"
-fi
-
-mkdir -p "$TARGET_DIR"
+# Target installation directory
+TARGET_DIR="/usr/local/bin"
 
 # Check write permissions; use sudo if target directory is not writable
 SUDO=""
-if [ ! -w "$TARGET_DIR" ]; then
-  if command -v sudo >/dev/null 2>&1; then
-    warn "Target directory '${TARGET_DIR}' is not writable by current user. Using sudo."
-    SUDO="sudo"
-  else
-    error "Target directory '${TARGET_DIR}' is not writable and sudo is not installed."
+if [ ! -d "$TARGET_DIR" ] || [ ! -w "$TARGET_DIR" ]; then
+  if [ "${EUID}" -ne 0 ]; then
+    if command -v sudo >/dev/null 2>&1; then
+      warn "Target directory '${TARGET_DIR}' requires elevated privileges. Using sudo."
+      SUDO="sudo"
+    else
+      error "Target directory '${TARGET_DIR}' requires elevated privileges and sudo is not installed."
+    fi
   fi
 fi
+
+$SUDO mkdir -p "$TARGET_DIR"
 
 # Detect OS and Architecture
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
