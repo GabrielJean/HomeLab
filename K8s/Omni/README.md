@@ -68,6 +68,46 @@ kubectl --context admin@k8s-talos-1 get nodes
 
 ---
 
+## Automated S3 etcd Backups
+
+Omni natively supports continuous `etcd` snapshots stored directly to S3 or S3-compatible object storage (AWS S3, Cloudflare R2, MinIO, Backblaze B2, etc.).
+
+### 1. Configure S3 Credentials in Omni
+1. Copy the example configuration:
+   ```bash
+   cp K8s/Omni/backups/s3-backup-config.example.yaml K8s/Omni/backups/s3-backup-config.yaml
+   ```
+2. Edit `K8s/Omni/backups/s3-backup-config.yaml` with your bucket, endpoint, and access keys.
+3. Apply the resource to Omni:
+   ```bash
+   omnictl apply -f K8s/Omni/backups/s3-backup-config.yaml
+   ```
+4. Verify S3 connectivity:
+   ```bash
+   omnictl get etcdbackupoverallstatus
+   ```
+
+### 2. Schedule Backups in Cluster Templates
+Both [`talos-1-cluster.yaml`](clusters/talos-1-cluster.yaml) and [`talos-2-cluster.yaml`](clusters/talos-2-cluster.yaml) have automated backups configured under `features.backupConfiguration`:
+
+```yaml
+features:
+  backupConfiguration:
+    interval:
+      seconds: 3600  # Automatically snapshots etcd every hour
+      nanos: 0
+```
+
+When you run `omnictl cluster template sync -f ...`, Omni immediately triggers an initial backup and schedules recurring snapshots according to this interval.
+
+### 3. Check Backup Records
+```bash
+# List all etcd backups for a cluster:
+omnictl get etcdbackup --selector omni.sidero.dev/cluster=k8s-talos-1
+```
+
+---
+
 ## Quick Reference Commands
 
 ```bash

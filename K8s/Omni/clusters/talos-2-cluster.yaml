@@ -4,6 +4,11 @@ kubernetes:
   version: v1.37.1
 talos:
   version: v1.14.4
+features:
+  backupConfiguration:
+    interval:
+      seconds: 3600
+      nanos: 0
 patches:
   - name: allow-controlplane-scheduling
     file: patches/allow-controlplane.yaml
