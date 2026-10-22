@@ -1,0 +1,16 @@
+kind: Cluster
+name: k8s-talos-1
+kubernetes:
+  version: v1.37.1
+talos:
+  version: v1.14.4
+patches:
+  - name: allow-controlplane-scheduling
+    file: patches/allow-controlplane.yaml
+  - name: flannel-network-policies
+    file: patches/flannel-network-policies.yaml
+---
+kind: ControlPlane
+machineClass:
+  name: pve-1
+  size: 1
