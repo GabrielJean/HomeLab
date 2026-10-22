@@ -1,371 +1,549 @@
-# Kubernetes Migration Plan
+# Kubernetes Migration Plan: Multi-Home Single-Node Clusters with Talos Linux and Sidero Omni
 
 ## Table Of Contents
 
 - [Purpose](#purpose)
 - [Current Environment Summary](#current-environment-summary)
-- [Proposed Target Architecture](#proposed-target-architecture)
+- [Target Architecture](#target-architecture)
+  - [Cluster Topology: Independent Single-Node Clusters](#cluster-topology-independent-single-node-clusters)
+  - [Management Layer: Sidero Omni SaaS & omnictl](#management-layer-sidero-omni-saas--omnictl)
+  - [Dashboard & Workload Visibility: Headlamp](#dashboard--workload-visibility-headlamp)
+  - [GitOps Engine: Flux CD](#gitops-engine-flux-cd)
+  - [Operational Tooling Separation](#operational-tooling-separation)
 - [Networking And Ingress](#networking-and-ingress)
+  - [Omni Default CNI (Flannel) & Network Policies](#omni-default-cni-flannel--network-policies)
+  - [Ingress Controller, TLS, and DNS Automation](#ingress-controller-tls-and-dns-automation)
 - [Authentication And Authorization](#authentication-and-authorization)
+  - [Omni Control Plane Access](#omni-control-plane-access)
+  - [Kubernetes API Access](#kubernetes-api-access)
+  - [Headlamp Dashboard Access](#headlamp-dashboard-access)
 - [Secrets Management](#secrets-management)
 - [Storage And Backup](#storage-and-backup)
+  - [Storage Classes](#storage-classes)
+  - [Backup Strategy & Disaster Recovery](#backup-strategy--disaster-recovery)
 - [GitOps Repository Layout](#gitops-repository-layout)
 - [Migration Sequence](#migration-sequence)
+  - [Phase 0: Prerequisites & Omni Account Setup](#phase-0-prerequisites--omni-account-setup)
+  - [Phase 1: Home 1 Cluster Bootstrap & Platform Foundation](#phase-1-home-1-cluster-bootstrap--platform-foundation)
+  - [Phase 2: Home 2 Cluster Bootstrap & Multi-Cluster GitOps](#phase-2-home-2-cluster-bootstrap--multi-cluster-gitops)
+  - [Phase 3: Lower-Risk Application Migration](#phase-3-lower-risk-application-migration)
+  - [Phase 4: Stateful & Media Workloads](#phase-4-stateful--media-workloads)
+  - [Phase 5: Edge & Hardware-Bound Workloads](#phase-5-edge--hardware-bound-workloads)
 - [Workloads Remaining Outside Kubernetes Initially](#workloads-remaining-outside-kubernetes-initially)
 - [Validation And Exit Criteria](#validation-and-exit-criteria)
-- [Decisions To Confirm Before Implementation](#decisions-to-confirm-before-implementation)
+- [Confirmed Decisions & Remaining Implementation Choices](#confirmed-decisions--remaining-implementation-choices)
+
+---
 
 ## Purpose
 
-Migrate suitable homelab Docker Compose workloads to Kubernetes while keeping the platform simple, reproducible, and recoverable. The initial design prioritizes a single-admin, non-HA environment with a clear path to future growth.
+Migrate suitable homelab Docker Compose workloads running across two separate physical homes to **Talos Linux Kubernetes**, centrally managed through the **Sidero Omni SaaS platform**.
 
-This plan replaces Docker Compose application deployment through Ansible with Flux-managed GitOps. Ansible remains responsible for infrastructure that Kubernetes should not manage, including Proxmox provisioning, NAS configuration, Tailscale routing, and host maintenance.
+The architecture establishes **one single-node cluster in each home**, providing complete failure isolation and zero cross-WAN dependencies, while maintaining a unified management and deployment model:
+- **Sidero Omni SaaS** provides the control and management plane for Talos machine lifecycle, OS upgrades, automated Kubernetes version management, and secure remote SideroLink tunnels.
+- **`omnictl`** serves as the administrative CLI for machine registration, cluster templates, and credential provisioning.
+- **`kubectl`** and **K9s** serve as the day-to-day Kubernetes management tools, connecting over Omni's secure WireGuard proxy without exposing API ports to the public internet.
+- **Headlamp** acts as the user-friendly, in-cluster Kubernetes dashboard for application monitoring, logs, pod inspection, and resource visibility.
+- **Flux CD** reconciles declarative infrastructure and application manifests from this monorepo, keeping both clusters configured independently from a shared Git foundation.
+- **Ansible** continues to manage underlying Proxmox virtual machines, host hardware passthrough, NAS configuration, and Tailscale routing.
+
+---
 
 ## Current Environment Summary
 
-- Proxmox hosts: `pve-1` and `pve-2`.
-- Docker workloads are deployed by Ansible to dedicated service VMs including Docker, DNS, Plex, gaming, and NAS hosts.
-- Most application state currently uses host-local `/Apps/...` bind mounts.
-- Media is available from a NAS SMB share at `//192.168.10.12/Medias`.
-- Traefik currently exposes HTTP(S) services and obtains certificates through Let's Encrypt DNS-01 validation against Azure DNS.
-- Microsoft Entra ID and Azure resources are already part of the environment.
-- Tailscale provides private connectivity and routing between LAN segments.
+- **Physical Sites**:
+  - **Home 1 (`pve-1`)**: Hosts the primary VM infrastructure including `Docker-1` (Traefik, Plex companion apps, Gitea, WebUI, utilities), `DNS-1` (AdGuard Home), `Plex-1` (media server with GPU), `Gaming-1`, and the dedicated NAS host (`pve-nas`).
+  - **Home 2 (`pve-2`)**: Hosts secondary VM infrastructure including `Docker-2` (Traefik, Home Assistant, PDF, utilities) and `DNS-2` (AdGuard Home).
+- **Inter-Site Networking**: Tailscale site-to-site routers bridge the subnets between homes.
+- **Application State**: Workloads currently use host-local `/Apps/...` bind mounts.
+- **Shared Storage**: Media is shared from the Home 1 NAS SMB share at `//192.168.10.12/Medias`.
+- **Ingress & TLS**: Traefik currently acts as reverse proxy, handling Let's Encrypt DNS-01 challenges via Azure DNS.
+- **Identity & Secrets**: Microsoft Entra ID provides identity, and Azure Key Vault holds sensitive configuration.
 
-## Proposed Target Architecture
+---
 
-### Cluster Shape
+## Target Architecture
 
-Start with one simple Kubernetes cluster across the two Proxmox hosts:
+### Cluster Topology: Independent Single-Node Clusters
 
-| Node | Location | Role | Initial scheduling |
-| --- | --- | --- | --- |
-| `k8s-cp-1` | `pve-1` | Talos control plane and etcd | Schedulable for workloads |
-| `k8s-worker-1` | `pve-2` | Talos worker | Schedulable for workloads |
+Rather than stretching a single Kubernetes cluster across two residential WAN links (which introduces etcd latency spikes, quorum loss hazards, and split-brain failures when the inter-site tunnel drops), the environment will run **two independent single-node clusters**:
 
-The initial Kubernetes API is not highly available. If `k8s-cp-1` or `pve-1` fails, the API, Flux reconciliation, and new scheduling stop until the control plane is restored. Existing workloads on `pve-2` may continue to run.
+```text
+               +-------------------------------------------+
+               |             Sidero Omni (SaaS)            |
+               |       https://omni.siderolabs.com         |
+               +---------------------+---------------------+
+                                     |
+                SideroLink WireGuard | Encrypted Tunnels
+                                     |
+               +---------------------+---------------------+
+               |                                           |
+               v                                           v
+    +----------------------+                   +----------------------+
+    |    Home 1 (pve-1)    |                   |    Home 2 (pve-2)    |
+    |  Cluster: k8s-home-1 |                   |  Cluster: k8s-home-2 |
+    |                      |                   |                      |
+    |  +----------------+  |                   |  +----------------+  |
+    |  | Node: talos-1  |  |                   |  | Node: talos-2  |  |
+    |  | (Control Plane)|  |                   |  | (Control Plane)|  |
+    |  +----------------+  |                   |  +----------------+  |
+    |  - Omni CNI (Flannel)|                   |  - Omni CNI (Flannel)|
+    |  - Traefik Ingress   |                   |  - Traefik Ingress   |
+    |  - Flux CD           |                   |  - Flux CD           |
+    |  - Headlamp          |                   |  - Headlamp          |
+    |  - Local Storage     |                   |  - Local Storage     |
+    |  - SMB CSI (NAS)     |                   |  - Local Services    |
+    +----------------------+                   +----------------------+
+               ^                                           ^
+               |                                           |
+               +================= Tailscale ===============+
+                                Site-to-Site
+```
 
-Daily Proxmox Backup Server VM backups provide the baseline VM recovery path. Add frequent encrypted etcd snapshots stored outside `k8s-cp-1` so Kubernetes state has a lower RPO than the daily VM backup. Application data still requires its own backup and restore procedures.
+| Node Name | Cluster Name | Location / Host | Machine Role | Scheduling | Primary Workload Scope |
+| --- | --- | --- | --- | --- | --- |
+| `talos-1` | `k8s-home-1` | Home 1 (`pve-1` VM) | Talos Control Plane | `allowSchedulingOnControlPlane: true` | Web apps, dev tools, media companion stack, monitoring |
+| `talos-2` | `k8s-home-2` | Home 2 (`pve-2` VM) | Talos Control Plane | `allowSchedulingOnControlPlane: true` | Local home services, remote utility apps, secondary tooling |
 
-### Future API HA Option
+#### Benefits of Single-Node Clusters in Each Home:
+1. **Zero Cross-Site Failure Coupling**: If Home 1 loses power or internet, Home 2's cluster continues running unaffected (and vice versa). Local home automation and internal DNS remain fully operational.
+2. **Simplified Storage & Scheduling**: Local volumes have zero failover ambiguity. There is no need for complex distributed block storage (Ceph/Longhorn) that requires 3+ nodes and high-bandwidth interconnects.
+3. **No Control Plane / Worker Split Overhead**: In small footprint setups, dedicating separate VMs for control plane and workers wastes CPU and RAM on redundant kernel and etcd overhead. Single-node Talos with schedulable control plane runs workloads efficiently on 100% of the allocated resources.
+4. **Independent Maintenance Windows**: Either home cluster can be rebooted, upgraded, or reconfigured without impacting the other site.
 
-True API HA is deferred, not ruled out. It requires three Talos control-plane/etcd members across three independent physical failure domains; placing additional control-plane VMs only on `pve-1` and `pve-2` cannot survive failure of either host.
+---
 
-If a third physical node becomes available, use one control-plane node on each Proxmox host and a third, control-plane-only member on the independent hardware. It should have separate power and networking where possible.
+### Management Layer: Sidero Omni SaaS & omnictl
 
-The preferred API endpoint for that future topology is `kube-vip` in BGP mode behind a stable DNS name such as `api.k8s.gwebs.ca`. BGP is needed because L2/ARP failover cannot span the routed sites. An equivalently redundant L4 endpoint is required if BGP is unavailable.
+Sidero Omni is the cloud-hosted management platform purpose-built for Talos Linux:
 
-Until that topology exists, prioritize short and tested API recovery rather than adding partial or asymmetric etcd quorum designs.
+- **Machine Bootstrapping**: Talos VMs boot using an Omni-generated boot media (ISO or kernel image) configured with the Omni account registration URL and secure token.
+- **SideroLink WireGuard Mesh**: Each Talos machine establishes an encrypted, outbound-only WireGuard tunnel to Omni. This eliminates the need to expose Kubernetes API ports or Talos API ports to the public internet or configure port forwarding on residential routers.
+- **Declarative Cluster Templates**: Clusters are defined and managed declaratively via Omni Cluster Templates (`omni.siderolabs.io/v1alpha1`).
+- **Control Plane Schedulability**: For single-node clusters, the cluster template applies an inline machine config patch:
+  ```yaml
+  patches:
+    - name: allow-controlplane-workloads
+      inline:
+        cluster:
+          allowSchedulingOnControlPlane: true
+  ```
+- **CLI Management (`omnictl`)**:
+  - `omnictl cluster template sync -f ...`: Applies declarative cluster specifications.
+  - `omnictl cluster upgrade ...`: Executes zero-downtime or controlled OS and Kubernetes version upgrades.
+  - `omnictl kubeconfig`: Generates a kubeconfig routed securely through the Omni SideroLink proxy to the target cluster.
+  - `omnictl talosconfig`: Generates client configuration for direct Talos OS API operations.
 
-### Availability Strategy: Recoverable Stateful Services
+---
 
-The homelab is predominantly stateful. App configuration, SQLite databases, Git repositories, metrics, Plex metadata, Home Assistant data, download state, game saves, and device integrations are all persistent state. Generic replica counts do not make these applications highly available and can corrupt state when two active replicas write to incompatible local or shared storage.
+### Dashboard & Workload Visibility: Headlamp
 
-The initial availability target is **fast, tested recovery**, not active-active application deployment:
+**Headlamp** is the Kubernetes web UI dashboard for developers and administrators:
+- **Deployment**: Deployed as an in-cluster workload via Flux HelmRelease in each cluster (or configured to view both clusters from a single UI).
+- **Authentication**: Secured with Microsoft Entra ID OIDC (either natively or via an `oauth2-proxy` front end), ensuring single sign-on consistency with existing homelab tools.
+- **Role**: Headlamp provides read/write visualization for Pods, Deployments, Persistent Volumes, CronJobs, Helm releases, events, and container logs.
+- **Separation of Concerns**:
+  - **Omni SaaS UI**: Used for node hardware status, Talos OS configuration, cluster bootstrapping, and Talos upgrades.
+  - **Headlamp UI**: Used for day-to-day Kubernetes workload monitoring, log viewing, and pod inspection.
+  - **Flux CD**: Serves as the sole authoritative deployment engine—changes are made via Git commits, not manual UI clicks.
 
-| Layer | Initial design |
-| --- | --- |
-| Cluster control plane | One Talos control-plane node with frequent encrypted etcd snapshots, daily PBS VM backups, and documented restoration |
-| Application replicas | One active replica for most workloads |
-| Application placement | Explicit node affinity for local PVCs, GPUs, USB devices, and other hardware-bound workloads |
-| Configuration recovery | Flux rebuilds manifests, routing, policies, and non-secret configuration from Git |
-| Secret recovery | Azure Key Vault is the runtime authority; SOPS protects bootstrap secrets |
-| Data recovery | Application-aware backup plus volume backup to NAS and encrypted offsite storage |
-| Host failure response | Restore or reschedule onto the other Proxmox host after restoring required local state |
+---
 
-Target redundancy where it provides the largest practical benefit. DNS should remain independently available on both sites; two AdGuard instances or equivalent resolvers provide more useful resilience than attempting active-active replicas for SQLite-backed application stacks.
+### GitOps Engine: Flux CD
 
-Do not introduce Ceph, Longhorn replica volumes, multi-site synchronous storage, or active-active database designs merely to claim HA. With only two Proxmox failure domains, they add quorum, split-brain, latency, fencing, and recovery complexity without providing a complete failure-domain solution.
+Flux CD runs inside each cluster, continuously reconciling desired state from the Git repository:
 
-Control-plane API availability does not make the application data plane highly available. Stateful workloads still follow the recovery-oriented design described in this plan.
+- **Monorepo Structure**: A unified repository root manages both clusters, sharing common application definitions and infrastructure operators while maintaining separate cluster overlays (`clusters/home-1` and `clusters/home-2`).
+- **Independent State**: Each cluster has its own `Kustomization` and `HelmRelease` manifests, allowing cluster-specific sizing, volume mappings, and environment variables.
+- **Automated Upgrades**: Flux works seamlessly with Renovate Bot to detect and open PRs for Helm chart and container image updates.
+- **Continuous Validation**: GitHub Actions runs `kubeconform` and Kustomize dry-runs on pull requests before merging to `main`.
 
-### Kubernetes Distribution
+---
 
-**Decision: Talos Linux**
+### Operational Tooling Separation
 
-Talos is the recommended distribution because it is immutable, API-managed, minimal, and purpose-built for Kubernetes. It avoids maintaining general-purpose Ubuntu servers solely to host Kubernetes, while retaining a documented upgrade and recovery model.
+To ensure clean administrative boundaries, each tool is assigned a distinct responsibility:
 
-Alternatives considered:
+```mermaid
+flowchart TD
+    subgraph Sidero_Omni["Sidero Omni (SaaS) & omnictl"]
+        OMNI_OS["Talos OS Provisioning & Updates"]
+        OMNI_K8S["Kubernetes Lifecycle & Upgrades"]
+        OMNI_AUTH["SideroLink WireGuard Kubeconfig Proxy"]
+    end
 
-| Option | Assessment |
-| --- | --- |
-| Talos Linux | Recommended. Strong declarative and security model for dedicated Proxmox Kubernetes VMs. |
-| RKE2 | Mature and appropriate if Rancher becomes mandatory, but heavier than necessary for the initial cluster. |
-| K3s | A reasonable lightweight baseline, but less opinionated about immutable node management than Talos. |
-| KubeSolo | Not recommended. It is designed for permanently isolated, resource-constrained, single-node devices; it does not fit a two-host cluster with future growth goals. |
+    subgraph GitOps_Flux["Flux CD (In-Cluster GitOps)"]
+        FLUX_INFRA["Infrastructure: Ingress, cert-manager, ESO"]
+        FLUX_APPS["Applications: HelmReleases & Manifests"]
+        FLUX_STORE["Storage: Local Path & SMB CSI"]
+    end
 
-### GitOps
+    subgraph Admin_Tools["Operator Access"]
+        KUBECTL["kubectl / K9s (Direct API Control)"]
+        HEADLAMP["Headlamp Dashboard (Web UI & Logs)"]
+    end
 
-**Decision: Flux CD**
+    subgraph Host_Infra["Ansible (Proxmox Host Layer)"]
+        ANS_VM["Proxmox VM Provisioning"]
+        ANS_PBS["PBS Backup Jobs"]
+        ANS_TS["Tailscale Subnet Routers"]
+    end
 
-Flux continuously reconciles Git into the cluster. Git becomes the desired state for application and platform configuration; administrators do not make routine changes through a dashboard.
+    OMNI_AUTH --> KUBECTL
+    OMNI_K8S --> GitOps_Flux
+    GitOps_Flux --> HEADLAMP
+```
 
-GitHub Actions changes responsibility from remote deployment to validation:
-
-- Render Helm and Kustomize resources.
-- Validate Kubernetes schemas with `kubeconform` or an equivalent tool.
-- Validate policies and manifests.
-- Optionally verify referenced container images.
-- Merge to `main`; Flux performs reconciliation.
-
-Argo CD remains a valid alternative if a rich GitOps user interface becomes important. Flux is preferred because it has a smaller operational footprint and matches the single-admin, Git-first workflow.
-
-### Management And Observability
-
-- Use **Headlamp** as the Kubernetes dashboard.
-- Use **Grafana** for metrics and dashboards.
-- Use `kubectl` and K9s for direct administration and troubleshooting.
-- Do not use Rancher initially; it adds a fleet-management layer that is not currently needed.
-- Do not use Portainer as a deployment mechanism; Docker socket-based operational patterns do not transfer cleanly to Kubernetes, and GitOps must remain authoritative.
+---
 
 ## Networking And Ingress
 
-### Core Networking
+### Omni Default CNI (Flannel) & Network Policies
 
-Use Cilium as the CNI and enable the following capabilities:
+The clusters use the **out-of-the-box networking default** provided by Talos Linux and Sidero Omni, with native network policy enforcement enabled:
+- **Flannel CNI**: Deployed and configured automatically on boot by Talos. Extremely lightweight (~30–50 MB RAM per node compared to 500 MB–1 GB+ for heavy eBPF CNI stacks), saving valuable system resources.
+- **Native Kube-Proxy**: Standard Kubernetes `kube-proxy` is retained and managed natively by Talos without manual intervention.
+- **Single-Node Simplicity**: Since each cluster is a single node (`talos-1` and `talos-2`), all pod-to-pod routing is host-local. Flannel manages pod IPAM seamlessly with no overlay complexity.
+- **Outbound IP Firewalling & Network Policies (`kubeNetworkPoliciesEnabled: true`)**:
+  By enabling the built-in network policy controller in Talos machine configuration, standard Kubernetes `NetworkPolicy` resources are fully enforced for both **Ingress** and **Egress (outbound)**:
+  - **Outbound LAN Isolation**: Block pods from accessing internal home LAN subnets (e.g. `192.168.0.0/16`, `10.0.0.0/8`, `172.16.0.0/12`) while still allowing outbound internet traffic via CIDR `ipBlock` rules.
+  - **Port-Based Outbound Restrictions**: Restrict pod egress strictly to authorized ports (e.g., DNS on UDP/TCP `53` and HTTPS on TCP `443`).
+  - **Namespace & Database Isolation**: Completely block database or internal backend pods from initiating outbound connections to the internet or outside their namespace.
+  - **Zero Third-Party Agent Overhead**: Handled by the native Linux kernel packet filtering without requiring Cilium, Calico, or custom kernel modules.
 
-- Kubernetes networking and network policies.
-- L2 announcements for LAN `LoadBalancer` service addresses.
-- Gateway API implementation for HTTP(S) traffic.
+#### Example Outbound Firewall Policy (Block LAN, Allow Internet):
 
-This avoids the deprecated community NGINX Ingress Controller and eliminates the need to operate a separate MetalLB installation for the initial design.
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: isolate-from-lan
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      security: restricted-egress
+  policyTypes:
+    - Egress
+  egress:
+    # 1. Allow DNS queries to cluster CoreDNS
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # 2. Allow outbound internet traffic, while blocking internal LANs
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 192.168.0.0/16     # Home LANs
+              - 10.0.0.0/8          # Internal networks / Pod CIDRs
+              - 172.16.0.0/12       # Docker / private subnets
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+```
 
-### Ingress And Certificates
+### Ingress Controller, TLS, and DNS Automation
 
-Use the following components:
+Rather than running complex multi-node load balancers or BGP routers, traffic entry relies on the dedicated node IP and **Traefik Ingress Controller**:
 
-| Responsibility | Component |
-| --- | --- |
-| External HTTP(S) entry point | Cilium Gateway API |
-| HTTP routing | `Gateway` and `HTTPRoute` resources |
-| TLS certificate issuance and renewal | cert-manager |
-| ACME DNS-01 challenge | Azure DNS solver for cert-manager |
-| DNS record automation | external-dns, introduced after ingress is stable |
+```text
+       Clients (LAN / Tailscale)
+                   |
+                   | HTTP :80 / HTTPS :443
+                   v
+       Node IP (talos-1 / talos-2)
+                   |
+                   v (hostPort 80/443)
+       +-------------------------------+
+       |   Traefik Ingress Controller  |
+       |     (Deployed via Flux)       |
+       +---------------+---------------+
+                       |
+        +--------------+--------------+
+        |                             |
+        v                             v
+  HTTP Services                 HTTP Services
+ (Homepage, PDF, WebUI)       (Gitea, Headlamp, etc.)
+```
 
-This preserves the existing Azure DNS certificate workflow while moving certificate state from Traefik's host-local ACME file into Kubernetes `Secret` resources managed by cert-manager.
+| Component | Responsibility | Implementation Details |
+| --- | --- | --- |
+| **Traefik Ingress** | External HTTP(S) entry point & reverse proxy | Deployed via official Traefik Helm chart through Flux. Binds ports `80` and `443` directly on the host using `hostPort` (or `hostNetwork: true`), matching your existing Docker setup. |
+| **Routing Model** | Hostname & path routing | Standard Kubernetes `Ingress` resources and Traefik `IngressRoute` CRDs. |
+| **cert-manager** | Automated TLS certificates | Interacts with Let's Encrypt using DNS-01 ACME challenges against Azure DNS. |
+| **Azure DNS Solver** | ACME challenge solver | Resolves wildcard and hostname challenges against your existing Azure DNS domains. |
+| **external-dns** (Phase 2+) | DNS record synchronization | Automates creation of AdGuard Home / Azure DNS records pointing to the node IP. |
 
-Keep Docker endpoints online during migration. Introduce Kubernetes-specific DNS names or repoint one existing service name only after its Kubernetes replacement has been verified.
+**No External LoadBalancer Required**: Because each cluster is hosted on a single VM with a fixed LAN IP, incoming traffic reaches the node directly. MetalLB, L2 announcements, and floating VIPs are eliminated entirely.
+
+Traffic routes internally and externally via HTTPS. Certificates are securely stored in Kubernetes `Secret` resources and automatically rotated.
+
+---
 
 ## Authentication And Authorization
 
+### Omni Control Plane Access
+- Administrative access to Omni SaaS is protected by MFA and single-sign-on.
+- `omnictl` uses an encrypted API token to interface with the Omni management API.
+
 ### Kubernetes API Access
+- **Through Omni SideroLink Proxy**:
+  - Administrators execute `omnictl kubeconfig -c k8s-home-1` or `omnictl kubeconfig -c k8s-home-2`.
+  - The generated kubeconfig connects through the encrypted SideroLink tunnel directly to the cluster API without requiring open inbound firewall ports.
+- **Entra ID OIDC Authentication**:
+  - The Talos Kubernetes API server is configured with OIDC parameters pointing to Microsoft Entra ID.
+  - Direct local access supports `kubelogin` using Entra ID credentials with group-based RBAC bindings (`homelab-k8s-admins` mapped to `cluster-admin`).
 
-Use Microsoft Entra ID OIDC authentication for Kubernetes API users:
+### Headlamp Dashboard Access
+- Headlamp instances in each cluster are exposed via Traefik Ingress.
+- Users authenticate via Microsoft Entra ID OIDC.
+- Role-Based Access Control (RBAC) ensures users see and manage only authorized namespaces and resources.
 
-- Configure Kubernetes API server OIDC options through Talos machine configuration.
-- Create an Entra security group for administrators, such as `homelab-k8s-admins`.
-- Bind that group to `cluster-admin` for the first phase.
-- Use `kubelogin` from local kubeconfig files for device-code or browser login.
-
-Talos node administration is separate from Kubernetes API authentication. Protect and retain Talos administrative client credentials offline for disaster recovery.
-
-### Dashboard Access
-
-Protect Headlamp with Entra OIDC, using either Headlamp's OIDC support or an `oauth2-proxy` front end. The dashboard is for visibility and controlled operations, not primary deployment.
+---
 
 ## Secrets Management
 
-### Initial Model
+A hybrid approach secures secrets without storing plaintext credentials in Git:
 
-Use a hybrid secrets model:
+```text
+               +-----------------------------------+
+               |          Azure Key Vault          |
+               |      (Source of Truth Secrets)    |
+               +-----------------+-----------------+
+                                 |
+                                 | Synchronized via API
+                                 v
+               +-----------------------------------+
+               |     External Secrets Operator     |
+               |      (Running in each cluster)    |
+               +-----------------+-----------------+
+                                 |
+                                 | Creates Kubernetes Secret
+                                 v
+               +-----------------------------------+
+               |         Kubernetes Secret         |
+               |       (Consumed by Workload)      |
+               +-----------------------------------+
+```
 
-| Secret category | Source and mechanism |
-| --- | --- |
-| Runtime application secrets | Azure Key Vault synchronized by External Secrets Operator |
-| Azure Key Vault bootstrap credential | SOPS-encrypted Kubernetes secret in Git |
-| Flux and infrastructure bootstrap secrets | SOPS-encrypted Kubernetes secrets in Git where necessary |
-| Recovery material | Stored outside Git and outside the cluster |
+1. **Azure Key Vault**: Authoritative store for runtime passwords, API tokens, database credentials, and service accounts.
+2. **External Secrets Operator (ESO)**: Deployed via Flux in each cluster. Watches `ExternalSecret` custom resources and pulls secrets into Kubernetes native `Secret` objects.
+3. **SOPS / Age Encryption**: Encrypts bootstrap secrets stored in Git (such as the Azure Service Principal credentials used by ESO to authenticate to Azure Key Vault).
+4. **Disaster Recovery**: Talos machine recovery secrets and Age private keys are archived in a secure password manager outside of Git and outside the clusters.
 
-Azure Key Vault is the source of truth for application secrets. External Secrets Operator creates Kubernetes `Secret` objects for workloads from the Key Vault values.
-
-The first iteration may use a narrowly scoped Azure application credential because a self-managed Kubernetes cluster needs additional public OIDC issuer/JWKS hosting to use Azure workload identity federation. Introduce workload identity federation later after the cluster's OIDC discovery design is complete.
+---
 
 ## Storage And Backup
 
 ### Storage Classes
 
-Use three storage categories:
+Because each home runs a single-node cluster, storage architecture is clean, high-performance, and immune to distributed locking issues:
 
-| Storage type | Intended use | Initial implementation |
-| --- | --- | --- |
-| Node-local persistent storage | App configs, databases, Grafana, Gitea, and low-to-medium critical state | Local-path provisioner or OpenEBS LocalPV |
-| Shared NAS storage | Media and other multi-reader content | Kubernetes SMB CSI driver backed by the existing NAS |
-| Offsite backup storage | Encrypted recovery copies | Azure Blob Storage or another object-storage target |
+| Storage Type | Purpose | Implementation | Provisioner Behavior |
+| --- | --- | --- | --- |
+| **Node-Local PVCs** | Databases, app configuration, SQLite files, logs | **Local Path Provisioner** (or OpenEBS LocalPV) | Dynamically provisions volumes backed by the VM's high-speed virtual disk. Zero network storage latency. |
+| **Shared SMB Storage** | Bulk media (`//192.168.10.12/Medias`), shared archives | **SMB CSI Driver** | Mounts NAS shares directly into pods. Used primarily in Home 1. |
+| **Offsite Backup** | Encrypted recovery archives | **Azure Blob Storage / PBS** | Scheduled object/VM backups for offsite disaster recovery. |
 
-Do not use Azure Files as the primary application storage solution. The current NAS is closer to the workloads, already contains media, and avoids adding cloud latency and operating cost for primary state.
+### Backup Strategy & Disaster Recovery
 
-This is a recovery-oriented storage design. Local Persistent Volumes are single-node by design; the recovery procedure restores them to a selected node rather than assuming Kubernetes can move their data automatically.
+A multi-tiered backup design protects against data loss:
 
-### Data Rules
+1. **Talos & etcd State**:
+   - Omni regularly monitors etcd health.
+   - Automated etcd snapshots are taken via cron/system jobs and uploaded to NAS / Azure Blob Storage.
+2. **Proxmox Backup Server (PBS)**:
+   - PBS takes nightly image-level backups of the `talos-1` and `talos-2` virtual machines on `pve-1` and `pve-2`.
+   - In a complete VM corruption or hardware failure, the VM can be restored from PBS in minutes.
+3. **Application State & Persistent Volumes**:
+   - Workloads with critical SQLite/Postgres databases (Gitea, Grafana, Home Assistant) use scheduled application dumps or Velero/Kopia volume backups to the NAS and Azure Blob Storage.
+4. **GitOps As Desired State**:
+   - Cluster configuration, manifests, routes, and policies are 100% codified in Git. A replaced node reconciles its entire workload set automatically upon joining Flux.
 
-- Local Persistent Volumes are tied to the node that hosts their data. Define node affinity explicitly for each stateful workload.
-- Use the SMB CSI driver for the existing `Medias` share rather than copying media into Kubernetes volumes.
-- Do not use `hostPath` as a general application storage abstraction.
-- Preserve application-native backup procedures for databases and configuration where available.
-- Use scheduled Talos/etcd snapshots, volume backups with Velero/Kopia or an equivalent tool, and a tested restore procedure.
-- Proxmox snapshots are useful infrastructure recovery support but are not the only data backup method.
-- Prefer application-aware backups for databases, Gitea repositories, Plex metadata, Home Assistant, Arr services, torrent state, and game saves.
-- Treat the NAS as a dependency with its own backup and recovery plan; SMB CSI provides shared access, not NAS high availability.
-- Encrypt and copy backup data to an independent target such as Azure Blob Storage.
+---
 
 ## GitOps Repository Layout
 
-Use this `K8s/` directory as the GitOps root:
+The repository will be structured under `K8s/` to support both single-node clusters while sharing common infrastructure and application manifests:
 
 ```text
 K8s/
-  clusters/
-    homelab/
-      flux-system/
-      infrastructure.yaml
-      apps.yaml
-  infrastructure/
-    cilium/
-    cert-manager/
-    external-secrets/
-    gateway/
-    monitoring/
-    storage/
-  apps/
-    homepage/
-    stirling-pdf/
-    open-webui/
-    gitea/
-    grafana/
-  platform/
-    namespaces/
-    rbac/
-    policies/
-    secrets/
-  talos/
-    patches/
-    controlplane.yaml
-    worker.yaml
+├── clusters/
+│   ├── home-1/                         # Home 1 Cluster Definition (pve-1)
+│   │   ├── flux-system/                # Flux operator manifests
+│   │   ├── infrastructure.yaml         # Points to infrastructure/ overlays
+│   │   └── apps.yaml                   # Points to Home 1 apps
+│   └── home-2/                         # Home 2 Cluster Definition (pve-2)
+│       ├── flux-system/                # Flux operator manifests
+│       ├── infrastructure.yaml         # Points to infrastructure/ overlays
+│       └── apps.yaml                   # Points to Home 2 apps
+│
+├── infrastructure/                     # Cluster-wide platform components
+│   ├── ingress/                        # Traefik Ingress Controller HelmRelease
+│   ├── cert-manager/                   # ACME cert-manager & Azure DNS solver
+│   ├── external-secrets/               # External Secrets Operator & Azure Key Vault Store
+│   ├── storage/                        # Local Path Provisioner & SMB CSI
+│   ├── headlamp/                       # Headlamp web dashboard
+│   └── monitoring/                     # Prometheus & Grafana stack
+│
+├── apps/                               # Application definitions (base & overlays)
+│   ├── base/                           # Shared application templates
+│   │   ├── stirling-pdf/
+│   │   ├── open-webui/
+│   │   ├── homepage/
+│   │   └── termix/
+│   ├── home-1/                         # Home 1 specific workloads
+│   │   ├── gitea/
+│   │   ├── plexapps/                   # Sonarr, Radarr, Overseerr, Jackett
+│   │   ├── stockbot/
+│   │   ├── finglass/
+│   │   └── joke-de-jean/
+│   └── home-2/                         # Home 2 specific workloads
+│       └── homeassistant/
+│
+├── omni/                               # Omni declarative templates
+│   ├── clusters/
+│   │   ├── home-1-cluster.yaml         # Omni template for Home 1 cluster
+│   │   └── home-2-cluster.yaml         # Omni template for Home 2 cluster
+│   └── patches/
+│       └── allow-controlplane.yaml     # Machine patch to allow scheduling on CP
+│
+└── platform/                           # Shared RBAC, namespaces, and security policies
+    ├── namespaces/
+    ├── rbac/
+    ├── policies/                       # Outbound firewall & NetworkPolicy rules
+    └── sops/                           # Encrypted bootstrap secrets
 ```
 
-The exact file structure may evolve, but the ownership boundary should remain clear:
-
-- `talos/` describes machine configuration.
-- `infrastructure/` describes cluster-wide operators and services.
-- `platform/` describes shared policy, namespaces, RBAC, and secret definitions.
-- `apps/` describes individual applications.
-- `clusters/homelab/` composes the desired state for this cluster.
+---
 
 ## Migration Sequence
 
-### Phase 0: Discovery And Prerequisites
+### Phase 0: Prerequisites & Omni Account Setup
 
-1. Size the Kubernetes VMs for expected workload memory, CPU, disk, and GPU requirements.
-2. Select Pod and Service CIDRs that do not overlap existing LAN networks or Tailscale-routed subnets.
-3. Reserve LAN IP addresses for Kubernetes nodes and Gateway/LoadBalancer services.
-4. Configure frequent encrypted etcd snapshots to a target outside the control-plane VM and retain daily PBS VM backups.
-5. Define per-application recovery point objective (RPO), recovery time objective (RTO), backup target, retention, and restore validation before migration.
-6. Inventory every Docker `.env`, `/Apps` directory, database, SMB mount, device mapping, exposed port, and current DNS name.
-7. Classify each workload as single-active, hardware-bound, NAS-backed, or requiring application-native backup.
+1. **Omni Setup**:
+   - Access the Sidero Omni SaaS account (`omni.siderolabs.com`).
+   - Install `omnictl` locally and authenticate using `omnictl config merge`.
+   - Download the customized Talos boot media (ISO) from Omni for the Proxmox environment.
+2. **IP & Network Allocation**:
+   - Reserve static LAN IP addresses for node `talos-1` (`k8s-home-1`) on Home 1's LAN and node `talos-2` (`k8s-home-2`) on Home 2's LAN.
+   - Ensure Pod CIDRs (`10.244.0.0/16` and `10.245.0.0/16`) and Service CIDRs do not conflict with existing LANs or Tailscale networks.
+3. **Repository Setup**:
+   - Initialize the `K8s/` directory layout with Flux multi-cluster directories and Omni template specifications.
 
-### Phase 1: Cluster Foundation
+### Phase 1: Home 1 Cluster Bootstrap & Platform Foundation
 
-1. Create the Talos control-plane VM on `pve-1` and worker VM on `pve-2`.
-2. Bootstrap the cluster, configure encrypted etcd snapshots, and retain encrypted recovery copies of Talos and Kubernetes credentials.
-3. Test control-plane recovery from an etcd snapshot and from a PBS VM restore in an isolated or planned recovery scenario.
-4. Install Cilium and configure L2 LoadBalancer address pools and Gateway API.
-5. Bootstrap Flux from this repository.
-6. Deploy cert-manager, Azure DNS credentials, and a test certificate.
-7. Deploy External Secrets Operator and connect it to Azure Key Vault.
-8. Deploy local persistent storage and SMB CSI storage.
-9. Configure Entra OIDC authentication, Kubernetes RBAC, and Headlamp access.
-10. Deploy metrics, logs, alerts, and backups.
+1. **Provision VM**: Create a dedicated VM named `talos-1` on `pve-1` and boot using the Omni Talos ISO.
+2. **Machine Registration**: The node `talos-1` appears in the Omni SaaS dashboard under Machines.
+3. **Cluster Creation**: Apply `omni/clusters/home-1-cluster.yaml` via `omnictl cluster template sync`:
+   - Configures single-node cluster with `allowSchedulingOnControlPlane: true`.
+   - Uses Omni default CNI (Flannel) with native NetworkPolicies (`kubeNetworkPoliciesEnabled: true`) and standard `kube-proxy`.
+4. **Access Verification**:
+   - Fetch kubeconfig via `omnictl kubeconfig -c k8s-home-1`.
+   - Verify node readiness with `kubectl get nodes` (shows `talos-1` in `Ready` state with Flannel CNI active).
+5. **Flux CD Bootstrap**: Run `flux bootstrap github` pointing to `clusters/home-1`.
+6. **Deploy Platform Services via Flux**:
+   - Traefik Ingress Controller (with `hostPort: 80/443`).
+   - Local Path Provisioner and SMB CSI driver.
+   - cert-manager with Azure DNS solver.
+   - External Secrets Operator connected to Azure Key Vault.
+   - Headlamp dashboard with Entra ID OIDC authentication.
 
-### Phase 2: Lower-Risk Application Migration
+### Phase 2: Home 2 Cluster Bootstrap & Multi-Cluster GitOps
 
-Migrate lower-coupling HTTP workloads first. These are still stateful where they retain configuration or user data, so each receives a PVC and backup/restore design before cutover:
+1. **Provision VM**: Create a dedicated VM named `talos-2` on `pve-2` and boot using the Omni Talos ISO.
+2. **Machine Registration**: Register machine `talos-2` in Omni SaaS.
+3. **Cluster Creation**: Apply `omni/clusters/home-2-cluster.yaml` via `omnictl cluster template sync`.
+4. **Bootstrap Flux**: Bootstrap Flux pointing to `clusters/home-2`.
+5. **Reconcile Platform Stack**: Flux reconciles Traefik Ingress, storage, cert-manager, ESO, and Headlamp on `k8s-home-2`.
+6. **Multi-Cluster Access**: Verify switching contexts seamlessly between `k8s-home-1` (`talos-1`) and `k8s-home-2` (`talos-2`) using `omnictl` and `kubectl`.
 
-- Stirling-PDF.
-- FinGlass.
-- StockBot.
-- Joke de Jean.
-- Termix.
-- Open WebUI.
-- Homepage.
+### Phase 3: Lower-Risk Application Migration
 
-For each application:
+Migrate stateless and low-risk web services from Docker Compose to Kubernetes:
+- **Applications**: Stirling-PDF, FinGlass, StockBot, Joke de Jean, Termix, Open WebUI, Homepage.
+- **Procedure**:
+  1. Create Kubernetes manifests / HelmReleases under `apps/`.
+  2. Configure `Ingress` / `IngressRoute` with Traefik and automated TLS certificates.
+  3. Validate pod startup, health probes, and persistent volumes.
+  4. Perform DNS cutover in AdGuard Home / Azure DNS from the old Docker host to the `talos-1` LAN IP.
+  5. Decommission the corresponding Docker Compose container in Ansible playbooks.
 
-1. Convert image, environment, volumes, ports, and health checks to Kubernetes resources or a maintained Helm chart.
-2. Use `Deployment`, `Service`, `HTTPRoute`, `ConfigMap`, `ExternalSecret`, and `PersistentVolumeClaim` resources as appropriate.
-3. Verify certificate issuance, routing, restart behavior, persistent data, and rollback before DNS cutover.
-4. Test a backup and restore of the application's persistent state.
-5. Retain the Docker Compose instance until the Kubernetes replacement passes validation.
+### Phase 4: Stateful & Media Workloads
 
-### Phase 3: Stateful Application Migration
+Migrate stateful applications and media companion services on `k8s-home-1`:
+- **Monitoring & Developer Tools**: Prometheus/Grafana stack and Gitea.
+  - Test database export/import and verify Local Path PVC backups.
+- **Media Companion Stack**: Overseerr, Radarr, Sonarr, Jackett, FlareSolverr.
+  - Mount NAS SMB share via SMB CSI (`//192.168.10.12/Medias`).
+  - Verify UID/GID permissions, directory write access, hardlink/rename support, and API integrations.
 
-Migrate Prometheus/Grafana, then Gitea, only after storage backups and restores have been tested.
+### Phase 5: Edge & Hardware-Bound Workloads
 
-- Define retained data duration and storage size for Prometheus.
-- Export and test Grafana dashboard and database recovery.
-- Create and test Gitea backup/restore procedures before cutover.
+Evaluate and migrate remaining complex workloads:
+- **Plex**: Requires NVIDIA GPU passthrough configuration in the Talos machine config and SMB media mounts.
+- **Home Assistant** (Home 2): Requires USB Zigbee stick passthrough (or network-attached Zigbee coordinator) and host networking configuration.
+- **VPN / Torrent Clients**: (Gluetun + qBittorrent) Requires TUN device creation, `NET_ADMIN` capabilities, and kill-switch verification.
 
-### Phase 4: Media Companion Workloads
-
-Migrate the standard media companion applications:
-
-- Overseerr.
-- Radarr.
-- Sonarr.
-- Jackett.
-- FlareSolverr.
-
-Mount the NAS media share through SMB CSI and validate file ownership, permissions, imports, and rename behavior before moving active download workflows.
-
-### Phase 5: Specialized Workloads
-
-Evaluate these only after the platform is proven:
-
-| Workload | Migration concerns |
-| --- | --- |
-| Plex | NVIDIA GPU access, media SMB mount, host-network behavior, and node-local config |
-| Gluetun plus Transmission/qBittorrent | TUN device, `NET_ADMIN`, shared network namespace, VPN kill-switch behavior, and exposed ports |
-| Home Assistant | Host networking, privileged mode, direct Zigbee USB access, and node pinning |
-| Game servers | UDP ports, fixed external ports, high memory allocation, save data, and node-local recovery |
+---
 
 ## Workloads Remaining Outside Kubernetes Initially
 
-Keep these on dedicated Docker or VM hosts until their requirements are deliberately designed and tested:
+The following services will remain on dedicated Docker or VM hosts until the core Kubernetes clusters are thoroughly proven:
 
-- AdGuard Home, because it owns host DNS/DHCP and related privileged network ports.
-- Home Assistant, because it needs host networking, privileged access, and Zigbee USB passthrough.
-- Plex, until NVIDIA GPU support, storage, and network behavior are validated.
-- Gluetun plus qBittorrent/Transmission, until privileged VPN networking is proven.
-- Satisfactory and Project Zomboid, until UDP exposure, resource isolation, and save recovery are proven.
+- **AdGuard Home (`DNS-1` and `DNS-2`)**: Provides DNS and DHCP for the physical networks. Keeping these on dedicated VMs ensures local DNS remains functional even during Kubernetes cluster maintenance.
+- **Plex Media Server (`Plex-1`)**: Kept separate until GPU drivers and transcode pipelines on Talos Linux are fully tested in staging.
+- **Gaming Servers (`Gaming-1`)**: Kept on dedicated Docker VMs due to high direct UDP port exposure and heavy memory footprints.
 
-Docker-specific components are replaced rather than migrated:
-
-- Docker-provider Traefik becomes Gateway API plus cert-manager.
-- Docker cAdvisor collection becomes Kubernetes-native metrics collection.
-- Docker-socket Portainer becomes Headlamp, Grafana, and Kubernetes CLI tooling.
+---
 
 ## Validation And Exit Criteria
 
-The platform foundation is complete when all of the following are true:
+The migration of each phase will be deemed complete once all of the following criteria are validated:
 
-- Flux reconciles a Git commit into the cluster without manual deployment steps.
-- An etcd snapshot restore and a PBS-backed control-plane VM recovery procedure are documented and tested.
-- An Entra-authenticated administrator can access the Kubernetes API and Headlamp.
-- A Gateway API route has a valid Azure DNS-issued TLS certificate.
-- External Secrets Operator retrieves an Azure Key Vault secret successfully.
-- Local and SMB-backed PersistentVolumeClaims both work and have documented restore procedures.
-- A backup and restore drill succeeds for at least one application from every storage/recovery class in use.
-- Metrics, logs, alerts, and cluster health dashboards are available.
+1. **Omni Management**:
+   - Machines in both homes register cleanly to the Omni SaaS console over SideroLink.
+   - `omnictl` successfully executes cluster template syncs and generates valid kubeconfig files.
+2. **Cluster Autonomy**:
+   - Severing the Tailscale link between homes results in zero downtime for either cluster's local applications.
+3. **GitOps & Reconciliation**:
+   - Committing a manifest change to `clusters/home-1/` or `clusters/home-2/` triggers automatic Flux reconciliation without manual intervention.
+4. **Ingress & Security**:
+   - Traefik Ingress routes traffic to target pods with valid Let's Encrypt certificates issued via Azure DNS.
+   - External Secrets Operator successfully pulls and syncs secrets from Azure Key Vault.
+5. **Storage & Persistence**:
+   - Local Path Provisioner dynamically provisions node-local volumes.
+   - Pod restart retains all SQLite and configuration data.
+   - SMB CSI successfully mounts `//192.168.10.12/Medias` with expected read/write permissions.
+6. **Operations & Observability**:
+   - Headlamp web UI is reachable via HTTPS and secured by Entra ID OIDC.
+   - PBS successfully backs up both Kubernetes VMs nightly.
 
-Each migrated application is complete only when its Kubernetes deployment has passed routing, persistence, restart, backup, monitoring, and rollback checks before the Docker Compose source is retired.
+---
 
-## Decisions To Confirm Before Implementation
+## Confirmed Decisions & Remaining Implementation Choices
 
-- Confirm the first cluster is one two-node cluster, not two independent single-node clusters.
-- Confirm Talos Linux as the Kubernetes distribution.
-- Confirm Flux CD as the GitOps reconciler.
-- Confirm Azure Key Vault plus External Secrets Operator with SOPS bootstrap secrets.
-- Confirm Cilium Gateway API, cert-manager, and Azure DNS as the ingress/certificate stack.
-- Confirm the local storage implementation: local-path provisioner or OpenEBS LocalPV.
-- Confirm the backup target and retention policy.
-- Confirm per-application RPO/RTO targets and the first workloads to receive restore testing.
-- Defer or select the future API HA topology: third physical failure domain plus BGP-backed `kube-vip` or an equivalent redundant L4 endpoint.
-- Confirm the initial DNS naming and cutover approach for Kubernetes services.
+### Confirmed Architectural Decisions:
+- **Two Single-Node Clusters**: Node `talos-1` (`k8s-home-1`) on `pve-1` and Node `talos-2` (`k8s-home-2`) on `pve-2`.
+- **Talos Linux**: Immutable, API-driven operating system.
+- **Sidero Omni (SaaS)**: Management plane for machine registration, SideroLink tunnels, and cluster lifecycle.
+- **Administrative Tooling**: `omnictl` for Omni lifecycle, `kubectl` / K9s for Kubernetes, `Headlamp` for web dashboard.
+- **GitOps**: Flux CD in a monorepo managing both clusters independently.
+- **Networking**: Omni Default CNI (Flannel) with native NetworkPolicies (`kubeNetworkPoliciesEnabled: true`) + Traefik Ingress Controller (using `hostPort: 80/443`).
+- **Secrets**: Azure Key Vault + External Secrets Operator + SOPS.
+- **Storage**: Local Path Provisioner (local PVCs) + SMB CSI Driver (NAS shares).
+
+### Remaining Implementation Choices to Confirm:
+- **Local Storage Provisioner**: Rancher Local Path Provisioner vs. OpenEBS LocalPV hostpath (Local Path Provisioner is recommended for maximum simplicity).
+- **Proxmox VM Sizing**: Allocate initial vCPU, RAM, and disk sizes for the `talos-1` and `talos-2` VMs (Recommended: 4 vCPU, 8-16 GB RAM, 60-100 GB SSD disk per VM).
+- **Static IP Allocations**: Specific IP addresses on Home 1 LAN and Home 2 LAN for the nodes `talos-1` and `talos-2`.
