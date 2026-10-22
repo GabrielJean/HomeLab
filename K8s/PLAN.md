@@ -81,7 +81,7 @@ Rather than stretching a single Kubernetes cluster across two residential WAN li
                v                                           v
     +----------------------+                   +----------------------+
     |    Home 1 (pve-1)    |                   |    Home 2 (pve-2)    |
-    |  Cluster: k8s-home-1 |                   |  Cluster: k8s-home-2 |
+    |  Cluster: k8s-talos-1|                   |  Cluster: k8s-talos-2|
     |                      |                   |                      |
     |  +----------------+  |                   |  +----------------+  |
     |  | Node: talos-1  |  |                   |  | Node: talos-2  |  |
@@ -102,8 +102,8 @@ Rather than stretching a single Kubernetes cluster across two residential WAN li
 
 | Node Name | Cluster Name | Location / Host | Machine Role | Scheduling | Primary Workload Scope |
 | --- | --- | --- | --- | --- | --- |
-| `talos-1` | `k8s-home-1` | Home 1 (`pve-1` VM) | Talos Control Plane | `allowSchedulingOnControlPlane: true` | Web apps, dev tools, media companion stack, monitoring |
-| `talos-2` | `k8s-home-2` | Home 2 (`pve-2` VM) | Talos Control Plane | `allowSchedulingOnControlPlane: true` | Local home services, remote utility apps, secondary tooling |
+| `talos-1` | `k8s-talos-1` | Home 1 (`pve-1` VM) | Talos Control Plane | `allowSchedulingOnControlPlanes: true` | Web apps, dev tools, media companion stack, monitoring |
+| `talos-2` | `k8s-talos-2` | Home 2 (`pve-2` VM) | Talos Control Plane | `allowSchedulingOnControlPlanes: true` | Local home services, remote utility apps, secondary tooling |
 
 #### Benefits of Single-Node Clusters in Each Home:
 1. **Zero Cross-Site Failure Coupling**: If Home 1 loses power or internet, Home 2's cluster continues running unaffected (and vice versa). Local home automation and internal DNS remain fully operational.
@@ -298,7 +298,7 @@ Traffic routes internally and externally via HTTPS. Certificates are securely st
 
 ### Kubernetes API Access
 - **Through Omni SideroLink Proxy**:
-  - Administrators execute `omnictl kubeconfig -c k8s-home-1` or `omnictl kubeconfig -c k8s-home-2`.
+  - Administrators execute `omnictl kubeconfig -c k8s-talos-1` or `omnictl kubeconfig -c k8s-talos-2`.
   - The generated kubeconfig connects through the encrypted SideroLink tunnel directly to the cluster API without requiring open inbound firewall ports.
 - **Entra ID OIDC Authentication**:
   - The Talos Kubernetes API server is configured with OIDC parameters pointing to Microsoft Entra ID.
@@ -436,7 +436,7 @@ K8s/
    - Install `omnictl` locally and authenticate using `omnictl config merge`.
    - Download the customized Talos boot media (ISO) from Omni for the Proxmox environment.
 2. **IP & Network Allocation**:
-   - Reserve static LAN IP addresses for node `talos-1` (`k8s-home-1`) on Home 1's LAN and node `talos-2` (`k8s-home-2`) on Home 2's LAN.
+   - Reserve static LAN IP addresses for node `talos-1` (`k8s-talos-1`) on Home 1's LAN and node `talos-2` (`k8s-talos-2`) on Home 2's LAN.
    - Ensure Pod CIDRs (`10.244.0.0/16` and `10.245.0.0/16`) and Service CIDRs do not conflict with existing LANs or Tailscale networks.
 3. **Repository Setup**:
    - Initialize the `K8s/` directory layout with Flux multi-cluster directories and Omni template specifications.
@@ -445,11 +445,11 @@ K8s/
 
 1. **Provision VM**: Create a dedicated VM named `talos-1` on `pve-1` and boot using the Omni Talos ISO.
 2. **Machine Registration**: The node `talos-1` appears in the Omni SaaS dashboard under Machines.
-3. **Cluster Creation**: Apply `omni/clusters/home-1-cluster.yaml` via `omnictl cluster template sync`:
-   - Configures single-node cluster with `allowSchedulingOnControlPlane: true`.
+3. **Cluster Creation**: Apply `omni/clusters/talos-1-cluster.yaml` via `omnictl cluster template sync`:
+   - Configures single-node cluster with `allowSchedulingOnControlPlanes: true`.
    - Uses Omni default CNI (Flannel) with native NetworkPolicies (`kubeNetworkPoliciesEnabled: true`) and standard `kube-proxy`.
 4. **Access Verification**:
-   - Fetch kubeconfig via `omnictl kubeconfig -c k8s-home-1`.
+   - Fetch kubeconfig via `omnictl kubeconfig -c k8s-talos-1`.
    - Verify node readiness with `kubectl get nodes` (shows `talos-1` in `Ready` state with Flannel CNI active).
 5. **Flux CD Bootstrap**: Run `flux bootstrap github` pointing to `clusters/home-1`.
 6. **Deploy Platform Services via Flux**:
@@ -463,10 +463,10 @@ K8s/
 
 1. **Provision VM**: Create a dedicated VM named `talos-2` on `pve-2` and boot using the Omni Talos ISO.
 2. **Machine Registration**: Register machine `talos-2` in Omni SaaS.
-3. **Cluster Creation**: Apply `omni/clusters/home-2-cluster.yaml` via `omnictl cluster template sync`.
+3. **Cluster Creation**: Apply `omni/clusters/talos-2-cluster.yaml` via `omnictl cluster template sync`.
 4. **Bootstrap Flux**: Bootstrap Flux pointing to `clusters/home-2`.
-5. **Reconcile Platform Stack**: Flux reconciles Traefik Ingress, storage, cert-manager, ESO, and Headlamp on `k8s-home-2`.
-6. **Multi-Cluster Access**: Verify switching contexts seamlessly between `k8s-home-1` (`talos-1`) and `k8s-home-2` (`talos-2`) using `omnictl` and `kubectl`.
+5. **Reconcile Platform Stack**: Flux reconciles Traefik Ingress, storage, cert-manager, ESO, and Headlamp on `k8s-talos-2`.
+6. **Multi-Cluster Access**: Verify switching contexts seamlessly between `k8s-talos-1` (`talos-1`) and `k8s-talos-2` (`talos-2`) using `omnictl` and `kubectl`.
 
 ### Phase 3: Lower-Risk Application Migration
 
@@ -481,7 +481,7 @@ Migrate stateless and low-risk web services from Docker Compose to Kubernetes:
 
 ### Phase 4: Stateful & Media Workloads
 
-Migrate stateful applications and media companion services on `k8s-home-1`:
+Migrate stateful applications and media companion services on `k8s-talos-1`:
 - **Monitoring & Developer Tools**: Prometheus/Grafana stack and Gitea.
   - Test database export/import and verify Local Path PVC backups.
 - **Media Companion Stack**: Overseerr, Radarr, Sonarr, Jackett, FlareSolverr.
@@ -534,7 +534,7 @@ The migration of each phase will be deemed complete once all of the following cr
 ## Confirmed Decisions & Remaining Implementation Choices
 
 ### Confirmed Architectural Decisions:
-- **Two Single-Node Clusters**: Node `talos-1` (`k8s-home-1`) on `pve-1` and Node `talos-2` (`k8s-home-2`) on `pve-2`.
+- **Two Single-Node Clusters**: Node `talos-1` (`k8s-talos-1`) on `pve-1` and Node `talos-2` (`k8s-talos-2`) on `pve-2`.
 - **Talos Linux**: Immutable, API-driven operating system.
 - **Sidero Omni (SaaS)**: Management plane for machine registration, SideroLink tunnels, and cluster lifecycle.
 - **Administrative Tooling**: `omnictl` for Omni lifecycle, `kubectl` / K9s for Kubernetes, `Headlamp` for web dashboard.
