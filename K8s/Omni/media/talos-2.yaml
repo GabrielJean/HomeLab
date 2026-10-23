@@ -6,8 +6,6 @@
 # - Talos Version: 1.14.4 (amd64, no secure boot)
 # - System Extensions:
 #     - siderolabs/qemu-guest-agent
-#     - siderolabs/nonfree-kmod-nvidia-lts (v580)
-#     - siderolabs/nvidia-container-toolkit-lts
 # - Initial Label: pve-2 (automatically matches MachineClass pve-2)
 #
 # Apply to Omni:
@@ -26,8 +24,6 @@ spec:
   secureboot: false
   installextensions:
     - siderolabs/qemu-guest-agent
-    - siderolabs/nonfree-kmod-nvidia-lts
-    - siderolabs/nvidia-container-toolkit-lts
   machinelabels:
     pve-2: ""
 
