@@ -1,5 +1,0 @@
-# Patch to allow workloads to be scheduled on control-plane nodes
-# Essential for single-node clusters where there are no separate worker nodes.
-cluster:
-  allowSchedulingOnControlPlanes: true
-
