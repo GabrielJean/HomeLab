@@ -26,8 +26,8 @@ spec:
   secureboot: false
   installextensions:
     - siderolabs/qemu-guest-agent
-    - siderolabs/nonfree-kmod-nvidia-lts
-    - siderolabs/nvidia-container-toolkit-lts
+    # - siderolabs/nonfree-kmod-nvidia-lts
+    # - siderolabs/nvidia-container-toolkit-lts
   machinelabels:
     pve-1: ""
 
