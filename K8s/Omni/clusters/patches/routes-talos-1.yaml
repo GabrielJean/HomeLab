@@ -1,0 +1,16 @@
+# Static routing patch for Home 1 (talos-1 / pve-1)
+# Cloud-Init configures the node's static IP and DNS nameservers.
+# This patch defines the routing table on eth0:
+# 1. Default gateway for internet and Omni SaaS connectivity (192.168.10.1)
+# 2. Site-to-site route to Home 2 (192.168.15.0/24) via local Tailscale router (192.168.10.7)
+
+machine:
+  network:
+    interfaces:
+      - interface: eth0
+        routes:
+          - network: 0.0.0.0/0
+            gateway: 192.168.10.1
+          - network: 192.168.15.0/24
+            gateway: 192.168.10.7
+

@@ -8,8 +8,8 @@ Declarative templates for provisioning and managing two independent single-node 
 
 | Cluster Name | Host / Site | Node Name | Omni Label | Machine Class | Template File |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`k8s-talos-1`** | Home 1 (`pve-1`) | `talos-1` | `pve-1` | `pve-1` | [`talos-1-cluster.yaml`](clusters/talos-1-cluster.yaml) |
-| **`k8s-talos-2`** | Home 2 (`pve-2`) | `talos-2` | `pve-2` | `pve-2` | [`talos-2-cluster.yaml`](clusters/talos-2-cluster.yaml) |
+| **`k8s-talos-1`** | Home 1 (`pve-1`) | `talos-1` | `pve-1` | `pve-1` | [`k8s-talos-1.yaml`](clusters/k8s-talos-1.yaml) |
+| **`k8s-talos-2`** | Home 2 (`pve-2`) | `talos-2` | `pve-2` | `pve-2` | [`k8s-talos-2.yaml`](clusters/k8s-talos-2.yaml) |
 
 Both clusters run as **single-node schedulable control planes** with native Flannel CNI and network policies enabled (`kubeNetworkPoliciesEnabled: true`).
 
@@ -18,17 +18,31 @@ Both clusters run as **single-node schedulable control planes** with native Flan
 ## 4-Step Bootstrap Walkthrough
 
 ### Step 1: Boot the VM in Proxmox
-1. Log in to your [Omni SaaS Dashboard](https://omni.siderolabs.com).
-2. Download the Talos boot ISO for your account.
+
+1. **Apply Media Presets to Omni (GitOps)**:
+   ```bash
+   omnictl apply -f Omni/media/
+   ```
+   *(Registers declarative presets for `talos-1` and `talos-2` with Talos 1.14.4, NoCloud cloud-init, QEMU guest agent, NVIDIA 580 LTS extensions, and auto-labels).*
+
+2. **Download Boot Media from Omni**:
+   - In your [Omni SaaS Dashboard](https://omni.siderolabs.com), open **Installation Media**, locate `talos-1` or `talos-2`, and click **Download ISO**.
 3. Upload the ISO to Proxmox and create your VM (`talos-1` on `pve-1` or `talos-2` on `pve-2`).
 4. Boot the VM.
 
 ---
 
-### Step 2: Label the Discovered Machine in Omni
-Once booted, the node connects over SideroLink and appears in the Omni UI under **Machines**:
-1. In the Omni dashboard, click the discovered machine.
-2. Add the corresponding label:
+### Step 2: Apply Machine Classes and Label Machines in Omni
+
+1. **Apply the Machine Classes to Omni**:
+   ```bash
+   omnictl apply -f Omni/classes/
+   ```
+   *(This registers the `pve-1` and `pve-2` machine selectors in Omni).*
+
+2. **Label the Discovered Machine in Omni**:
+   Once booted, the node connects over SideroLink and appears in the Omni UI under **Machines**:
+   - In the Omni dashboard, click the discovered machine.
    - For Home 1: add label **`pve-1`**
    - For Home 2: add label **`pve-2`**
 
@@ -41,16 +55,17 @@ From this repository, push the declarative cluster configuration to Omni:
 
 ```bash
 # For Home 1 (k8s-talos-1):
-omnictl cluster template sync -f omni/clusters/talos-1-cluster.yaml
+omnictl cluster template sync -f Omni/clusters/k8s-talos-1.yaml
 
 # For Home 2 (k8s-talos-2):
-omnictl cluster template sync -f omni/clusters/talos-2-cluster.yaml
+omnictl cluster template sync -f Omni/clusters/k8s-talos-2.yaml
 ```
 
 Omni will automatically:
 - Allocate the labeled node to the cluster.
 - Apply the single-node patch (`allowSchedulingOnControlPlanes: true`).
 - Enable native NetworkPolicies on Flannel.
+- Apply site-to-site static routes between Home 1 and Home 2 via local Tailscale routers.
 - Bootstrap etcd and Kubernetes.
 
 ---
@@ -60,10 +75,12 @@ Fetch the admin credentials routed through Omni's secure WireGuard proxy:
 
 ```bash
 # Merge credentials into your ~/.kube/config:
-omnictl kubeconfig -c k8s-talos-1
+omnictl kubeconfig -c k8s-talos-1 --service-account --user admin --force-context-name admin@k8s-talos-1 --force
+omnictl kubeconfig -c k8s-talos-2 --service-account --user admin --force-context-name admin@k8s-talos-2 --force
 
-# Verify the cluster:
+# Verify the clusters:
 kubectl --context admin@k8s-talos-1 get nodes
+kubectl --context admin@k8s-talos-2 get nodes
 ```
 
 ---
@@ -72,35 +89,19 @@ kubectl --context admin@k8s-talos-1 get nodes
 
 Omni natively supports continuous `etcd` snapshots stored directly to S3 or S3-compatible object storage (AWS S3, Cloudflare R2, MinIO, Backblaze B2, etc.).
 
-### 1. Configure S3 Credentials in Omni
-1. Copy the example configuration:
-   ```bash
-   cp K8s/Omni/backups/s3-backup-config.example.yaml K8s/Omni/backups/s3-backup-config.yaml
-   ```
-2. Edit `K8s/Omni/backups/s3-backup-config.yaml` with your bucket, endpoint, and access keys.
-3. Apply the resource to Omni:
-   ```bash
-   omnictl apply -f K8s/Omni/backups/s3-backup-config.yaml
-   ```
-4. Verify S3 connectivity:
-   ```bash
-   omnictl get etcdbackupoverallstatus
-   ```
 
-### 2. Schedule Backups in Cluster Templates
-Both [`talos-1-cluster.yaml`](clusters/talos-1-cluster.yaml) and [`talos-2-cluster.yaml`](clusters/talos-2-cluster.yaml) have automated backups configured under `features.backupConfiguration`:
+### 1. Schedule Backups in Cluster Templates
+Both [`k8s-talos-1.yaml`](clusters/k8s-talos-1.yaml) and [`k8s-talos-2.yaml`](clusters/k8s-talos-2.yaml) have automated backups configured under `features.backupConfiguration`:
 
 ```yaml
 features:
   backupConfiguration:
-    interval:
-      seconds: 3600  # Automatically snapshots etcd every hour
-      nanos: 0
+    interval: 1h  # Automatically snapshots etcd every hour
 ```
 
 When you run `omnictl cluster template sync -f ...`, Omni immediately triggers an initial backup and schedules recurring snapshots according to this interval.
 
-### 3. Check Backup Records
+### 2. Check Backup Records
 ```bash
 # List all etcd backups for a cluster:
 omnictl get etcdbackup --selector omni.sidero.dev/cluster=k8s-talos-1
@@ -118,7 +119,7 @@ omnictl get machines
 omnictl get clusters
 
 # Preview template changes before syncing
-omnictl cluster template diff -f omni/clusters/talos-1-cluster.yaml
+omnictl cluster template diff -f Omni/clusters/k8s-talos-1.yaml
 
 # Stream live node logs
 omnictl machine-logs <machine-id>
