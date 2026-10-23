@@ -21,3 +21,4 @@ rke2-k8s-master-1.yaml
 
 # Locally generated OKD SNO installer assets and credentials
 okd-sno/
+omniconfig.yaml
