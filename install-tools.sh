@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# install-tools.sh - Install or update omnictl and kubectl
+# install-tools.sh - Install or update omnictl, kubectl, and flux
 # ==============================================================================
 # Usage:
 #   ./install-tools.sh
 #
 # Description:
-#   Installs omnictl and kubectl system-wide to /usr/local/bin.
+#   Installs omnictl, kubectl, and flux system-wide to /usr/local/bin.
 #   Uses sudo automatically if write permissions are required.
 # ==============================================================================
 
@@ -112,6 +112,34 @@ $SUDO install -m 755 "${TMP_DIR}/kubectl" "${TARGET_DIR}/kubectl"
 success "kubectl installed to ${TARGET_DIR}/kubectl"
 echo -n "  Version: "
 "${TARGET_DIR}/kubectl" version --client --output=yaml | grep 'gitVersion:' | head -n1 | sed 's/^[ ]*//' || true
+echo ""
+
+# ------------------------------------------------------------------------------
+# 3. Install flux (Flux CD CLI)
+# ------------------------------------------------------------------------------
+info "Installing / Updating ${BOLD}flux${NC}..."
+
+FLUX_VERSION="${FLUX_VERSION:-latest}"
+if [ "$FLUX_VERSION" = "latest" ]; then
+  FLUX_VERSION="$(curl -sSL -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/fluxcd/flux2/releases/latest | grep '"tag_name":' | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')"
+  if [ -z "$FLUX_VERSION" ]; then
+    warn "Could not resolve latest flux release via GitHub API, falling back to v2.9.6"
+    FLUX_VERSION="v2.9.6"
+  fi
+fi
+
+FLUX_TAG_NO_V="${FLUX_VERSION#v}"
+FLUX_URL="https://github.com/fluxcd/flux2/releases/download/${FLUX_VERSION}/flux_${FLUX_TAG_NO_V}_${OS}_${ARCH}.tar.gz"
+info "Downloading flux ${FLUX_VERSION} from ${FLUX_URL}..."
+
+curl -sSL -f -o "${TMP_DIR}/flux.tar.gz" "$FLUX_URL" || error "Failed to download flux from $FLUX_URL"
+tar -xzf "${TMP_DIR}/flux.tar.gz" -C "${TMP_DIR}"
+chmod +x "${TMP_DIR}/flux"
+
+$SUDO install -m 755 "${TMP_DIR}/flux" "${TARGET_DIR}/flux"
+success "flux installed to ${TARGET_DIR}/flux"
+echo -n "  Version: "
+"${TARGET_DIR}/flux" --version || true
 echo ""
 
 # ------------------------------------------------------------------------------

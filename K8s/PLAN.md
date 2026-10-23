@@ -153,7 +153,7 @@ Sidero Omni is the cloud-hosted management platform purpose-built for Talos Linu
 
 Flux CD runs inside each cluster, continuously reconciling desired state from the Git repository:
 
-- **Monorepo Structure**: A unified repository root manages both clusters, sharing common application definitions and infrastructure operators while maintaining separate cluster overlays (`clusters/home-1` and `clusters/home-2`).
+- **Monorepo Structure**: A unified repository root manages both clusters, sharing common application definitions and infrastructure operators while maintaining separate cluster overlays (`clusters/k8s-talos-1` and `clusters/k8s-talos-2`).
 - **Independent State**: Each cluster has its own `Kustomization` and `HelmRelease` manifests, allowing cluster-specific sizing, volume mappings, and environment variables.
 - **Automated Upgrades**: Flux works seamlessly with Renovate Bot to detect and open PRs for Helm chart and container image updates.
 - **Continuous Validation**: GitHub Actions runs `kubeconform` and Kustomize dry-runs on pull requests before merging to `main`.
@@ -379,14 +379,14 @@ The repository will be structured under `K8s/` to support both single-node clust
 ```text
 K8s/
 ├── clusters/
-│   ├── home-1/                         # Home 1 Cluster Definition (pve-1)
+│   ├── k8s-talos-1/                    # Home 1 Cluster Definition (pve-1)
 │   │   ├── flux-system/                # Flux operator manifests
-│   │   ├── infrastructure.yaml         # Points to infrastructure/ overlays
-│   │   └── apps.yaml                   # Points to Home 1 apps
-│   └── home-2/                         # Home 2 Cluster Definition (pve-2)
+│   │   ├── infrastructure.yaml         # Points to infrastructure/
+│   │   └── apps.yaml                   # Points to k8s-talos-1 apps
+│   └── k8s-talos-2/                    # Home 2 Cluster Definition (pve-2)
 │       ├── flux-system/                # Flux operator manifests
-│       ├── infrastructure.yaml         # Points to infrastructure/ overlays
-│       └── apps.yaml                   # Points to Home 2 apps
+│       ├── infrastructure.yaml         # Points to infrastructure/
+│       └── apps.yaml                   # Points to k8s-talos-2 apps
 │
 ├── infrastructure/                     # Cluster-wide platform components
 │   ├── ingress/                        # Traefik Ingress Controller HelmRelease
@@ -402,19 +402,19 @@ K8s/
 │   │   ├── open-webui/
 │   │   ├── homepage/
 │   │   └── termix/
-│   ├── home-1/                         # Home 1 specific workloads
+│   ├── k8s-talos-1/                    # Home 1 specific workloads
 │   │   ├── gitea/
 │   │   ├── plexapps/                   # Sonarr, Radarr, Overseerr, Jackett
 │   │   ├── stockbot/
 │   │   ├── finglass/
 │   │   └── joke-de-jean/
-│   └── home-2/                         # Home 2 specific workloads
+│   └── k8s-talos-2/                    # Home 2 specific workloads
 │       └── homeassistant/
 │
-├── omni/                               # Omni declarative templates
+├── Omni/                               # Omni declarative templates
 │   ├── clusters/
-│   │   ├── home-1-cluster.yaml         # Omni template for Home 1 cluster
-│   │   └── home-2-cluster.yaml         # Omni template for Home 2 cluster
+│   │   ├── k8s-talos-1.yaml            # Omni template for Home 1 cluster
+│   │   └── k8s-talos-2.yaml            # Omni template for Home 2 cluster
 │   └── patches/
 │       └── allow-controlplane.yaml     # Machine patch to allow scheduling on CP
 │
@@ -451,7 +451,7 @@ K8s/
 4. **Access Verification**:
    - Fetch kubeconfig via `omnictl kubeconfig -c k8s-talos-1`.
    - Verify node readiness with `kubectl get nodes` (shows `talos-1` in `Ready` state with Flannel CNI active).
-5. **Flux CD Bootstrap**: Run `flux bootstrap github` pointing to `clusters/home-1`.
+5. **Flux CD Bootstrap**: Run `kubectl apply -k K8s/clusters/k8s-talos-1`.
 6. **Deploy Platform Services via Flux**:
    - Traefik Ingress Controller (with `hostPort: 80/443`).
    - Local Path Provisioner and SMB CSI driver.
@@ -464,7 +464,7 @@ K8s/
 1. **Provision VM**: Create a dedicated VM named `talos-2` on `pve-2` and boot using the Omni Talos ISO.
 2. **Machine Registration**: Register machine `talos-2` in Omni SaaS.
 3. **Cluster Creation**: Apply `K8s/Omni/clusters/k8s-talos-2.yaml` via `omnictl cluster template sync`.
-4. **Bootstrap Flux**: Bootstrap Flux pointing to `clusters/home-2`.
+4. **Bootstrap Flux**: Run `kubectl apply -k K8s/clusters/k8s-talos-2`.
 5. **Reconcile Platform Stack**: Flux reconciles Traefik Ingress, storage, cert-manager, ESO, and Headlamp on `k8s-talos-2`.
 6. **Multi-Cluster Access**: Verify switching contexts seamlessly between `k8s-talos-1` (`talos-1`) and `k8s-talos-2` (`talos-2`) using `omnictl` and `kubectl`.
 
@@ -517,7 +517,7 @@ The migration of each phase will be deemed complete once all of the following cr
 2. **Cluster Autonomy**:
    - Severing the Tailscale link between homes results in zero downtime for either cluster's local applications.
 3. **GitOps & Reconciliation**:
-   - Committing a manifest change to `clusters/home-1/` or `clusters/home-2/` triggers automatic Flux reconciliation without manual intervention.
+   - Committing a manifest change to `clusters/k8s-talos-1/` or `clusters/k8s-talos-2/` triggers automatic Flux reconciliation without manual intervention.
 4. **Ingress & Security**:
    - Traefik Ingress routes traffic to target pods with valid Let's Encrypt certificates issued via Azure DNS.
    - External Secrets Operator successfully pulls and syncs secrets from Azure Key Vault.
