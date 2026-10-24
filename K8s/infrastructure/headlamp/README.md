@@ -16,7 +16,7 @@ Headlamp provides a developer-friendly, extensible web dashboard for monitoring 
 | **Flux Plugin Image** | `ghcr.io/headlamp-k8s/headlamp-plugin-flux:v0.7.0` | Pre-loaded via initContainer |
 | **Namespace** | `headlamp` | Dedicated platform namespace |
 | **Service Port** | `80` (targets `4466`) | HTTP ClusterIP |
-| **Ingress Host** | `headlamp.k8s.gwebs.ca` | Traefik Ingress with Let's Encrypt TLS |
+| **Ingress Host** | `headlamp.${CLUSTER_NAME}.gwebs.ca` | `headlamp.talos-1.gwebs.ca` or `headlamp.talos-2.gwebs.ca` via Flux substitution |
 
 ---
 
@@ -117,7 +117,8 @@ kubectl apply -k K8s/infrastructure/headlamp
 
 ### 1. Ingress URL
 Once Traefik and cert-manager are running, access Headlamp securely via HTTPS:
-- **URL**: `https://headlamp.k8s.gwebs.ca`
+- **Home 1 (`k8s-talos-1`)**: `https://headlamp.talos-1.gwebs.ca`
+- **Home 2 (`k8s-talos-2`)**: `https://headlamp.talos-2.gwebs.ca`
 
 ### 2. Local Port-Forward (Emergency or Pre-Ingress)
 ```bash
@@ -147,7 +148,7 @@ Paste the token into the Headlamp authentication prompt.
 To enable single sign-on with your homelab Entra ID tenant:
 
 1. Register an application in Microsoft Entra ID:
-   - **Redirect URI (Web)**: `https://headlamp.k8s.gwebs.ca/oidc-callback`
+   - **Redirect URI (Web)**: `https://headlamp.talos-1.gwebs.ca/oidc-callback` (and/or `https://headlamp.talos-2.gwebs.ca/oidc-callback`)
    - Note the **Client ID**, **Tenant ID**, and generate a **Client Secret**.
 2. In [`deployment.yaml`](deployment.yaml), uncomment the OIDC container arguments:
    ```yaml

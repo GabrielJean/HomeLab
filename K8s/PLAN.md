@@ -288,6 +288,26 @@ Rather than running complex multi-node load balancers or BGP routers, traffic en
 
 Traffic routes internally and externally via HTTPS. Certificates are securely stored in Kubernetes `Secret` resources and automatically rotated.
 
+#### Cluster-Scoped Ingress & Domain Isolation Rules:
+1. **Strict Hostname Separation**:
+   - Each cluster strictly serves its own domain namespace, following the established homelab pattern:
+     - **Home 1 (`k8s-talos-1`)**: `<app>.talos-1.gwebs.ca`
+     - **Home 2 (`k8s-talos-2`)**: `<app>.talos-2.gwebs.ca`
+   - **Core Rule**: An ingress resource must **never** list both cluster hostnames in the same rule or TLS certificate block. A cluster must only answer for, and issue Let's Encrypt certificates for, its own local identity. Combining them causes operator confusion (accidentally modifying resources in Home 1 while believing you are in Home 2) and causes duplicate certificate issuance against Let's Encrypt rate limits.
+2. **DRY Configuration via Flux `postBuild.substitute`**:
+   - Shared platform components (`infrastructure/`) and shared app templates (`apps/base/`) use the `${CLUSTER_NAME:=talos-1}` placeholder in their `Ingress` specs:
+     ```yaml
+     spec:
+       rules:
+         - host: <app>.${CLUSTER_NAME:=talos-1}.gwebs.ca
+       tls:
+         - secretName: <app>-tls
+           hosts:
+             - <app>.${CLUSTER_NAME:=talos-1}.gwebs.ca
+     ```
+   - Each cluster's root Flux Kustomization (`clusters/k8s-talos-1/*.yaml` and `clusters/k8s-talos-2/*.yaml`) dynamically injects `CLUSTER_NAME: talos-1` or `CLUSTER_NAME: talos-2` at reconciliation time.
+   - This eliminates repetitive Kustomize overlay folders while ensuring 100% isolation at runtime.
+
 ---
 
 ## Authentication And Authorization
@@ -542,6 +562,7 @@ The migration of each phase will be deemed complete once all of the following cr
 - **Networking**: Omni Default CNI (Flannel) with native NetworkPolicies (`kubeNetworkPoliciesEnabled: true`) + Traefik Ingress Controller (using `hostPort: 80/443`).
 - **Secrets**: Azure Key Vault + External Secrets Operator + SOPS.
 - **Storage**: Local Path Provisioner (local PVCs) + SMB CSI Driver (NAS shares).
+- **DNS & Ingress Isolation**: Strict separation of hostnames per cluster (`<app>.talos-1.gwebs.ca` vs `<app>.talos-2.gwebs.ca`) using Flux `postBuild.substitute` (`CLUSTER_NAME`) to prevent cross-cluster routing confusion and duplicate TLS certificate requests.
 
 ### Remaining Implementation Choices to Confirm:
 - **Local Storage Provisioner**: Rancher Local Path Provisioner vs. OpenEBS LocalPV hostpath (Local Path Provisioner is recommended for maximum simplicity).
