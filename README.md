@@ -58,6 +58,34 @@ Metrics  ---> monitoring stack -------> dashboards
 | `etc/` | Version-controlled host configuration for services such as file sharing, monitoring, snapshotting, and scheduled jobs. |
 | `Archives/` | Historical infrastructure experiments and retired configuration retained for reference. |
 
+## Documentation Index (Table of Contents)
+
+A complete index of all documentation files across this repository:
+
+### Kubernetes Infrastructure & Operations (`K8s/`)
+
+* **Core & Architecture**:
+  * [`K8s/Bootstrap.md`](K8s/Bootstrap.md) — **End-to-End Bootstrap Guide**: Complete walkthrough for provisioning Talos Linux via Omni, Azure Workload Identity OIDC federation, External Secrets Operator, and Flux CD.
+  * [`K8s/PLAN.md`](K8s/PLAN.md) — **Kubernetes Migration Plan**: Architectural specifications and phased migration roadmap from Docker Compose to Talos Linux.
+  * [`K8s/Omni/README.md`](K8s/Omni/README.md) — **Sidero Omni Operations**: Machine classes, declarative media presets, site routing patches, and Omni cluster templates.
+  * [`K8s/clusters/README.md`](K8s/clusters/README.md) — **Multi-Cluster GitOps**: Flux CD architecture, independent cluster overlays, and secretless variable substitution.
+* **Platform Infrastructure Components (`K8s/infrastructure/`)**:
+  * [`K8s/infrastructure/external-secrets/README.md`](K8s/infrastructure/external-secrets/README.md) — **External Secrets Operator**: Azure Key Vault integration, secretless Workload Identity federation, secret registry, and expiration runbook.
+  * [`K8s/infrastructure/headlamp/README.md`](K8s/infrastructure/headlamp/README.md) — **Headlamp Dashboard**: Kubernetes web UI, Microsoft Entra ID OIDC SSO, Gateway API routing, and breakglass recovery.
+  * [`K8s/infrastructure/traefik/README.md`](K8s/infrastructure/traefik/README.md) — **Traefik Ingress**: Gateway API controller, HostPort 80/443 entrypoints, and cross-namespace routing.
+  * [`K8s/infrastructure/gateway-api/README.md`](K8s/infrastructure/gateway-api/README.md) — **Kubernetes Gateway API**: Standard Gateway API CRDs and Gateway listener specifications.
+  * [`K8s/infrastructure/metrics-server/README.md`](K8s/infrastructure/metrics-server/README.md) — **Metrics Server**: In-cluster resource metrics for `kubectl top` and horizontal scaling.
+  * [`K8s/infrastructure/storage/local-path/README.md`](K8s/infrastructure/storage/local-path/README.md) — **Local Path Provisioner**: Host-path dynamic storage class configuration.
+
+### Docker & Host Workloads (`Docker/`)
+
+* [`Docker/homeassistant/README-zigbee-usb.md`](Docker/homeassistant/README-zigbee-usb.md) — **Home Assistant Zigbee USB**: Hardware passthrough and device mapping guide for Zigbee coordinators.
+* [`Docker/plex/scripts/README.md`](Docker/plex/scripts/README.md) — **Plex Maintenance Scripts**: Helper scripts for Plex media server management.
+
+### Archives & Retired Experiments (`Archives/`)
+
+* [`Archives/Terraform/modules/proxmox_vm/README.md`](Archives/Terraform/modules/proxmox_vm/README.md) — **Terraform Proxmox VM Module**: Historical Terraform module for provisioning Proxmox virtual machines.
+
 ## Deployment Design
 
 The deployment model is intentionally simple:

@@ -358,10 +358,19 @@ If authentication suddenly fails:
 
 ---
 
-## Directory Reference
+## Documentation & Component Reference
 
-* [`K8s/Omni/`](Omni/): Machine classes, declarative media presets, site routing patches, and Omni cluster templates.
-* [`K8s/clusters/`](clusters/): Independent Flux cluster overlays, variable substitutions, and root synchronization definitions.
-* [`K8s/infrastructure/`](infrastructure/): Cluster-wide platform components (Headlamp, Traefik, External Secrets, storage, metrics).
-* [`K8s/apps/`](apps/): Workload manifests separated into shared templates (`base/`) and cluster overlays (`k8s-talos-1/`, `k8s-talos-2/`).
-* [`K8s/PLAN.md`](PLAN.md): Full architectural specification and phased migration plan from Docker Compose.
+* **Cluster Management & Bootstrapping**:
+  * [`K8s/Bootstrap.md`](Bootstrap.md) — Main end-to-end bootstrap walkthrough.
+  * [`K8s/PLAN.md`](PLAN.md) — Architectural design and phased migration plan from Docker Compose.
+  * [`K8s/Omni/README.md`](Omni/README.md) — Machine classes, media presets, site routing patches, and Omni cluster templates.
+  * [`K8s/clusters/README.md`](clusters/README.md) — Independent Flux cluster overlays, dynamic substitutions, and root synchronization.
+* **Platform Infrastructure Guides (`infrastructure/`)**:
+  * [`K8s/infrastructure/external-secrets/README.md`](infrastructure/external-secrets/README.md) — External Secrets Operator, Azure Key Vault, Workload Identity federation, and renewal runbook.
+  * [`K8s/infrastructure/headlamp/README.md`](infrastructure/headlamp/README.md) — Headlamp web dashboard, Microsoft Entra ID OIDC SSO, and breakglass recovery.
+  * [`K8s/infrastructure/traefik/README.md`](infrastructure/traefik/README.md) — Traefik ingress & Gateway API controller routing host ports 80/443.
+  * [`K8s/infrastructure/gateway-api/README.md`](infrastructure/gateway-api/README.md) — Kubernetes Gateway API CRDs and listeners.
+  * [`K8s/infrastructure/metrics-server/README.md`](infrastructure/metrics-server/README.md) — Metrics Server deployment for pod resource utilization.
+  * [`K8s/infrastructure/storage/local-path/README.md`](infrastructure/storage/local-path/README.md) — Local Path Provisioner host-path storage class.
+* **Application Workloads (`apps/`)**:
+  * [`K8s/apps/`](apps/) — Workload manifests separated into shared templates (`base/`) and cluster overlays (`k8s-talos-1/`, `k8s-talos-2/`).
