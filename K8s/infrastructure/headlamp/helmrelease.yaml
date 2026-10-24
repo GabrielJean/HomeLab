@@ -65,6 +65,8 @@ spec:
         value: "https://login.microsoftonline.com/10b7061b-f2d0-4778-8cae-2666faf4af25/v2.0"
       - name: OIDC_SCOPES
         value: "openid profile email offline_access"
+      - name: OIDC_CALLBACK_URL
+        value: "https://headlamp.${CLUSTER_NAME:=talos-1}.gwebs.ca/oidc-callback"
 
     # Kubernetes Gateway API HTTPRoute attached to Traefik
     httpRoute:
