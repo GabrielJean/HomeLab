@@ -302,7 +302,7 @@ Rather than running complex multi-node load balancers or BGP routers, traffic en
 | Component | Responsibility | Implementation Details |
 | --- | --- | --- |
 | **Traefik Ingress** | External HTTP(S) entry point & reverse proxy | Deployed via official Traefik Helm chart through Flux. Binds ports `80` and `443` directly on the host using `hostPort` (or `hostNetwork: true`), matching your existing Docker setup. |
-| **Routing Model** | Hostname & path routing | Standard Kubernetes `Ingress` resources and Traefik `IngressRoute` CRDs. |
+| **Routing Model** | Hostname & path routing | Modern Kubernetes **Gateway API** (`GatewayClass`, `Gateway`, `HTTPRoute`) as the primary routing standard, eliminating legacy `Ingress` resources. |
 | **cert-manager** | Automated TLS certificates | Interacts with Let's Encrypt using DNS-01 ACME challenges against Azure DNS. |
 | **Azure DNS Solver** | ACME challenge solver | Resolves wildcard and hostname challenges against your existing Azure DNS domains. |
 | **external-dns** (Phase 2+) | DNS record synchronization | Automates creation of AdGuard Home / Azure DNS records pointing to the node IP. |
@@ -311,22 +311,29 @@ Rather than running complex multi-node load balancers or BGP routers, traffic en
 
 Traffic routes internally and externally via HTTPS. Certificates are securely stored in Kubernetes `Secret` resources and automatically rotated.
 
-#### Cluster-Scoped Ingress & Domain Isolation Rules:
+#### Cluster-Scoped Routing & Domain Isolation Rules:
 1. **Strict Hostname Separation**:
    - Each cluster strictly serves its own domain namespace, following the established homelab pattern:
      - **Home 1 (`k8s-talos-1`)**: `<app>.talos-1.gwebs.ca`
      - **Home 2 (`k8s-talos-2`)**: `<app>.talos-2.gwebs.ca`
-   - **Core Rule**: An ingress resource must **never** list both cluster hostnames in the same rule or TLS certificate block. A cluster must only answer for, and issue Let's Encrypt certificates for, its own local identity. Combining them causes operator confusion (accidentally modifying resources in Home 1 while believing you are in Home 2) and causes duplicate certificate issuance against Let's Encrypt rate limits.
+   - **Core Rule**: A route resource (`HTTPRoute`) must **never** list both cluster hostnames in the same rule. A cluster must only answer for, and issue Let's Encrypt certificates for, its own local identity. Combining them causes operator confusion (accidentally modifying resources in Home 1 while believing you are in Home 2) and causes duplicate certificate issuance against Let's Encrypt rate limits.
 2. **DRY Configuration via Flux `postBuild.substitute`**:
-   - Shared platform components (`infrastructure/`) and shared app templates (`apps/base/`) use the `${CLUSTER_NAME:=talos-1}` placeholder in their `Ingress` specs:
+   - Shared platform components (`infrastructure/`) and shared app templates (`apps/base/`) use the `${CLUSTER_NAME:=talos-1}` placeholder in their `HTTPRoute` specs:
      ```yaml
      spec:
+       parentRefs:
+         - name: traefik-gateway
+           namespace: traefik
+       hostnames:
+         - "<app>.${CLUSTER_NAME:=talos-1}.gwebs.ca"
        rules:
-         - host: <app>.${CLUSTER_NAME:=talos-1}.gwebs.ca
-       tls:
-         - secretName: <app>-tls
-           hosts:
-             - <app>.${CLUSTER_NAME:=talos-1}.gwebs.ca
+         - matches:
+             - path:
+                 type: PathPrefix
+                 value: /
+           backendRefs:
+             - name: <app-service>
+               port: 80
      ```
    - Each cluster's root Flux Kustomization (`clusters/k8s-talos-1/*.yaml` and `clusters/k8s-talos-2/*.yaml`) dynamically injects `CLUSTER_NAME: talos-1` or `CLUSTER_NAME: talos-2` at reconciliation time.
    - This eliminates repetitive Kustomize overlay folders while ensuring 100% isolation at runtime.
