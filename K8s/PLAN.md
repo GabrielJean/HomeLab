@@ -2,6 +2,7 @@
 
 ## Table Of Contents
 
+- [Current Status & Implementation Checklist](#current-status--implementation-checklist)
 - [Purpose](#purpose)
 - [Current Environment Summary](#current-environment-summary)
 - [Target Architecture](#target-architecture)
@@ -32,6 +33,77 @@
 - [Workloads Remaining Outside Kubernetes Initially](#workloads-remaining-outside-kubernetes-initially)
 - [Validation And Exit Criteria](#validation-and-exit-criteria)
 - [Confirmed Decisions & Remaining Implementation Choices](#confirmed-decisions--remaining-implementation-choices)
+
+---
+
+## Current Status & Implementation Checklist
+
+> [!NOTE]
+> **Active Branch**: `k8s-migration`  
+> **Overall Progress**: **Phase 0 & 1 Complete (100%)** | **Phase 2 In Progress (60%)**
+
+```mermaid
+flowchart LR
+    P0["Phase 0: Omni & GitOps<br/>(Complete)"] --> P1["Phase 1: talos-1 Core<br/>(Complete)"]
+    P1 --> P2["Phase 2: talos-2 Core<br/>(In Progress)"]
+    P2 --> P3["Phase 3: Web Apps<br/>(Pending)"]
+    P3 --> P4["Phase 4: Media & NAS<br/>(Pending)"]
+    P4 --> P5["Phase 5: GPU & Edge<br/>(Pending)"]
+    classDef done fill:#2e7d32,stroke:#1b5e20,color:#ffffff;
+    classDef inprog fill:#f57f17,stroke:#e65100,color:#ffffff;
+    classDef todo fill:#424242,stroke:#212121,color:#ffffff;
+    class P0,P1 done;
+    class P2 inprog;
+    class P3,P4,P5 todo;
+```
+
+### Phase 0: Prerequisites & Automation
+- [x] **Omni SaaS Setup**: Provisioned account and established encrypted SideroLink tunnels.
+- [x] **Administrative Tooling**: Configured `omnictl` CLI, downloaded admin credentials, and verified WireGuard proxies.
+- [x] **Dynamic Omni GitOps Pipeline**: Built [`.github/workflows/omni-gitops.yml`](../.github/workflows/omni-gitops.yml) with automated latest `omnictl` download, template validation, and zero hardcoded secrets.
+- [x] **Installation Media**: Generated declarative media presets ([`media/talos-1.yaml`](Omni/media/talos-1.yaml), [`media/talos-2.yaml`](Omni/media/talos-2.yaml)) with QEMU guest agent extensions.
+- [x] **Machine Classes & Auto-Labeling**: Configured Omni machine selectors for `pve-1` and `pve-2`.
+
+### Phase 1: Home 1 Cluster Bootstrap (`k8s-talos-1`) — COMPLETE
+- [x] **VM Provisioning**: Booted `talos-1` on Proxmox `pve-1` and registered via SideroLink.
+- [x] **Cluster Template Sync**: Applied [`Omni/clusters/k8s-talos-1.yaml`](Omni/clusters/k8s-talos-1.yaml) with single-node scheduling and Flannel native NetworkPolicies.
+- [x] **Automated etcd Backups**: Scheduled hourly S3 backups via Omni backup controller.
+- [x] **Inter-Site Networking**: Configured site-to-site static routes via Tailscale router (`192.168.10.7`).
+- [x] **Flux CD Bootstrap**: Deployed Flux CD toolkit reconciling from `clusters/k8s-talos-1`.
+- [x] **Ingress & Gateway API**: Deployed Traefik with Gateway API CRDs and `traefik-gateway` listening on `hostPort: 80/443`.
+- [x] **Persistent Storage**: Deployed Rancher Local Path Provisioner as default StorageClass (`local-path`).
+- [x] **Secrets Management**: Deployed External Secrets Operator connected to Azure Key Vault via Microsoft Entra Workload Identity Federation.
+- [x] **Structured Authentication (OIDC)**: Applied [`patches/oidc-azure-ad.yaml`](Omni/clusters/patches/oidc-azure-ad.yaml) (`KubeAuthenticationConfig`) enabling Microsoft Entra ID authentication on `kube-apiserver`.
+- [x] **Control Plane RBAC**: Deployed [`infrastructure/system-rbac/apiserver-kubelet.yaml`](infrastructure/system-rbac/apiserver-kubelet.yaml) to authorize `apiserver-kubelet-client` for kubelet webhook authorization.
+- [x] **Headlamp Dashboard**: Deployed Headlamp v0.46.0 with Flux UI plugin, Gateway API routing (`headlamp.talos-1.gwebs.ca`), Entra ID OIDC SSO, and static breakglass token secret.
+
+### Phase 2: Home 2 Cluster Bootstrap (`k8s-talos-2`) — IN PROGRESS
+- [x] **VM Provisioning**: Booted `talos-2` on Proxmox `pve-2` and registered via SideroLink.
+- [x] **Cluster Template Sync**: Applied [`Omni/clusters/k8s-talos-2.yaml`](Omni/clusters/k8s-talos-2.yaml) with single-node scheduling, Flannel NetworkPolicies, and hourly etcd S3 backups.
+- [x] **Structured Authentication**: Synchronized `KubeAuthenticationConfig` patch to `k8s-talos-2` control plane.
+- [x] **Control Plane RBAC**: Applied `ClusterRoleBinding/apiserver-kubelet-admin` on `k8s-talos-2`.
+- [ ] **Bootstrap Flux CD**: Run `kubectl apply -k K8s/clusters/k8s-talos-2` to install Flux controllers on `k8s-talos-2`.
+- [ ] **Reconcile Platform Infrastructure**: Flux reconciliation of Traefik, Local Path Storage, External Secrets Operator, and Headlamp on `k8s-talos-2`.
+- [ ] **Verify Headlamp SSO**: Test Microsoft Entra ID sign-in on `https://headlamp.talos-2.gwebs.ca`.
+
+### Phase 3: Lower-Risk Application Migration (Pending)
+- [ ] **Stirling-PDF**: Deploy PDF manipulation suite with Local Path PVC.
+- [ ] **FinGlass / StockBot**: Financial tracking and alerting tools.
+- [ ] **Joke de Jean / Termix**: Utility web tools.
+- [ ] **Open WebUI**: Local AI interface.
+- [ ] **Homepage**: Cluster and homelab dashboard.
+- [ ] **DNS Cutover**: Switch local DNS records in AdGuard Home to cluster IPs.
+
+### Phase 4: Stateful & Media Workloads (Pending)
+- [ ] **SMB CSI Driver**: Install and validate SMB CSI driver mounting `//192.168.10.12/Medias`.
+- [ ] **Developer Stack**: Migrate Gitea with PostgreSQL and Local Path PVC backups.
+- [ ] **Observability Stack**: Deploy Prometheus, Grafana, and Alertmanager.
+- [ ] **Media Companion Stack**: Migrate Radarr, Sonarr, Overseerr, Jackett, and FlareSolverr.
+
+### Phase 5: Edge & Hardware-Bound Workloads (Pending)
+- [ ] **Plex Media Server**: Add NVIDIA extensions (`siderolabs/nonfree-kmod-nvidia-lts`, `siderolabs/nvidia-container-toolkit-lts`) and configure GPU passthrough on `talos-1`.
+- [ ] **Home Assistant**: Deploy on `talos-2` with host networking and Zigbee coordinator integration.
+- [ ] **VPN / Torrent Clients**: Deploy Gluetun VPN container with qBittorrent sidecar and kill-switch verification.
 
 ---
 
