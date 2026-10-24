@@ -158,6 +158,24 @@ Flux CD runs inside each cluster, continuously reconciling desired state from th
 - **Automated Upgrades**: Flux works seamlessly with Renovate Bot to detect and open PRs for Helm chart and container image updates.
 - **Continuous Validation**: GitHub Actions runs `kubeconform` and Kustomize dry-runs on pull requests before merging to `main`.
 
+#### GitOps Bootstrap & Schema Integrity Rules (Zero-Friction Guarantee):
+1. **Two-Stage Initial Bootstrap Protocol**:
+   - When bootstrapping a brand-new cluster into GitOps from zero, the Kubernetes API cannot accept custom resources (`Kustomization`, `GitRepository`) before their CRD schemas are registered.
+   - Use the dedicated bootstrap script ([K8s/scripts/bootstrap-cluster.sh](file:///home/gabriel/HomeLab/K8s/scripts/bootstrap-cluster.sh)):
+     - **Stage 1**: Deploys `gotk-components.yaml` (Flux namespace, CRDs, and controllers).
+     - **Stage 2**: Awaits CRD establishment (`Established`) and controller availability (`Available`).
+     - **Stage 3**: Applies cluster root Kustomizations (`apps.yaml`, `infrastructure.yaml`, `gotk-sync.yaml`).
+   - Once Stage 3 completes, Flux takes over 100% autonomously without manual intervention.
+2. **Strict HelmRelease Schema Pre-Validation**:
+   - Modern Helm charts enforce strict JSON schema validation (`values.schema.json`).
+   - Legacy, renamed, or misspelled chart parameters cause Helm controller failures that block Flux health checks.
+   - Always run pre-commit validation via [K8s/scripts/validate.sh](file:///home/gabriel/HomeLab/K8s/scripts/validate.sh) to verify `values.yaml` against upstream schemas before pushing.
+3. **Single-Node Declarative Control-Plane Schedulability**:
+   - In single-node Talos clusters (`talos-1`, `talos-2`), the control-plane taint must be removed declaratively in Omni cluster templates ([patches/allow-controlplane.yaml](file:///home/gabriel/HomeLab/K8s/Omni/clusters/patches/allow-controlplane.yaml) using `kind: KubeNodeConfig` with `taints: node-role.kubernetes.io/control-plane: $patch: delete`).
+   - Nodes must never rely on manual `kubectl taint` commands; they must boot ready to schedule user workloads from birth.
+4. **Pod Security Admission (PSA) for Host/Privileged Namespaces**:
+   - Any namespace utilizing `hostPath` (e.g. `local-path-storage`) or `hostPort` (e.g. `traefik`) must have explicit `pod-security.kubernetes.io/enforce: privileged` labels declared on its `Namespace` manifest to avoid admission controller rejections on Kubernetes 1.31+.
+
 ---
 
 ### Operational Tooling Separation
