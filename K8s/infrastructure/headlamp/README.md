@@ -180,7 +180,7 @@ Permissions are granted using Kubernetes `ClusterRoleBinding` resources:
 
 - **OIDC Administrator Binding** ([`oidc-rbac.yaml`](oidc-rbac.yaml)):
   Grants `cluster-admin` to the Entra ID user identity injected at runtime via `${OIDC_ADMIN_EMAIL}`.
-- **Kubelet-to-API Server Binding** ([`apiserver-kubelet-rbac.yaml`](../apiserver-kubelet-rbac.yaml)):
+- **Kubelet-to-API Server Binding** ([`system-rbac/apiserver-kubelet.yaml`](../system-rbac/apiserver-kubelet.yaml)):
   Binds `apiserver-kubelet-client` to `system:kubelet-api-admin` for kubelet webhook authorization.
 - **Emergency Breakglass Binding** ([`rbac-admin.yaml`](rbac-admin.yaml)):
   Provides a static ServiceAccount `headlamp-breakglass` and Secret `headlamp-breakglass-token` for emergency cluster recovery when OIDC or external internet is unavailable.
