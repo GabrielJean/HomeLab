@@ -281,6 +281,12 @@ kubectl --context admin@<cluster> apply --server-side -f https://raw.githubuserc
 
 Because the repository is public, **no SSH keys or GitHub tokens are required**.
 
+> [!IMPORTANT]
+> Ensure your working directory is the repository root:
+> ```bash
+> cd /home/gabriel/HomeLab
+> ```
+
 #### For Cluster 1 (`k8s-talos-1`):
 ```bash
 # 1. Install Flux namespace, CRDs, and controllers
