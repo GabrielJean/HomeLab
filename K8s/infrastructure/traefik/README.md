@@ -19,3 +19,4 @@ Traefik acts as the external HTTP(S) entrypoint and reverse proxy for each Talos
 ├── kustomization.yaml    # Kustomize aggregation
 └── README.md             # Documentation
 ```
+
