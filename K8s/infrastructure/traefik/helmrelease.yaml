@@ -33,8 +33,8 @@ spec:
         type: ClusterIP
 
     ingressClass:
-      enabled: true
-      isDefaultClass: true
+      enabled: false
+      isDefaultClass: false
 
     ports:
       web:
@@ -65,7 +65,7 @@ spec:
         enabled: true
         allowCrossNamespace: true
       kubernetesIngress:
-        enabled: true
+        enabled: false
       kubernetesGateway:
         enabled: true
         experimentalChannel: true
