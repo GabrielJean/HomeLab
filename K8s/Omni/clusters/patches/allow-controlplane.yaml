@@ -1,4 +1,6 @@
-# Allow scheduling user workloads on single-node control planes.
-# Removes the default 'node-role.kubernetes.io/control-plane:NoSchedule' taint.
-cluster:
-  allowSchedulingOnControlPlanes: true
+# Talos v1.14+ document patch to allow scheduling workloads on control plane nodes.
+# Removes the default 'node-role.kubernetes.io/control-plane: NoSchedule' taint.
+apiVersion: v1alpha1
+kind: KubeNodeConfig
+taints:
+  node-role.kubernetes.io/control-plane: $patch: delete
