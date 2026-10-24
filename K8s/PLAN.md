@@ -159,17 +159,22 @@ Flux CD runs inside each cluster, continuously reconciling desired state from th
 - **Continuous Validation**: GitHub Actions runs `kubeconform` and Kustomize dry-runs on pull requests before merging to `main`.
 
 #### GitOps Bootstrap & Schema Integrity Rules (Zero-Friction Guarantee):
-1. **Two-Stage Initial Bootstrap Protocol**:
-   - When bootstrapping a brand-new cluster into GitOps from zero, the Kubernetes API cannot accept custom resources (`Kustomization`, `GitRepository`) before their CRD schemas are registered.
-   - Use the dedicated bootstrap script ([K8s/scripts/bootstrap-cluster.sh](file:///home/gabriel/HomeLab/K8s/scripts/bootstrap-cluster.sh)):
-     - **Stage 1**: Deploys `gotk-components.yaml` (Flux namespace, CRDs, and controllers).
-     - **Stage 2**: Awaits CRD establishment (`Established`) and controller availability (`Available`).
-     - **Stage 3**: Applies cluster root Kustomizations (`apps.yaml`, `infrastructure.yaml`, `gotk-sync.yaml`).
-   - Once Stage 3 completes, Flux takes over 100% autonomously without manual intervention.
-2. **Strict HelmRelease Schema Pre-Validation**:
+1. **Native Two-Stage Bootstrap Ordering**:
+   - When bootstrapping a brand-new cluster into GitOps from zero, the Kubernetes API server cannot accept Custom Resources (`Kustomization`, `GitRepository`) before their CRD schemas are fully registered.
+   - Follow standard native Kubernetes bootstrap ordering using `kubectl`:
+     ```bash
+     # 1. Install Flux namespace, CRDs, and controllers
+     kubectl --context <context> apply -f K8s/clusters/<cluster>/flux-system/gotk-components.yaml
+
+     # 2. Apply cluster root GitOps definitions (GitRepository + Kustomizations)
+     kubectl --context <context> apply -k K8s/clusters/<cluster>
+     ```
+   - Alternatively, if running `kubectl apply -k K8s/clusters/<cluster>` in a single shot, re-run the same command once more after CRDs register to bind the custom resources.
+   - Once applied, Flux takes over 100% autonomously without manual intervention.
+2. **Strict HelmRelease Schema Integrity**:
    - Modern Helm charts enforce strict JSON schema validation (`values.schema.json`).
-   - Legacy, renamed, or misspelled chart parameters cause Helm controller failures that block Flux health checks.
-   - Always run pre-commit validation via [K8s/scripts/validate.sh](file:///home/gabriel/HomeLab/K8s/scripts/validate.sh) to verify `values.yaml` against upstream schemas before pushing.
+   - Legacy, renamed, or misspelled chart parameters (e.g. Traefik v2 vs v3 flags) cause Helm controller failures that block Flux health checks.
+   - Always verify `values.yaml` against upstream chart documentation or JSON schema before committing to Git.
 3. **Single-Node Declarative Control-Plane Schedulability**:
    - In single-node Talos clusters (`talos-1`, `talos-2`), the control-plane taint must be removed declaratively in Omni cluster templates ([patches/allow-controlplane.yaml](file:///home/gabriel/HomeLab/K8s/Omni/clusters/patches/allow-controlplane.yaml) using `kind: KubeNodeConfig` with `taints: node-role.kubernetes.io/control-plane: $patch: delete`).
    - Nodes must never rely on manual `kubectl taint` commands; they must boot ready to schedule user workloads from birth.

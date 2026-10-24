@@ -146,29 +146,46 @@ kubectl --context admin@k8s-talos-2 get nodes
 
 ---
 
-### Step 5: Bootstrap GitOps & Platform Stack (One Command)
+### Step 5: Bootstrap GitOps & Platform Stack
 
-Because the repository is public, **no SSH keys or GitHub tokens are required**. Simply apply the cluster Kustomization:
+Because the repository is public, **no SSH keys or GitHub tokens are required**.
+
+To bootstrap a fresh cluster into GitOps cleanly, apply the Flux components and CRDs first, followed by the cluster root synchronization:
 
 #### For Cluster 1 (`k8s-talos-1`):
 ```bash
+# 1. Install Flux namespace, CRDs, and controllers
+kubectl --context admin@k8s-talos-1 apply -f K8s/clusters/k8s-talos-1/flux-system/gotk-components.yaml
+
+# 2. Apply the cluster synchronization manifests (GitRepository + Kustomizations)
 kubectl --context admin@k8s-talos-1 apply -k K8s/clusters/k8s-talos-1
 ```
 
 #### For Cluster 2 (`k8s-talos-2`):
 ```bash
+# 1. Install Flux namespace, CRDs, and controllers
+kubectl --context admin@k8s-talos-2 apply -f K8s/clusters/k8s-talos-2/flux-system/gotk-components.yaml
+
+# 2. Apply the cluster synchronization manifests (GitRepository + Kustomizations)
 kubectl --context admin@k8s-talos-2 apply -k K8s/clusters/k8s-talos-2
 ```
 
+> [!TIP]
+> Alternatively, running `kubectl apply -k K8s/clusters/<cluster>` directly will install everything in one go. If running on a brand-new cluster where CRDs are not yet established, simply re-run the same command once more so the custom resources (`Kustomization`, `GitRepository`) attach cleanly.
+
 **What happens automatically:**
-1. Installs the Flux CD controllers (`flux-system`).
-2. Flux clones `https://github.com/GabrielJean/HomeLab.git` via anonymous HTTPS.
-3. Flux deploys all shared platform components under [`K8s/infrastructure/`](infrastructure/) (including **Headlamp** with the Flux plugin).
+1. Flux CD starts up in the `flux-system` namespace.
+2. Flux pulls `https://github.com/GabrielJean/HomeLab.git` via anonymous HTTPS.
+3. Flux deploys all shared platform components under [`K8s/infrastructure/`](infrastructure/):
+   - **Local Path Provisioner**: dynamic host storage at `/var/local-path-provisioner/<namespace>/<pvc-name>`.
+   - **Traefik Ingress Controller**: binds host ports `80` & `443` with automatic HTTP-to-HTTPS redirect.
+   - **Headlamp Dashboard**: Kubernetes web UI with the Flux GitOps plugin.
 4. Flux begins reconciling cluster-specific apps under [`K8s/apps/`](apps/).
 
-Verify Flux reconciliation:
+Verify Flux reconciliation status:
 ```bash
 kubectl --context admin@k8s-talos-1 -n flux-system get kustomizations
+# All entries (flux-system, infrastructure, apps) should report READY: True
 ```
 
 ---
