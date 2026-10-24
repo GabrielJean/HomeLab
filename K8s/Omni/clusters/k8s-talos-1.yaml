@@ -18,6 +18,8 @@ patches:
     file: patches/routes-talos-1.yaml
   - name: sa-issuer
     file: patches/service-account-issuer-talos-1.yaml
+  - name: oidc-auth
+    file: patches/oidc-azure-ad.yaml
 ---
 kind: ControlPlane
 machineClass:

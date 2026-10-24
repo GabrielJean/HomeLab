@@ -1,0 +1,21 @@
+# OpenID Connect authentication configuration for Microsoft Entra ID (Azure AD)
+# Configures kube-apiserver via Talos v1.14+ modular KubeAuthenticationConfig document.
+apiVersion: v1alpha1
+kind: KubeAuthenticationConfig
+configuration:
+  apiVersion: apiserver.config.k8s.io/v1beta1
+  kind: AuthenticationConfiguration
+  anonymous:
+    enabled: true
+    conditions:
+      - path: /livez
+      - path: /readyz
+      - path: /healthz
+  jwt:
+    - issuer:
+        url: https://login.microsoftonline.com/10b7061b-f2d0-4778-8cae-2666faf4af25/v2.0
+      audiences:
+        - e1d55ddd-3453-4a91-9842-aa7d7dc620a3
+      claimMappings:
+        username:
+          expression: 'has(claims.email) && claims.email != "" ? claims.email : (has(claims.preferred_username) ? claims.preferred_username : claims.sub)'
