@@ -57,6 +57,7 @@ spec:
       inCluster: true
       pluginsDir: /headlamp/plugins
       extraArgs:
+        - "-kubeconfig=/home/headlamp/.kube/config"
         - "-oidc-use-token-broadcast=true"
       oidc:
         useTokenBroadcast: true
