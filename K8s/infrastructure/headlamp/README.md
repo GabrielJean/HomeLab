@@ -67,6 +67,7 @@ Headlamp is configured to authenticate users via Microsoft Entra ID (Azure AD) u
    - Store this secret value directly in Azure Key Vault (`https://gjtaloskv.vault.azure.net/`) under the secret name:
      - **Secret Name**: `headlamp-oidc-client-secret`
      - **Value**: `<Azure Client Secret Value>`
+   - *(Active client secret is valid until **October 23, 2028**).*
    - The External Secrets Operator automatically synchronizes it into Kubernetes Secret `headlamp-oidc` (`OIDC_CLIENT_SECRET`). No secrets are committed to Git.
 
 3. **API Permissions**:

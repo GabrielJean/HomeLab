@@ -96,10 +96,47 @@ infrastructure/external-secrets/
 
 The following secrets must exist in Azure Key Vault (`https://gjtaloskv.vault.azure.net/`):
 
-| Secret Name in Key Vault | Target Kubernetes Secret | Target Namespace | Purpose |
-| :--- | :--- | :--- | :--- |
-| **`headlamp-oidc-client-secret`** | `headlamp-oidc` (`OIDC_CLIENT_SECRET`) | `headlamp` | Client secret required by Headlamp backend for the `/oidc-callback` authorization code exchange with Microsoft Entra ID. |
-| **`headlamp-admin-email`** | `cluster-secrets` (`OIDC_ADMIN_EMAIL`) | `flux-system` | Admin email address injected dynamically into Kubernetes RBAC (`oidc-admin` ClusterRoleBinding) so personal emails never appear in Git. |
+| Secret Name in Key Vault | Target Kubernetes Secret | Target Namespace | Expiration | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| **`headlamp-oidc-client-secret`** | `headlamp-oidc` (`OIDC_CLIENT_SECRET`) | `headlamp` | **Oct 23, 2028** | Client secret required by Headlamp backend for the `/oidc-callback` authorization code exchange with Microsoft Entra ID. |
+| **`headlamp-admin-email`** | `cluster-secrets` (`OIDC_ADMIN_EMAIL`) | `flux-system` | Never | Admin email address injected dynamically into Kubernetes RBAC (`oidc-admin` ClusterRoleBinding) so personal emails never appear in Git. |
+
+---
+
+## Secret Lifecycle, Expiration & Failure Runbook
+
+> [!WARNING]
+> **Client Secret Expiration Notice**:
+> The Microsoft Entra ID Client Secret (`headlamp-oidc-client-secret`) is valid until **October 23, 2028**.
+> If authentication suddenly fails around or after this date, consult the diagnostics below.
+
+### How to Diagnose an Expired or Broken Secret
+
+1. **Check External Secrets Operator status**:
+   ```bash
+   kubectl get externalsecrets -A
+   ```
+   If Key Vault cannot be contacted or the secret name is wrong, `STATUS` displays `SecretSyncedError` and `READY` is `False`.
+2. **Check Headlamp Backend logs**:
+   ```bash
+   kubectl logs -n headlamp -l app.kubernetes.io/name=headlamp --tail=50
+   ```
+   If the Entra ID client secret has expired, Microsoft returns:
+   `AADSTS7000222: The provided client secret keys are expired. Visit the Azure portal to create new keys for your app...`
+3. **Emergency Recovery (Breakglass)**:
+   If Entra ID login fails due to an expired secret, log into Headlamp immediately using the breakglass token:
+   ```bash
+   kubectl get secret -n headlamp headlamp-breakglass-token -o jsonpath='{.data.token}' | base64 --decode
+   echo ""
+   ```
+4. **Renewal Procedure (When October 2028 arrives)**:
+   1. Open **Microsoft Entra ID** ➔ **App registrations** ➔ `e1d55ddd-3453-4a91-9842-aa7d7dc620a3`.
+   2. Navigate to **Certificates & secrets** ➔ **+ New client secret**.
+   3. Copy the new secret **Value**.
+   4. Open **Azure Key Vault** (`gjtaloskv`) ➔ **Secrets** ➔ `headlamp-oidc-client-secret` ➔ **+ New version**.
+   5. Paste the new secret value and click **Create**.
+   6. ESO automatically detects and updates the Kubernetes Secret (or run `kubectl annotate externalsecret -n headlamp headlamp-oidc force-sync=$(date +%s) --overwrite`).
+   7. Restart the Headlamp pod: `kubectl rollout restart deployment/headlamp -n headlamp`.
 
 ---
 
@@ -209,3 +246,4 @@ kubectl get secret -n flux-system cluster-secrets -o yaml
 ```bash
 kubectl logs -n external-secrets -l app.kubernetes.io/name=external-secrets -f
 ```
+
