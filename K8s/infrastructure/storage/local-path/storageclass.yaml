@@ -10,4 +10,7 @@ metadata:
 provisioner: rancher.io/local-path
 volumeBindingMode: WaitForFirstConsumer
 reclaimPolicy: Delete
+parameters:
+  allowUnsafePathPattern: "true"
+  pathPattern: "{{ .PVC.Namespace }}/{{ .PVC.Name }}"
 
