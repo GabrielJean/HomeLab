@@ -27,9 +27,10 @@
   - [Phase 0: Prerequisites & Omni Account Setup](#phase-0-prerequisites--omni-account-setup)
   - [Phase 1: Home 1 Cluster Bootstrap & Platform Foundation](#phase-1-home-1-cluster-bootstrap--platform-foundation)
   - [Phase 2: Home 2 Cluster Bootstrap & Multi-Cluster GitOps](#phase-2-home-2-cluster-bootstrap--multi-cluster-gitops)
-  - [Phase 3: Lower-Risk Application Migration](#phase-3-lower-risk-application-migration)
-  - [Phase 4: Stateful & Media Workloads](#phase-4-stateful--media-workloads)
-  - [Phase 5: Edge & Hardware-Bound Workloads](#phase-5-edge--hardware-bound-workloads)
+  - [Phase 3: Platform Ingress TLS & Disaster Recovery](#phase-3-platform-ingress-tls--disaster-recovery)
+  - [Phase 4: Lower-Risk Application Migration](#phase-4-lower-risk-application-migration)
+  - [Phase 5: Stateful & Media Workloads](#phase-5-stateful--media-workloads)
+  - [Phase 6: Edge & Hardware-Bound Workloads](#phase-6-edge--hardware-bound-workloads)
 - [Workloads Remaining Outside Kubernetes Initially](#workloads-remaining-outside-kubernetes-initially)
 - [Validation And Exit Criteria](#validation-and-exit-criteria)
 - [Confirmed Decisions & Remaining Implementation Choices](#confirmed-decisions--remaining-implementation-choices)
@@ -40,21 +41,22 @@
 
 > [!NOTE]
 > **Active Branch**: `k8s-migration`  
-> **Overall Progress**: **Phase 0 & 1 Complete (100%)** | **Phase 2 In Progress (60%)**
+> **Overall Progress**: **Phase 0, 1 & 2 Complete (100%)** | **Phase 3 Ready to Start (0%)**
 
 ```mermaid
 flowchart LR
     P0["Phase 0: Omni & GitOps<br/>(Complete)"] --> P1["Phase 1: talos-1 Core<br/>(Complete)"]
     P1 --> P2["Phase 2: talos-2 Core<br/>(Complete)"]
-    P2 --> P3["Phase 3: Web Apps<br/>(Ready to Start)"]
-    P3 --> P4["Phase 4: Media & NAS<br/>(Pending)"]
-    P4 --> P5["Phase 5: GPU & Edge<br/>(Pending)"]
+    P2 --> P3["Phase 3: TLS & Backups<br/>(Ready to Start)"]
+    P3 --> P4["Phase 4: Web Apps<br/>(Pending)"]
+    P4 --> P5["Phase 5: Media & NAS<br/>(Pending)"]
+    P5 --> P6["Phase 6: GPU & Edge<br/>(Pending)"]
     classDef done fill:#2e7d32,stroke:#1b5e20,color:#ffffff;
     classDef inprog fill:#f57f17,stroke:#e65100,color:#ffffff;
     classDef todo fill:#424242,stroke:#212121,color:#ffffff;
     class P0,P1,P2 done;
     class P3 inprog;
-    class P4,P5 todo;
+    class P4,P5,P6 todo;
 ```
 
 ### Phase 0: Prerequisites & Automation
@@ -86,21 +88,34 @@ flowchart LR
 - [x] **Reconcile Platform Infrastructure**: Flux reconciliation of Traefik, Local Path Storage, External Secrets Operator, and Headlamp on `k8s-talos-2`.
 - [x] **Verify Headlamp SSO**: Test Microsoft Entra ID sign-in on `https://headlamp.talos-2.gwebs.ca`.
 
-### Phase 3: Lower-Risk Application Migration (Pending)
-- [ ] **Stirling-PDF**: Deploy PDF manipulation suite with Local Path PVC.
+### Phase 3: Platform Ingress TLS & Disaster Recovery — READY TO START
+- [ ] **cert-manager Deployment**: Deploy cert-manager via Flux in [`infrastructure/cert-manager/`](infrastructure/cert-manager/) with CRDs enabled.
+- [ ] **Azure DNS Secret / Credentials**: Configure Azure DNS SP credentials or Workload Identity via External Secrets Operator (`azure-dns-secret`).
+- [ ] **Let's Encrypt ClusterIssuers**:
+  - Deploy `letsencrypt-staging` and `letsencrypt-prod` `ClusterIssuer` with Azure DNS DNS-01 ACME solver for `gwebs.ca`.
+- [ ] **Wildcard TLS Certificates**:
+  - Deploy wildcard `Certificate` for `*.talos-1.gwebs.ca` on `k8s-talos-1` and attach to `traefik-gateway`.
+  - Deploy wildcard `Certificate` for `*.talos-2.gwebs.ca` on `k8s-talos-2` and attach to `traefik-gateway`.
+- [ ] **Velero Deployment**: Deploy Velero via Flux in [`infrastructure/velero/`](infrastructure/velero/) with node-agent (Kopia/Restic) enabled for PVC volume backups.
+- [ ] **Backup Storage Location (BSL)**: Configure Velero BSL targeting Azure Blob Storage (or S3/MinIO) and verify authenticated bucket connection.
+- [ ] **Backup Schedules & Policies**: Define daily cluster-wide backup schedules with retention policies.
+- [ ] **Disaster Recovery Dry-Run**: Execute an ad-hoc test backup and verify volume snapshot / metadata upload.
+
+### Phase 4: Lower-Risk Application Migration (Pending)
+- [ ] **Stirling-PDF**: Deploy PDF manipulation suite with Local Path PVC and TLS Gateway route.
 - [ ] **FinGlass / StockBot**: Financial tracking and alerting tools.
 - [ ] **Joke de Jean / Termix**: Utility web tools.
 - [ ] **Open WebUI**: Local AI interface.
 - [ ] **Homepage**: Cluster and homelab dashboard.
 - [ ] **DNS Cutover**: Switch local DNS records in AdGuard Home to cluster IPs.
 
-### Phase 4: Stateful & Media Workloads (Pending)
+### Phase 5: Stateful & Media Workloads (Pending)
 - [ ] **SMB CSI Driver**: Install and validate SMB CSI driver mounting `//192.168.10.12/Medias`.
 - [ ] **Developer Stack**: Migrate Gitea with PostgreSQL and Local Path PVC backups.
 - [ ] **Observability Stack**: Deploy Prometheus, Grafana, and Alertmanager.
 - [ ] **Media Companion Stack**: Migrate Radarr, Sonarr, Overseerr, Jackett, and FlareSolverr.
 
-### Phase 5: Edge & Hardware-Bound Workloads (Pending)
+### Phase 6: Edge & Hardware-Bound Workloads (Pending)
 - [ ] **Plex Media Server**: Add NVIDIA extensions (`siderolabs/nonfree-kmod-nvidia-lts`, `siderolabs/nvidia-container-toolkit-lts`) and configure GPU passthrough on `talos-1`.
 - [ ] **Home Assistant**: Deploy on `talos-2` with host networking and Zigbee coordinator integration.
 - [ ] **VPN / Torrent Clients**: Deploy Gluetun VPN container with qBittorrent sidecar and kill-switch verification.
@@ -410,6 +425,55 @@ Traffic routes internally and externally via HTTPS. Certificates are securely st
    - Each cluster's root Flux Kustomization (`clusters/k8s-talos-1/*.yaml` and `clusters/k8s-talos-2/*.yaml`) dynamically injects `CLUSTER_NAME: talos-1` or `CLUSTER_NAME: talos-2` at reconciliation time.
    - This eliminates repetitive Kustomize overlay folders while ensuring 100% isolation at runtime.
 
+### Automated TLS & Wildcard Certificates (cert-manager + Azure DNS)
+
+To eliminate per-application Let's Encrypt rate limits, challenge propagation delays, and open HTTP-01 ports, TLS certificates are issued via **cert-manager** using **ACME DNS-01 challenges against Azure DNS**:
+
+```text
+  +-------------------------------------------------------------------------+
+  |                              Azure DNS                                  |
+  |                           (Zone: gwebs.ca)                              |
+  +-----------------------------------+-------------------------------------+
+                                      ^
+                                      | DNS-01 TXT record challenge
+                                      v
+  +-------------------------------------------------------------------------+
+  |                    cert-manager ClusterIssuer                           |
+  |                (letsencrypt-prod / letsencrypt-staging)                 |
+  +-----------------------------------+-------------------------------------+
+                                      |
+                                      | Generates Wildcard Secret
+                                      v
+             +-------------------------------------------------+
+             |           Wildcard Certificate Resource         |
+             |  Home 1: *.talos-1.gwebs.ca                     |
+             |  Home 2: *.talos-2.gwebs.ca                     |
+             +------------------------+------------------------+
+                                      |
+                                      | Attached to TLS Gateway Listener
+                                      v
+  +-------------------------------------------------------------------------+
+  |                   Traefik Gateway (`traefik-gateway`)                   |
+  |             Port 443 HTTPS Listener (Wildcard TLS Default)              |
+  +-----------------------------------+-------------------------------------+
+                                      |
+                 +--------------------+--------------------+
+                 |                                         |
+                 v                                         v
+        HTTPRoute: headlamp                       HTTPRoute: stirling-pdf
+   (headlamp.talos-1.gwebs.ca)                   (pdf.talos-1.gwebs.ca)
+   [Instant Valid TLS - Zero Delay]              [Instant Valid TLS - Zero Delay]
+```
+
+- **Architecture Details**:
+  - **`cert-manager` Deployment**: Deployed via official Helm chart in `infrastructure/cert-manager/` with `installCRDs: true`.
+  - **Azure DNS Authentication**: Uses Azure Service Principal credentials (or Workload Identity) managed securely via Azure Key Vault and synchronized into the `cert-manager` namespace by External Secrets Operator (`azure-dns-secret`).
+  - **ClusterIssuers**: `letsencrypt-staging` (for validation) and `letsencrypt-prod` (for production certificates), targeting the Azure DNS hosted zone `gwebs.ca`.
+  - **Single Wildcard Certificate per Cluster**:
+    - `k8s-talos-1`: Issues `*.talos-1.gwebs.ca` and stores it in `Secret/wildcard-talos-1-tls` in namespace `traefik`.
+    - `k8s-talos-2`: Issues `*.talos-2.gwebs.ca` and stores it in `Secret/wildcard-talos-2-tls` in namespace `traefik`.
+  - **Seamless Gateway Integration**: The wildcard TLS Secret is bound directly to Traefik's `Gateway` HTTPS listener (`certificateRefs`). Any downstream `HTTPRoute` immediately inherits valid HTTPS without creating individual per-app certificates!
+
 ---
 
 ## Authentication And Authorization
@@ -487,10 +551,51 @@ A multi-tiered backup design protects against data loss:
 2. **Proxmox Backup Server (PBS)**:
    - PBS takes nightly image-level backups of the `talos-1` and `talos-2` virtual machines on `pve-1` and `pve-2`.
    - In a complete VM corruption or hardware failure, the VM can be restored from PBS in minutes.
-3. **Application State & Persistent Volumes**:
-   - Workloads with critical SQLite/Postgres databases (Gitea, Grafana, Home Assistant) use scheduled application dumps or Velero/Kopia volume backups to the NAS and Azure Blob Storage.
+3. **Application State & Persistent Volumes (Velero Disaster Recovery)**:
+   - Workloads with critical SQLite/Postgres databases (Gitea, Grafana, Home Assistant) and configuration PVCs use Velero for scheduled cluster-wide state and volume backups.
 4. **GitOps As Desired State**:
    - Cluster configuration, manifests, routes, and policies are 100% codified in Git. A replaced node reconciles its entire workload set automatically upon joining Flux.
+
+### Velero Disaster Recovery Architecture (Azure Blob / S3)
+
+To protect stateful applications and local persistent volumes against data loss or VM corruption, **Velero** is deployed as an in-cluster platform service:
+
+```text
+  +-------------------------------------------------------------------------+
+  |                     Kubernetes Cluster (talos-1 / talos-2)              |
+  |                                                                         |
+  |   +-----------------------+              +--------------------------+   |
+  |   |    Velero Server      |              |    Velero Node-Agent     |   |
+  |   |  (Metadata & State)   |              |   (Kopia/Restic PVC)     |   |
+  |   +-----------+-----------+              +------------+-------------+   |
+  |               |                                       |                 |
+  |               | Dumps CRDs, Namespaces, PVC specs     | File-level sync |
+  |               v                                       v                 |
+  |         +---------------------------------------------------+           |
+  |         |        BackupStorageLocation (BSL: Azure / S3)    |           |
+  |         +-------------------------+-------------------------+           |
+  +-----------------------------------|-------------------------------------+
+                                      | Encrypted HTTPS Transfer
+                                      v
+  +-------------------------------------------------------------------------+
+  |                      Offsite Cloud Object Storage                       |
+  |            Azure Blob Storage Container (or S3 Compatible Bucket)       |
+  |        - Daily cluster metadata snapshots                               |
+  |        - Deduplicated, encrypted PVC filesystem archives (Kopia)        |
+  +-------------------------------------------------------------------------+
+```
+
+- **Architecture Details**:
+  - **`velero` Deployment**: Deployed via official Helm chart in `infrastructure/velero/`.
+  - **Node-Agent (Kopia Engine)**: Deployed as a DaemonSet to perform efficient, deduplicated, file-level backups of node-local `local-path` PVCs without requiring storage-array CSI snapshots.
+  - **Storage Provider**:
+    - **Primary Target**: Azure Blob Storage container (or S3 bucket) using the `velero-plugin-for-microsoft-azure` (or `velero-plugin-for-aws`).
+    - **Authentication**: Azure Storage Account credentials pulled securely from Azure Key Vault via External Secrets Operator into `Secret/velero-credentials`.
+  - **Automated Backup Schedules (`Schedule` CRs)**:
+    - **Daily Cluster Backup**: Takes nightly full snapshots of all namespaces, persistent volume data, and custom resources with 14-day retention.
+    - **Pre-Upgrade Snapshots**: Ad-hoc snapshots before performing Talos or Kubernetes version upgrades.
+  - **Disaster Recovery Workflow**:
+    - In case of total VM loss, a fresh Talos node bootstrapped with Flux and Velero can restore all PVC data and workloads in a single command: `velero restore create --from-backup <backup-name>`.
 
 ---
 
@@ -515,6 +620,7 @@ K8s/
 │   ├── cert-manager/                   # ACME cert-manager & Azure DNS solver
 │   ├── external-secrets/               # External Secrets Operator & Azure Key Vault Store
 │   ├── storage/                        # Local Path Provisioner & SMB CSI
+│   ├── velero/                         # Velero cluster & volume disaster recovery backups
 │   ├── headlamp/                       # Headlamp web dashboard
 │   └── monitoring/                     # Prometheus & Grafana stack
 │
@@ -590,27 +696,45 @@ K8s/
 5. **Reconcile Platform Stack**: Flux reconciles Traefik Ingress, storage, cert-manager, ESO, and Headlamp on `k8s-talos-2`.
 6. **Multi-Cluster Access**: Verify switching contexts seamlessly between `k8s-talos-1` (`talos-1`) and `k8s-talos-2` (`talos-2`) using `omnictl` and `kubectl`.
 
-### Phase 3: Lower-Risk Application Migration
+### Phase 3: Platform Ingress TLS & Disaster Recovery
+
+1. **Deploy cert-manager**:
+   - Install `cert-manager` via HelmRelease in `infrastructure/cert-manager/` with CRDs enabled.
+   - Synchronize Azure DNS credentials from Azure Key Vault into `cert-manager` namespace using External Secrets Operator (`azure-dns-secret`).
+   - Create `ClusterIssuer` resources for Let's Encrypt (staging & production) configuring DNS-01 ACME challenges against Azure DNS for zone `gwebs.ca`.
+2. **Issue Wildcard Certificates**:
+   - Deploy `Certificate` custom resource for `*.talos-1.gwebs.ca` on `k8s-talos-1` and `*.talos-2.gwebs.ca` on `k8s-talos-2`.
+   - Bind wildcard certificates to Traefik Gateway (`traefik-gateway`) HTTPS listener on port 443.
+   - Verify zero-downtime certificate issuance and confirm browser trust.
+3. **Deploy Velero & Node-Agent**:
+   - Install Velero via HelmRelease in `infrastructure/velero/` with the Azure (or AWS S3) object store plugin and node-agent (Kopia/Restic).
+   - Sync cloud storage account credentials from Azure Key Vault via ESO.
+   - Establish `BackupStorageLocation` targeting offsite container/bucket.
+4. **Disaster Recovery Validation**:
+   - Create recurring daily cluster backup schedules.
+   - Trigger manual test backup, inspect logs, and verify volume snapshot upload to object storage.
+
+### Phase 4: Lower-Risk Application Migration
 
 Migrate stateless and low-risk web services from Docker Compose to Kubernetes:
 - **Applications**: Stirling-PDF, FinGlass, StockBot, Joke de Jean, Termix, Open WebUI, Homepage.
 - **Procedure**:
   1. Create Kubernetes manifests / HelmReleases under `apps/`.
-  2. Configure `Ingress` / `IngressRoute` with Traefik and automated TLS certificates.
+  2. Configure `HTTPRoute` with Traefik Gateway API (automatically inheriting wildcard TLS).
   3. Validate pod startup, health probes, and persistent volumes.
-  4. Perform DNS cutover in AdGuard Home / Azure DNS from the old Docker host to the `talos-1` LAN IP.
+  4. Perform DNS cutover in AdGuard Home / Azure DNS from the old Docker host to the cluster LAN IP.
   5. Decommission the corresponding Docker Compose container in Ansible playbooks.
 
-### Phase 4: Stateful & Media Workloads
+### Phase 5: Stateful & Media Workloads
 
 Migrate stateful applications and media companion services on `k8s-talos-1`:
 - **Monitoring & Developer Tools**: Prometheus/Grafana stack and Gitea.
-  - Test database export/import and verify Local Path PVC backups.
+  - Test database export/import, verify Local Path PVC backups, and configure Velero volume protection.
 - **Media Companion Stack**: Overseerr, Radarr, Sonarr, Jackett, FlareSolverr.
   - Mount NAS SMB share via SMB CSI (`//192.168.10.12/Medias`).
   - Verify UID/GID permissions, directory write access, hardlink/rename support, and API integrations.
 
-### Phase 5: Edge & Hardware-Bound Workloads
+### Phase 6: Edge & Hardware-Bound Workloads
 
 Evaluate and migrate remaining complex workloads:
 - **Plex**: Requires NVIDIA GPU passthrough configuration in the Talos machine config and SMB media mounts.
@@ -640,13 +764,14 @@ The migration of each phase will be deemed complete once all of the following cr
    - Severing the Tailscale link between homes results in zero downtime for either cluster's local applications.
 3. **GitOps & Reconciliation**:
    - Committing a manifest change to `clusters/k8s-talos-1/` or `clusters/k8s-talos-2/` triggers automatic Flux reconciliation without manual intervention.
-4. **Ingress & Security**:
-   - Traefik Ingress routes traffic to target pods with valid Let's Encrypt certificates issued via Azure DNS.
+4. **Ingress & TLS Security**:
+   - Traefik Gateway routes traffic to target pods with valid Let's Encrypt wildcard certificates (`*.talos-1.gwebs.ca`, `*.talos-2.gwebs.ca`) issued via Azure DNS DNS-01 challenges.
    - External Secrets Operator successfully pulls and syncs secrets from Azure Key Vault.
-5. **Storage & Persistence**:
+5. **Storage & Disaster Recovery**:
    - Local Path Provisioner dynamically provisions node-local volumes.
    - Pod restart retains all SQLite and configuration data.
    - SMB CSI successfully mounts `//192.168.10.12/Medias` with expected read/write permissions.
+   - Velero successfully captures cluster state and PVC volume backups to Azure Blob / S3 storage.
 6. **Operations & Observability**:
    - Headlamp web UI is reachable via HTTPS and secured by Entra ID OIDC.
    - PBS successfully backs up both Kubernetes VMs nightly.
@@ -662,6 +787,8 @@ The migration of each phase will be deemed complete once all of the following cr
 - **Administrative Tooling**: `omnictl` for Omni lifecycle, `kubectl` / K9s for Kubernetes, `Headlamp` for web dashboard.
 - **GitOps**: Flux CD in a monorepo managing both clusters independently.
 - **Networking**: Omni Default CNI (Flannel) with native NetworkPolicies (`kubeNetworkPoliciesEnabled: true`) + Traefik Ingress Controller (using `hostPort: 80/443`).
+- **TLS Certificates**: cert-manager with Azure DNS DNS-01 ACME challenges and wildcard certificates per cluster (`*.talos-1.gwebs.ca` and `*.talos-2.gwebs.ca`).
+- **Disaster Recovery**: Velero with node-agent (Kopia/Restic) backing up cluster metadata and local-path PVCs to Azure Blob Storage or S3.
 - **Secrets**: Azure Key Vault + External Secrets Operator + SOPS.
 - **Storage**: Local Path Provisioner (local PVCs) + SMB CSI Driver (NAS shares).
 - **DNS & Ingress Isolation**: Strict separation of hostnames per cluster (`<app>.talos-1.gwebs.ca` vs `<app>.talos-2.gwebs.ca`) using Flux `postBuild.substitute` (`CLUSTER_NAME`) to prevent cross-cluster routing confusion and duplicate TLS certificate requests.
