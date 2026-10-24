@@ -59,6 +59,7 @@ spec:
       extraArgs:
         - "-kubeconfig=/home/headlamp/.kube/config"
         - "-oidc-use-token-broadcast=true"
+        - "-skipped-kube-contexts=main"
       oidc:
         useTokenBroadcast: true
         secret:
