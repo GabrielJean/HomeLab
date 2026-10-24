@@ -63,6 +63,20 @@ spec:
         allowCrossNamespace: true
       kubernetesIngress:
         enabled: true
+      kubernetesGateway:
+        enabled: true
+
+    gatewayClass:
+      enabled: true
+
+    gateway:
+      enabled: true
+      listeners:
+        web:
+          port: 8000
+          protocol: HTTP
+          namespacePolicy:
+            from: All
 
     resources:
       requests:
