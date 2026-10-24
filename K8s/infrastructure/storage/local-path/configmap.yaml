@@ -13,7 +13,7 @@ data:
         {
           "node": "DEFAULT_PATH_FOR_NON_LISTED_NODES",
           "paths": [
-            "/var/mnt/local-path"
+            "/var/local-path-provisioner"
           ]
         }
       ]
