@@ -29,3 +29,4 @@ System-level and control plane Role-Based Access Control (RBAC) bindings for the
 | :--- | :--- | :--- |
 | [`apiserver-kubelet.yaml`](apiserver-kubelet.yaml) | `ClusterRoleBinding/apiserver-kubelet-admin` | Authorizes `apiserver-kubelet-client` with `system:kubelet-api-admin` ClusterRole |
 | [`kustomization.yaml`](kustomization.yaml) | `Kustomization` | Bundles system RBAC manifests for Flux GitOps |
+

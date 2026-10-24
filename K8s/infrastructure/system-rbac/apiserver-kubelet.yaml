@@ -24,3 +24,4 @@ roleRef:
   kind: ClusterRole
   name: system:kubelet-api-admin
   apiGroup: rbac.authorization.k8s.io
+

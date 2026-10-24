@@ -3,3 +3,4 @@ kind: Kustomization
 
 resources:
   - apiserver-kubelet.yaml
+
