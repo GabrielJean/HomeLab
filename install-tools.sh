@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# install-tools.sh - Install or update omnictl, kubectl, and flux
+# install-tools.sh - Install or update omnictl, kubectl, flux, and k9s
 # ==============================================================================
 # Usage:
 #   ./install-tools.sh
 #
 # Description:
-#   Installs omnictl, kubectl, and flux system-wide to /usr/local/bin.
+#   Installs omnictl, kubectl, flux, and k9s system-wide to /usr/local/bin.
 #   Uses sudo automatically if write permissions are required.
 # ==============================================================================
 
@@ -140,6 +140,35 @@ $SUDO install -m 755 "${TMP_DIR}/flux" "${TARGET_DIR}/flux"
 success "flux installed to ${TARGET_DIR}/flux"
 echo -n "  Version: "
 "${TARGET_DIR}/flux" --version || true
+echo ""
+
+# ------------------------------------------------------------------------------
+# 4. Install k9s (Kubernetes Terminal UI)
+# ------------------------------------------------------------------------------
+info "Installing / Updating ${BOLD}k9s${NC}..."
+
+K9S_VERSION="${K9S_VERSION:-latest}"
+if [ "$K9S_VERSION" = "latest" ]; then
+  K9S_VERSION="$(curl -sSL -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/derailed/k9s/releases/latest | grep '"tag_name":' | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')"
+  if [ -z "$K9S_VERSION" ]; then
+    warn "Could not resolve latest k9s release via GitHub API, falling back to v0.51.0"
+    K9S_VERSION="v0.51.0"
+  fi
+fi
+
+# Capitalize OS for k9s release assets (Linux, Darwin)
+K9S_OS="$(echo "$OS" | sed 's/.*/\u&/')"
+K9S_URL="https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/k9s_${K9S_OS}_${ARCH}.tar.gz"
+info "Downloading k9s ${K9S_VERSION} from ${K9S_URL}..."
+
+curl -sSL -f -o "${TMP_DIR}/k9s.tar.gz" "$K9S_URL" || error "Failed to download k9s from $K9S_URL"
+tar -xzf "${TMP_DIR}/k9s.tar.gz" -C "${TMP_DIR}" k9s
+chmod +x "${TMP_DIR}/k9s"
+
+$SUDO install -m 755 "${TMP_DIR}/k9s" "${TARGET_DIR}/k9s"
+success "k9s installed to ${TARGET_DIR}/k9s"
+echo -n "  Version: "
+"${TARGET_DIR}/k9s" version --short 2>/dev/null | head -n1 || true
 echo ""
 
 # ------------------------------------------------------------------------------

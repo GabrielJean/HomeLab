@@ -8,6 +8,8 @@ features:
   backupConfiguration:
     interval: 1h
 patches:
+  - name: allow-controlplane-workloads
+    file: patches/allow-controlplane.yaml
   - name: flannel-network-policies
     file: patches/flannel-network-policies.yaml
   - name: site-to-site-routes
