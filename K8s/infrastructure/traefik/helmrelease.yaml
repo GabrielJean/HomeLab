@@ -1,0 +1,73 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: traefik
+  namespace: traefik
+spec:
+  interval: 1h
+  chart:
+    spec:
+      chart: traefik
+      version: "42.1.3"
+      sourceRef:
+        kind: HelmRepository
+        name: traefik
+        namespace: traefik
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  values:
+    deployment:
+      replicas: 1
+
+    service:
+      spec:
+        type: ClusterIP
+
+    ingressClass:
+      enabled: true
+      isDefaultClass: true
+
+    ports:
+      web:
+        port: 8000
+        hostPort: 80
+        expose:
+          default: true
+        exposedPort: 80
+        http:
+          redirections:
+            entryPoint:
+              to: websecure
+              scheme: https
+              permanent: true
+
+      websecure:
+        port: 8443
+        hostPort: 443
+        expose:
+          default: true
+        exposedPort: 443
+        http:
+          tls:
+            enabled: true
+
+    providers:
+      kubernetesCRD:
+        enabled: true
+        allowCrossNamespace: true
+      kubernetesIngress:
+        enabled: true
+        allowCrossNamespaceResources: true
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
