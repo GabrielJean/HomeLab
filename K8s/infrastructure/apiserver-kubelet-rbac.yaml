@@ -1,3 +1,15 @@
+# Authorize the kube-apiserver client certificate to administer kubelet APIs.
+# 
+# Background:
+# In Kubernetes 1.30+ with webhook kubelet authorization (--authorization-mode=Webhook),
+# requests sent from the API server or Talos static pod controllers to kubelet port 10250
+# (such as node/pod status inspection, exec, port-forward, and logs) present the client
+# certificate identity 'apiserver-kubelet-client'.
+#
+# When kubelet receives the request, it queries kube-apiserver via a SubjectAccessReview
+# to verify if 'apiserver-kubelet-client' has permissions on 'nodes/proxy', 'nodes/pods', etc.
+# This ClusterRoleBinding binds 'apiserver-kubelet-client' to the default 'system:kubelet-api-admin'
+# ClusterRole, preventing 'Authorization error (user=apiserver-kubelet-client)' failures.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:

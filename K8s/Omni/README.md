@@ -18,6 +18,7 @@ Declarative templates for provisioning and managing two independent single-node 
   - [Step 4: Get kubeconfig and Verify](#step-4-get-kubeconfig-and-verify)
 - [Automated S3 etcd Backups](#automated-s3-etcd-backups)
 - [Automated Omni GitOps (GitHub Actions)](#automated-omni-gitops-github-actions)
+- [Control Plane Structured Authentication (OIDC)](#control-plane-structured-authentication-oidc)
 - [Quick Reference Commands](#quick-reference-commands)
 
 ---
@@ -181,6 +182,39 @@ Cluster templates, machine classes, and installation media presets are automatic
 To authenticate the workflow with Omni, configure the following repository secrets in GitHub (**Settings > Secrets and variables > Actions**):
 - `OMNI_ENDPOINT`: Omni SaaS API endpoint (found in `~/.talos/omni/github-actions-sa.yaml`).
 - `OMNI_SERVICE_ACCOUNT_KEY`: Service account key generated via `omnictl serviceaccount create github-actions`.
+
+---
+
+## Control Plane Structured Authentication (OIDC)
+
+Starting with Talos Linux v1.14+, legacy command-line arguments under `cluster.apiServer.extraArgs` (such as `--oidc-issuer-url`, `--oidc-client-id`) are prohibited. Instead, Talos manages API server authentication through the native Kubernetes **Structured Authentication Configuration** (`AuthenticationConfiguration`) using modular `KubeAuthenticationConfig` documents.
+
+### Declarative Patch: `patches/oidc-azure-ad.yaml`
+
+Microsoft Entra ID (Azure AD) authentication is declared as a reusable patch in [`clusters/patches/oidc-azure-ad.yaml`](clusters/patches/oidc-azure-ad.yaml):
+
+```yaml
+apiVersion: v1alpha1
+kind: KubeAuthenticationConfig
+configuration:
+  apiVersion: apiserver.config.k8s.io/v1beta1
+  kind: AuthenticationConfiguration
+  jwt:
+    - issuer:
+        url: https://login.microsoftonline.com/10b7061b-f2d0-4778-8cae-2666faf4af25/v2.0
+        audiences:
+          - e1d55ddd-3453-4a91-9842-aa7d7dc620a3
+      claimMappings:
+        username:
+          claim: preferred_username
+          prefix: ""
+```
+
+### Static Pod Lifecycle & Verification:
+1. **Replacement Semantics**: In Talos, `KubeAuthenticationConfig.configuration` completely replaces the inner payload rather than performing a deep merge.
+2. **Static Pod Re-rendering**: When this patch is added or updated, Talos's `k8s.StaticPodServerController` renders an updated `kube-apiserver` manifest (`old_version` -> `new_version`).
+3. **Recreation Delay**: During container recreation (~45–90 seconds), the API server initializes caches and webhooks. Omni temporarily reports `Load Balancer Not Ready` or `proxy error` until health checks pass and SideroLink tunnels re-establish.
+4. **Kubelet RBAC**: Ensure `ClusterRoleBinding/apiserver-kubelet-admin` is active so that kubelet webhook authorization does not fail when static pod status controllers query node endpoints.
 
 ---
 
