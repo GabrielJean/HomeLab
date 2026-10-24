@@ -1,0 +1,4 @@
+# Allow scheduling user workloads on single-node control planes.
+# Removes the default 'node-role.kubernetes.io/control-plane:NoSchedule' taint.
+cluster:
+  allowSchedulingOnControlPlanes: true
