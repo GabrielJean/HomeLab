@@ -63,7 +63,6 @@ spec:
         allowCrossNamespace: true
       kubernetesIngress:
         enabled: true
-        allowCrossNamespaceResources: true
 
     resources:
       requests:
@@ -71,3 +70,4 @@ spec:
         memory: 128Mi
       limits:
         memory: 512Mi
+
