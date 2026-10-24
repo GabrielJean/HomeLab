@@ -52,3 +52,4 @@ A master directory and index of all documentation files in this repository.
 
 - **[`README.md`](README.md)** — **HomeLab Overview & Monorepo Tour**
   - High-level environment philosophy, architecture diagram, technology stack, directory tour, CI/CD design, and safety guidelines.
+

@@ -4,6 +4,8 @@ kubernetes:
   version: v1.37.1
 talos:
   version: v1.14.4
+systemExtensions:
+  - siderolabs/qemu-guest-agent
 features:
   backupConfiguration:
     interval: 1h
