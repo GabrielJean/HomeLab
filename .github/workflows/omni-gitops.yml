@@ -25,10 +25,10 @@ jobs:
 
       - name: Install omnictl
         run: |
-          OMNI_VERSION="v0.45.0"
-          curl -sLO "https://github.com/siderolabs/omni/releases/download/${OMNI_VERSION}/omnictl-linux-amd64"
+          curl -fsSLO "https://github.com/siderolabs/omni/releases/latest/download/omnictl-linux-amd64"
           chmod +x omnictl-linux-amd64
           sudo mv omnictl-linux-amd64 /usr/local/bin/omnictl
+          omnictl --version
 
       - name: Validate Cluster Templates
         run: |
@@ -51,10 +51,10 @@ jobs:
 
       - name: Install omnictl
         run: |
-          OMNI_VERSION="v0.45.0"
-          curl -sLO "https://github.com/siderolabs/omni/releases/download/${OMNI_VERSION}/omnictl-linux-amd64"
+          curl -fsSLO "https://github.com/siderolabs/omni/releases/latest/download/omnictl-linux-amd64"
           chmod +x omnictl-linux-amd64
           sudo mv omnictl-linux-amd64 /usr/local/bin/omnictl
+          omnictl --version
 
       - name: Apply Omni Media Presets & Machine Classes
         run: |
@@ -67,3 +67,4 @@ jobs:
             echo "Syncing ${template}..."
             omnictl cluster template sync -f "${template}" -v
           done
+
