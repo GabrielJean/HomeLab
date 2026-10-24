@@ -6,6 +6,19 @@ Headlamp provides a clean, extensible, multi-cluster web dashboard for monitorin
 
 ---
 
+## Table of Contents
+
+- [Component Details](#component-details)
+- [Directory Structure](#directory-structure)
+- [Microsoft Entra ID (Azure AD) SSO Configuration](#microsoft-entra-id-azure-ad-sso-configuration)
+  - [Azure App Registration Parameters](#azure-app-registration-parameters)
+  - [Step-by-Step Azure Portal Setup](#step-by-step-azure-portal-setup)
+- [Workload Identity Federation & Azure Key Vault](#workload-identity-federation--azure-key-vault)
+- [Cluster RBAC Access](#cluster-rbac-access)
+  - [Retrieving the Breakglass Token](#retrieving-the-breakglass-token)
+
+---
+
 ## Component Details
 
 | Property | Value | Notes |

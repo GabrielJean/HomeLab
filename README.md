@@ -4,6 +4,28 @@
 
 This repository documents and automates my homelab environment. It is not intended to be a turnkey deployment guide or a shared operations manual. Configuration is deliberately presented at a high level: private infrastructure details, credentials, addresses, domains, and inventory data are excluded.
 
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [What I Built](#what-i-built)
+- [Technology Stack](#technology-stack)
+- [Repository Tour](#repository-tour)
+- [Documentation Index](#documentation-index-table-of-contents)
+  - [Kubernetes Infrastructure & Operations (`K8s/`)](#kubernetes-infrastructure--operations-k8s)
+  - [Docker & Host Workloads (`Docker/`)](#docker--host-workloads-docker)
+  - [Archives & Retired Experiments (`Archives/`)](#archives--retired-experiments-archives)
+- [Deployment Design](#deployment-design)
+- [Continuous Delivery](#continuous-delivery)
+- [Engineering Decisions](#engineering-decisions)
+- [Skills Demonstrated](#skills-demonstrated)
+- [Scope and Safety](#scope-and-safety)
+- [Selected Services](#selected-services)
+- [Project Status](#project-status)
+
+---
+
 ## Overview
 
 HomeLab is a practical platform for building experience with the systems that support real applications after they leave a developer's laptop. The environment combines virtual machines, Docker Compose workloads, Ansible automation, monitoring, network-facing services, and CI/CD workflows.

@@ -4,6 +4,33 @@ End-to-end operational guide for provisioning, bootstrapping, and operating the 
 
 ---
 
+## Table of Contents
+
+- [Architecture Overview](#architecture-overview)
+- [Prerequisites & Tools](#prerequisites--tools)
+  - [1. Install CLI Tooling](#1-install-cli-tooling)
+  - [2. Authenticate Omni CLI](#2-authenticate-omni-cli)
+  - [3. Azure Infrastructure Setup](#3-azure-infrastructure-setup)
+- [Step-by-Step Bootstrap Walkthrough](#step-by-step-bootstrap-walkthrough-8-steps)
+  - [Step 1: Register Media Presets & Download ISO](#step-1-register-media-presets--download-iso)
+  - [Step 2: Create & Boot the Proxmox VM](#step-2-create--boot-the-proxmox-vm)
+  - [Step 3: Label Machine & Sync Omni Cluster Template](#step-3-label-machine--sync-omni-cluster-template)
+  - [Step 4: Fetch Admin Kubeconfig](#step-4-fetch-admin-kubeconfig)
+  - [Step 5: Establish Azure Workload Identity Federation (Path 2)](#step-5-establish-azure-workload-identity-federation-path-2)
+  - [Step 6: Populate Secrets in Azure Key Vault](#step-6-populate-secrets-in-azure-key-vault)
+  - [Step 7: Pre-Install CRD Bundles (Server-Side Apply)](#step-7-pre-install-crd-bundles-server-side-apply)
+  - [Step 8: Bootstrap Flux GitOps & Platform Stack](#step-8-bootstrap-flux-gitops--platform-stack)
+- [Verification & Day-to-Day Operations](#verification--day-to-day-operations)
+  - [1. Verify Flux Reconciliation](#1-verify-flux-reconciliation)
+  - [2. Verify External Secrets & Key Vault Sync](#2-verify-external-secrets--key-vault-sync)
+  - [3. Verify Dynamic RBAC Binding](#3-verify-dynamic-rbac-binding)
+  - [4. Log Into Headlamp Web Dashboard](#4-log-into-headlamp-web-dashboard)
+- [Secret Expiration & Maintenance Runbook](#secret-expiration--maintenance-runbook)
+- [Summary Cheat Sheet](#summary-cheat-sheet)
+- [Documentation & Component Reference](#documentation--component-reference)
+
+---
+
 ## Architecture Overview
 
 ```text

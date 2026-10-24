@@ -6,6 +6,18 @@ Because the repository is **public**, zero SSH keys or GitHub tokens are require
 
 ---
 
+## Table of Contents
+
+- [Topology](#topology)
+- [Directory Structure](#directory-structure)
+- [How to Bootstrap (One Single Command Per Cluster)](#how-to-bootstrap-one-single-command-per-cluster)
+  - [For Cluster 1 (`k8s-talos-1`)](#for-cluster-1-k8s-talos-1)
+  - [For Cluster 2 (`k8s-talos-2`)](#for-cluster-2-k8s-talos-2)
+- [Secretless GitOps & Dynamic Variable Substitution](#secretless-gitops--dynamic-variable-substitution)
+- [Day-to-Day Operations](#day-to-day-operations)
+
+---
+
 ## Topology
 
 ```text

@@ -6,6 +6,25 @@ This subsystem provides **100% secretless GitOps**: no static API keys, service 
 
 ---
 
+## Table of Contents
+
+- [Component Details](#component-details)
+- [Architecture: Secretless Workload Identity Federation](#architecture-secretless-workload-identity-federation)
+  - [Trust Chain Workflow](#trust-chain-workflow)
+- [Directory Structure](#directory-structure)
+- [Secrets Managed in Azure Key Vault](#secrets-managed-in-azure-key-vault)
+- [Secret Lifecycle, Expiration & Failure Runbook](#secret-lifecycle-expiration--failure-runbook)
+  - [How to Diagnose an Expired or Broken Secret](#how-to-diagnose-an-expired-or-broken-secret)
+- [Integration with Flux CD (Dynamic Variable Substitution)](#integration-with-flux-cd-dynamic-variable-substitution)
+- [Operational Verification & Troubleshooting](#operational-verification--troubleshooting)
+  - [1. Check Operator Pods](#1-check-operator-pods)
+  - [2. Check ClusterSecretStore Status](#2-check-clustersecretstore-status)
+  - [3. Check ExternalSecret Synchronization](#3-check-externalsecret-synchronization)
+  - [4. Verify Generated Kubernetes Secrets](#4-verify-generated-kubernetes-secrets)
+  - [5. View Operator Logs](#5-view-operator-logs)
+
+---
+
 ## Component Details
 
 | Property | Value | Notes |

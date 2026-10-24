@@ -4,6 +4,23 @@ Declarative templates for provisioning and managing two independent single-node 
 
 ---
 
+## Table of Contents
+
+- [Clusters Overview](#clusters-overview)
+- [Installation Media Presets](#installation-media-presets-omnimedia)
+  - [1. Apply Media Presets to Omni (GitOps)](#1-apply-media-presets-to-omni-gitops)
+  - [2. Manage and Download via CLI](#2-manage-and-download-via-cli)
+  - [3. Modifying Extensions on Existing Running Nodes](#3-modifying-extensions-on-existing-running-nodes)
+- [4-Step Bootstrap Walkthrough](#4-step-bootstrap-walkthrough)
+  - [Step 1: Boot the VM in Proxmox](#step-1-boot-the-vm-in-proxmox)
+  - [Step 2: Apply Machine Classes and Label Machines in Omni](#step-2-apply-machine-classes-and-label-machines-in-omni)
+  - [Step 3: Sync the Cluster Template](#step-3-sync-the-cluster-template)
+  - [Step 4: Get kubeconfig and Verify](#step-4-get-kubeconfig-and-verify)
+- [Automated S3 etcd Backups](#automated-s3-etcd-backups)
+- [Quick Reference Commands](#quick-reference-commands)
+
+---
+
 ## Clusters Overview
 
 | Cluster Name | Host / Site | Node Name | Omni Label | Machine Class | Media Preset | Template File |
