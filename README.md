@@ -50,7 +50,7 @@ Metrics  ---> monitoring stack -------> dashboards
 
 | Path | Description |
 | --- | --- |
-| `K8s/` | Declarative GitOps infrastructure for Talos Linux Kubernetes clusters with Flux CD, Gateway API, Headlamp, and External Secrets Operator (Azure Workload Identity). |
+| `K8s/` | Declarative GitOps infrastructure for Talos Linux Kubernetes clusters with Flux CD, Gateway API, Headlamp, and External Secrets Operator (Azure Workload Identity). See [`K8s/Bootstrap.md`](K8s/Bootstrap.md) for the end-to-end setup guide. |
 | `Ansible/` | The automation layer. Playbooks describe host setup, Docker application deployment, updates, networking, storage, and media-related configuration. |
 | `Ansible/roles/` | Reusable Ansible tasks for reachability checks, Docker installation, Compose deployment, and deployment cleanup. |
 | `Docker/` | Self-contained Docker Compose projects. Each application owns its Compose definition and non-sensitive supporting configuration. |
