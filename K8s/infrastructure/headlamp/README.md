@@ -43,6 +43,7 @@ Headlamp provides a clean, extensible, multi-cluster web dashboard for monitorin
 infrastructure/headlamp/
 ├── README.md                      # Documentation & operational guide
 ├── namespace.yaml                 # Dedicated 'headlamp' namespace
+├── clusters-config.yaml           # Multi-cluster kubeconfig ConfigMap (talos-1 & talos-2)
 ├── helmrepository.yaml            # Official Headlamp Helm repository
 ├── helmrelease.yaml               # Headlamp HelmRelease (v0.46.0, Flux plugin, Gateway API, OIDC)
 ├── external-secret.yaml           # ExternalSecret syncing client secret from Azure Key Vault
@@ -52,6 +53,48 @@ infrastructure/headlamp/
 ```
 
 ---
+
+## Multi-Cluster Management & Token Broadcasting
+
+Both Headlamp deployments are configured to manage both `k8s-talos-1` and `k8s-talos-2` from a single pane of glass:
+
+```mermaid
+flowchart TD
+    User(["Authenticated Admin (admin@example.com)"]) --> Browser["Headlamp Web UI<br/>(headlamp.talos-1 or headlamp.talos-2)"]
+
+    subgraph Headlamp_Instance["Headlamp Server (In-Cluster)"]
+        UI["UI Cluster Switcher Dropdown"]
+        TB["OIDC Token Broadcaster<br/>(-oidc-use-token-broadcast=true)"]
+        KC["Multi-Cluster Kubeconfig<br/>(/home/headlamp/.kube/config)"]
+    end
+
+    Browser --> UI
+    UI --> TB
+    TB --> KC
+
+    subgraph Cluster_1["Home 1 (talos-1)"]
+        API1["kube-apiserver:6443<br/>(192.168.10.15)"]
+    end
+
+    subgraph Cluster_2["Home 2 (talos-2)"]
+        API2["kube-apiserver:6443<br/>(192.168.15.15)"]
+    end
+
+    KC -->|"Context: k8s-talos-1 (Bearer OIDC JWT)"| API1
+    KC -->|"Context: k8s-talos-2 (Bearer OIDC JWT)"| API2
+```
+
+### How Multi-Cluster Federation Works:
+
+1. **Declarative Multi-Cluster Kubeconfig**:
+   [`clusters-config.yaml`](clusters-config.yaml) defines contexts for both `k8s-talos-1` (`https://192.168.10.15:6443`) and `k8s-talos-2` (`https://192.168.15.15:6443`) with their respective cluster root CA certificates.
+2. **Dynamic Default Context**:
+   `current-context: k8s-${CLUSTER_NAME:=talos-1}` defaults to the local cluster where that specific Headlamp instance is deployed, but both clusters are always registered and active.
+3. **OIDC Token Broadcasting (`-oidc-use-token-broadcast=true`)**:
+   Because both clusters share the exact same Microsoft Entra ID tenant and client ID:
+   - When you log in with your Microsoft account on `https://headlamp.talos-1.gwebs.ca`, Headlamp automatically broadcasts the authentication cookie to both cluster contexts.
+   - You can toggle between `k8s-talos-1` and `k8s-talos-2` directly in the top-left cluster dropdown in Headlamp without logging in twice or re-authenticating.
+   - The same seamless experience applies if you access `https://headlamp.talos-2.gwebs.ca`.
 
 ## Architecture: End-to-End OIDC SSO
 
