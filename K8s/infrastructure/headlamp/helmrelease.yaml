@@ -49,7 +49,7 @@ spec:
       - name: plugins-dir
         mountPath: /headlamp/plugins
       - name: multi-cluster-kubeconfig
-        mountPath: /etc/headlamp
+        mountPath: /home/headlamp/.kube
         readOnly: true
 
     # Configuration for multi-cluster, plugins, and Microsoft Entra ID OIDC SSO
@@ -70,7 +70,7 @@ spec:
 
     env:
       - name: KUBECONFIG
-        value: "/etc/headlamp/config"
+        value: "/home/headlamp/.kube/config"
       - name: HEADLAMP_CONFIG_OIDC_USE_TOKEN_BROADCAST
         value: "true"
       - name: OIDC_CLIENT_ID
