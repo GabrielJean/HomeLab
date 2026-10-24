@@ -46,18 +46,25 @@ spec:
       - name: plugins-dir
         mountPath: /headlamp/plugins
 
-    # Configuration for plugins and Microsoft Entra ID OIDC SSO
+    # Configuration for plugins and Microsoft Entra ID OIDC SSO via Azure Key Vault
     config:
       pluginsDir: /headlamp/plugins
       oidc:
         secret:
-          create: true
+          create: false
+        externalSecret:
+          enabled: true
           name: headlamp-oidc
-        clientID: "e1d55ddd-3453-4a91-9842-aa7d7dc620a3"
-        clientSecret: ""
-        issuerURL: "https://login.microsoftonline.com/10b7061b-f2d0-4778-8cae-2666faf4af25/v2.0"
-        scopes: "openid profile email offline_access"
-        usePKCE: true
+          hasScopes: true
+        callbackURL: "https://headlamp.${CLUSTER_NAME:=talos-1}.gwebs.ca/oidc-callback"
+
+    env:
+      - name: OIDC_CLIENT_ID
+        value: "e1d55ddd-3453-4a91-9842-aa7d7dc620a3"
+      - name: OIDC_ISSUER_URL
+        value: "https://login.microsoftonline.com/10b7061b-f2d0-4778-8cae-2666faf4af25/v2.0"
+      - name: OIDC_SCOPES
+        value: "openid profile email offline_access"
 
     # Kubernetes Gateway API HTTPRoute attached to Traefik
     httpRoute:
@@ -75,4 +82,3 @@ spec:
       limits:
         cpu: 500m
         memory: 512Mi
-

@@ -15,4 +15,8 @@ spec:
   postBuild:
     substitute:
       CLUSTER_NAME: talos-1
+    substituteFrom:
+      - kind: Secret
+        name: cluster-secrets
+        optional: true
 

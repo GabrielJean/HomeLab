@@ -14,6 +14,8 @@ patches:
     file: patches/flannel-network-policies.yaml
   - name: site-to-site-routes
     file: patches/routes-talos-1.yaml
+  - name: sa-issuer
+    file: patches/service-account-issuer-talos-1.yaml
 ---
 kind: ControlPlane
 machineClass:
