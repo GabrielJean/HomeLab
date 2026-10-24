@@ -178,9 +178,9 @@ Cluster templates, machine classes, and installation media presets are automatic
   - `workflow_dispatch`: Manual execution from GitHub Actions UI.
 
 ### GitHub Repository Secrets
-To authenticate the workflow with Omni, the following repository secrets are configured in GitHub (**Settings > Secrets and variables > Actions**):
+To authenticate the workflow with Omni, configure the following repository secrets in GitHub (**Settings > Secrets and variables > Actions**):
+- `OMNI_ENDPOINT`: Omni SaaS API endpoint (found in `~/.talos/omni/github-actions-sa.yaml`).
 - `OMNI_SERVICE_ACCOUNT_KEY`: Service account key generated via `omnictl serviceaccount create github-actions`.
-- `OMNI_ENDPOINT`: *(Optional)* Omni SaaS API endpoint (defaults to `https://gwebs.na-west-2.omni.siderolabs.io:443`).
 
 ---
 
