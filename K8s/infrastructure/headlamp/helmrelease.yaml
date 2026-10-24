@@ -59,6 +59,8 @@ spec:
       extraArgs:
         - "-oidc-use-token-broadcast=true"
       oidc:
+        useCookie: true
+        useTokenBroadcast: true
         secret:
           create: false
         externalSecret:
