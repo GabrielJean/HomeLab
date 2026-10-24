@@ -182,7 +182,9 @@ kubectl --context admin@k8s-talos-1 -n headlamp get secret headlamp-admin-token 
 *(Copy the resulting token string).*
 
 #### 2. Open Headlamp
-* **Via Ingress (once DNS/Traefik is configured)**: `https://headlamp.k8s.gwebs.ca`
+* **Via Ingress (once DNS/Traefik is configured)**:
+  * Home 1 (`k8s-talos-1`): `https://headlamp.talos-1.gwebs.ca`
+  * Home 2 (`k8s-talos-2`): `https://headlamp.talos-2.gwebs.ca`
 * **Via Port-Forward (Immediate / Local)**:
   ```bash
   kubectl --context admin@k8s-talos-1 -n headlamp port-forward svc/headlamp 8080:80

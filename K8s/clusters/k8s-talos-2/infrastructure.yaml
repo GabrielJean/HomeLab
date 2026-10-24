@@ -12,4 +12,7 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
+  postBuild:
+    substitute:
+      CLUSTER_NAME: talos-2
 
