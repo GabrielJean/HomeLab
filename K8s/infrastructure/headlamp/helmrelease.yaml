@@ -37,18 +37,27 @@ spec:
             drop:
               - ALL
 
-    # Shared plugin volume
+    # Shared plugin volume and multi-cluster kubeconfig
     volumes:
       - name: plugins-dir
         emptyDir: {}
+      - name: multi-cluster-kubeconfig
+        configMap:
+          name: headlamp-clusters-config
 
     volumeMounts:
       - name: plugins-dir
         mountPath: /headlamp/plugins
+      - name: multi-cluster-kubeconfig
+        mountPath: /etc/headlamp
+        readOnly: true
 
-    # Configuration for plugins and Microsoft Entra ID OIDC SSO via Azure Key Vault
+    # Configuration for multi-cluster, plugins, and Microsoft Entra ID OIDC SSO
     config:
+      inCluster: false
       pluginsDir: /headlamp/plugins
+      extraArgs:
+        - "-oidc-use-token-broadcast=true"
       oidc:
         secret:
           create: false
@@ -59,6 +68,10 @@ spec:
         callbackURL: "https://headlamp.${CLUSTER_NAME:=talos-1}.gwebs.ca/oidc-callback"
 
     env:
+      - name: KUBECONFIG
+        value: "/etc/headlamp/config"
+      - name: HEADLAMP_CONFIG_OIDC_USE_TOKEN_BROADCAST
+        value: "true"
       - name: OIDC_CLIENT_ID
         value: "e1d55ddd-3453-4a91-9842-aa7d7dc620a3"
       - name: OIDC_ISSUER_URL
