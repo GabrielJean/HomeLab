@@ -14,7 +14,7 @@ The **Local Path Provisioner** provides dynamic persistent storage using node-lo
 | **Version** | `v0.0.37` | Latest stable release (patched for CVE-2025-62878) |
 | **Namespace** | `local-path-storage` | Dedicated storage namespace |
 | **StorageClass Name** | `local-path` | Annotated as cluster default (`is-default-class: true`) |
-| **Host Storage Path** | `/var/mnt/local-path` | Located on Talos's writable `/var` partition |
+| **Host Storage Path** | `/var/mnt/local-path/<namespace>/<pvc-name>` | Predictable namespace-scoped structure on `/var` partition |
 | **Volume Binding Mode**| `WaitForFirstConsumer` | Provisions on the exact node where the pod is scheduled |
 | **RAM Footprint** | ~15–20 MB | Minimal resource overhead |
 
@@ -26,11 +26,18 @@ Talos Linux has an immutable, read-only root filesystem (`/`).
 
 Upstream default manifests attempt to use `/opt/local-path-provisioner`, which fails immediately on Talos with a `Read-only file system` error.
 
-In our [`configmap.yaml`](configmap.yaml), the provisioner is explicitly configured to store volumes under:
-```json
-"paths": ["/var/mnt/local-path"]
+In our [`configmap.yaml`](configmap.yaml) and [`storageclass.yaml`](storageclass.yaml), the provisioner is dynamically configured for all nodes with a clean path template:
+
+```text
+/var/mnt/local-path/<namespace>/<pvc-name>
 ```
-Because `/var` is mounted on the VM's main writable data partition, volumes are created without permission issues and are automatically included in your nightly **Proxmox Backup Server (PBS)** VM image backups.
+
+For example:
+- Gitea: `/var/mnt/local-path/default/gitea-data`
+- Home Assistant: `/var/mnt/local-path/homeassistant/config`
+- Prometheus: `/var/mnt/local-path/monitoring/prometheus-db`
+
+Because `/var` is mounted on the VM's main writable data partition, volumes are created without permission issues and are automatically included in your nightly **Proxmox Backup Server (PBS)** VM image backups with clean, human-readable directory browsing. Zero hardcoded node names.
 
 ---
 
