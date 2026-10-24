@@ -54,12 +54,11 @@ spec:
 
     # Configuration for multi-cluster, plugins, and Microsoft Entra ID OIDC SSO
     config:
-      inCluster: false
+      inCluster: true
       pluginsDir: /headlamp/plugins
       extraArgs:
         - "-oidc-use-token-broadcast=true"
       oidc:
-        useCookie: true
         useTokenBroadcast: true
         secret:
           create: false
