@@ -45,16 +45,16 @@
 ```mermaid
 flowchart LR
     P0["Phase 0: Omni & GitOps<br/>(Complete)"] --> P1["Phase 1: talos-1 Core<br/>(Complete)"]
-    P1 --> P2["Phase 2: talos-2 Core<br/>(In Progress)"]
-    P2 --> P3["Phase 3: Web Apps<br/>(Pending)"]
+    P1 --> P2["Phase 2: talos-2 Core<br/>(Complete)"]
+    P2 --> P3["Phase 3: Web Apps<br/>(Ready to Start)"]
     P3 --> P4["Phase 4: Media & NAS<br/>(Pending)"]
     P4 --> P5["Phase 5: GPU & Edge<br/>(Pending)"]
     classDef done fill:#2e7d32,stroke:#1b5e20,color:#ffffff;
     classDef inprog fill:#f57f17,stroke:#e65100,color:#ffffff;
     classDef todo fill:#424242,stroke:#212121,color:#ffffff;
-    class P0,P1 done;
-    class P2 inprog;
-    class P3,P4,P5 todo;
+    class P0,P1,P2 done;
+    class P3 inprog;
+    class P4,P5 todo;
 ```
 
 ### Phase 0: Prerequisites & Automation
@@ -77,14 +77,14 @@ flowchart LR
 - [x] **Control Plane RBAC**: Deployed [`infrastructure/system-rbac/apiserver-kubelet.yaml`](infrastructure/system-rbac/apiserver-kubelet.yaml) to authorize `apiserver-kubelet-client` for kubelet webhook authorization.
 - [x] **Headlamp Dashboard**: Deployed Headlamp v0.46.0 with Flux UI plugin, Gateway API routing (`headlamp.talos-1.gwebs.ca`), Entra ID OIDC SSO, and static breakglass token secret.
 
-### Phase 2: Home 2 Cluster Bootstrap (`k8s-talos-2`) — IN PROGRESS
+### Phase 2: Home 2 Cluster Bootstrap (`k8s-talos-2`) — COMPLETE
 - [x] **VM Provisioning**: Booted `talos-2` on Proxmox `pve-2` and registered via SideroLink.
 - [x] **Cluster Template Sync**: Applied [`Omni/clusters/k8s-talos-2.yaml`](Omni/clusters/k8s-talos-2.yaml) with single-node scheduling, Flannel NetworkPolicies, and hourly etcd S3 backups.
 - [x] **Structured Authentication**: Synchronized `KubeAuthenticationConfig` patch to `k8s-talos-2` control plane.
 - [x] **Control Plane RBAC**: Applied `ClusterRoleBinding/apiserver-kubelet-admin` on `k8s-talos-2`.
 - [x] **Bootstrap Flux CD**: Run `kubectl apply -k K8s/clusters/k8s-talos-2` to install Flux controllers on `k8s-talos-2`.
 - [x] **Reconcile Platform Infrastructure**: Flux reconciliation of Traefik, Local Path Storage, External Secrets Operator, and Headlamp on `k8s-talos-2`.
-- [ ] **Verify Headlamp SSO**: Test Microsoft Entra ID sign-in on `https://headlamp.talos-2.gwebs.ca`.
+- [x] **Verify Headlamp SSO**: Test Microsoft Entra ID sign-in on `https://headlamp.talos-2.gwebs.ca`.
 
 ### Phase 3: Lower-Risk Application Migration (Pending)
 - [ ] **Stirling-PDF**: Deploy PDF manipulation suite with Local Path PVC.
