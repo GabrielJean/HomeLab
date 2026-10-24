@@ -17,6 +17,7 @@ Declarative templates for provisioning and managing two independent single-node 
   - [Step 3: Sync the Cluster Template](#step-3-sync-the-cluster-template)
   - [Step 4: Get kubeconfig and Verify](#step-4-get-kubeconfig-and-verify)
 - [Automated S3 etcd Backups](#automated-s3-etcd-backups)
+- [Automated Omni GitOps (GitHub Actions)](#automated-omni-gitops-github-actions)
 - [Quick Reference Commands](#quick-reference-commands)
 
 ---
@@ -163,6 +164,23 @@ When you run `omnictl cluster template sync -f ...`, Omni immediately triggers a
 # List all etcd backups for a cluster:
 omnictl get etcdbackup --selector omni.sidero.dev/cluster=k8s-talos-1
 ```
+
+---
+
+## Automated Omni GitOps (GitHub Actions)
+
+Cluster templates, machine classes, and installation media presets are automatically synchronized to Sidero Omni SaaS via GitHub Actions:
+
+- **Workflow**: [`.github/workflows/omni-gitops.yml`](../../.github/workflows/omni-gitops.yml)
+- **Execution Matrix**:
+  - `pull_request`: Runs offline validation (`omnictl cluster template validate`) on modified templates.
+  - `push` (branches: `main`, `k8s-migration`): Validates templates, applies machine classes and media presets, and syncs cluster templates with verbose output.
+  - `workflow_dispatch`: Manual execution from GitHub Actions UI.
+
+### GitHub Repository Secrets
+To authenticate the workflow with Omni, the following repository secrets are configured in GitHub (**Settings > Secrets and variables > Actions**):
+- `OMNI_SERVICE_ACCOUNT_KEY`: Service account key generated via `omnictl serviceaccount create github-actions`.
+- `OMNI_ENDPOINT`: *(Optional)* Omni SaaS API endpoint (defaults to `https://gwebs.na-west-2.omni.siderolabs.io:443`).
 
 ---
 

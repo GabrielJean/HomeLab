@@ -12,7 +12,7 @@ A master directory and index of all documentation files in this repository.
 - **[`K8s/PLAN.md`](K8s/PLAN.md)** — **Kubernetes Migration Plan & Architecture**
   - Architectural blueprint and phased migration roadmap from legacy Docker Compose to Talos Linux.
 - **[`K8s/Omni/README.md`](K8s/Omni/README.md)** — **Sidero Omni Operations & Media Presets**
-  - Omni SaaS cluster templates, machine classes, declarative media presets, extension management, and etcd backups.
+  - Omni SaaS cluster templates, machine classes, declarative media presets, extension management, etcd backups, and GitHub Actions GitOps workflow.
 - **[`K8s/clusters/README.md`](K8s/clusters/README.md)** — **Multi-Cluster GitOps Architecture**
   - Independent Flux pull-sync topology, cluster overlays (`k8s-talos-1`, `k8s-talos-2`), and secretless variable substitution via `postBuild.substituteFrom`.
 
