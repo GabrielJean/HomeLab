@@ -16,7 +16,7 @@ Headlamp provides a developer-friendly, extensible web dashboard for monitoring 
 | **Flux Plugin Image** | `ghcr.io/headlamp-k8s/headlamp-plugin-flux:v0.7.0` | Pre-loaded via initContainer |
 | **Namespace** | `headlamp` | Dedicated platform namespace |
 | **Service Port** | `80` (targets `4466`) | HTTP ClusterIP |
-| **Ingress Host** | `headlamp.${CLUSTER_NAME}.gwebs.ca` | `headlamp.talos-1.gwebs.ca` or `headlamp.talos-2.gwebs.ca` via Flux substitution |
+| **Routing** | `headlamp.${CLUSTER_NAME}.gwebs.ca` | Kubernetes Gateway API `HTTPRoute` attached to `traefik-gateway` |
 
 ---
 
@@ -30,7 +30,7 @@ infrastructure/headlamp/
 ├── cluster-role-binding.yaml      # ClusterRoleBinding granting cluster inspection
 ├── deployment.yaml                # Headlamp v0.46.0 + Flux plugin initContainer
 ├── service.yaml                   # ClusterIP service on port 80 (targets 4466)
-├── ingress.yaml                   # Traefik Ingress with cert-manager TLS
+├── httproute.yaml                 # Gateway API HTTPRoute attached to Traefik
 ├── rbac-admin.yaml                # Admin ServiceAccount, ClusterRoleBinding & login token
 └── kustomization.yaml             # Kustomize entrypoint bundling all manifests
 ```

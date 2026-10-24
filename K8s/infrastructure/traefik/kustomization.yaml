@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
+  - default-cert.yaml
   - helmrepository.yaml
   - helmrelease.yaml
 

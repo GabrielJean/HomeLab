@@ -81,6 +81,13 @@ spec:
           protocol: HTTP
           namespacePolicy:
             from: All
+        websecure:
+          port: 8443
+          protocol: HTTPS
+          certificateRefs:
+            - name: traefik-default-cert
+          namespacePolicy:
+            from: All
 
     resources:
       requests:
