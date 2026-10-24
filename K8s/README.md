@@ -45,6 +45,7 @@ End-to-end operational guide for provisioning, bootstrapping, and operating the 
 | **Management** | **Sidero Omni SaaS** | Machine registration, WireGuard SideroLink tunnels, OS lifecycle |
 | **Networking** | **Flannel CNI** | Out-of-the-box CNI with native NetworkPolicies enabled |
 | **GitOps** | **Flux CD v2.9.6** | Declarative state reconciliation directly from GitHub over HTTPS |
+| **Secrets Management** | **External Secrets Operator v2.14.0** | Secretless Workload Identity federation with Azure Key Vault |
 | **Dashboard** | **Headlamp v0.46.0** | In-cluster web dashboard with pre-loaded Flux CD GitOps plugin |
 | **Ingress & TLS** | **Traefik + cert-manager** | HostPort (80/443) entrypoint with automated Let's Encrypt TLS |
 

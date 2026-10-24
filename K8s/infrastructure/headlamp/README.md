@@ -29,6 +29,7 @@ infrastructure/headlamp/
 ├── namespace.yaml                 # Dedicated 'headlamp' namespace
 ├── helmrepository.yaml            # Official Headlamp Helm repository
 ├── helmrelease.yaml               # Headlamp HelmRelease (v0.46.0, Flux plugin, Gateway API, OIDC)
+├── external-secret.yaml           # ExternalSecret syncing client secret from Azure Key Vault
 ├── oidc-rbac.yaml                 # ClusterRoleBinding granting cluster-admin to Entra ID users
 ├── rbac-admin.yaml                # Emergency breakglass ServiceAccount & static token
 └── kustomization.yaml             # Kustomize entrypoint bundling all manifests
@@ -59,10 +60,14 @@ Headlamp is configured to authenticate users via Microsoft Entra ID (Azure AD) u
    - Under **Implicit grant and hybrid flows**, enable **ID tokens (used for implicit and hybrid flows)**.
    - Click **Save**.
 
-2. **Certificates & Secrets**:
+2. **Certificates & Secrets (Azure Key Vault)**:
    - Under **Manage**, select **Certificates & secrets** > **Client secrets**.
    - Click **New client secret**, enter a description (e.g. `headlamp-sso`), and choose an expiration period.
-   - Copy the **Value** immediately. Set this secret in `K8s/infrastructure/headlamp/helmrelease.yaml` under `config.oidc.clientSecret` (or into Kubernetes Secret `headlamp-oidc`).
+   - Copy the **Value** immediately.
+   - Store this secret value directly in Azure Key Vault (`https://gjtaloskv.vault.azure.net/`) under the secret name:
+     - **Secret Name**: `headlamp-oidc-client-secret`
+     - **Value**: `<Azure Client Secret Value>`
+   - The External Secrets Operator automatically synchronizes it into Kubernetes Secret `headlamp-oidc` (`OIDC_CLIENT_SECRET`). No secrets are committed to Git.
 
 3. **API Permissions**:
    - Under **Manage**, select **API permissions**.
@@ -85,23 +90,15 @@ Headlamp is configured to authenticate users via Microsoft Entra ID (Azure AD) u
 
 ---
 
-## Talos Linux API Server Configuration
+## Workload Identity Federation & Azure Key Vault
 
-For Kubernetes to accept and authorize Entra ID tokens passed by Headlamp, the `kube-apiserver` must trust Entra ID as an OIDC issuer.
+Headlamp's OIDC credentials and administrator identity are decoupled from Git using the [External Secrets Operator](../external-secrets/README.md) and Microsoft Entra Workload Identity Federation:
 
-This is managed natively via Omni cluster template patch `K8s/Omni/clusters/patches/oidc.yaml`:
+1. **Headlamp Backend Token Exchange**:
+   Headlamp runs as a server-side backend service. When Microsoft redirects to `/oidc-callback`, the backend completes the token exchange using `OIDC_CLIENT_SECRET`, which is injected from Secret `headlamp-oidc` synced from Azure Key Vault by the External Secrets Operator.
 
-```yaml
-apiVersion: v1alpha1
-kind: KubeAPIServerConfig
-extraArgs:
-  oidc-issuer-url: "https://login.microsoftonline.com/10b7061b-f2d0-4778-8cae-2666faf4af25/v2.0"
-  oidc-client-id: "e1d55ddd-3453-4a91-9842-aa7d7dc620a3"
-  oidc-username-claim: "email"
-  oidc-groups-claim: "groups"
-```
-
-Applied to both `k8s-talos-1` and `k8s-talos-2` via `omnictl cluster template sync`.
+2. **Zero-Secret Administrator RBAC**:
+   The admin user's identity is stored in Azure Key Vault secret `headlamp-admin-email`. ESO synchronizes this into Secret `flux-system/cluster-secrets`. Flux CD uses `postBuild.substituteFrom` to dynamically populate `${OIDC_ADMIN_EMAIL}` into `oidc-rbac.yaml`, ensuring that personal email addresses remain 100% confidential.
 
 ---
 
@@ -110,7 +107,7 @@ Applied to both `k8s-talos-1` and `k8s-talos-2` via `omnictl cluster template sy
 Permissions are granted using Kubernetes `ClusterRoleBinding` resources:
 
 - **OIDC Administrator Binding** ([`oidc-rbac.yaml`](oidc-rbac.yaml)):
-  Grants `cluster-admin` to the Entra ID user identity configured via `${OIDC_ADMIN_EMAIL}`.
+  Grants `cluster-admin` to the Entra ID user identity injected at runtime via `${OIDC_ADMIN_EMAIL}`.
 - **Emergency Breakglass Binding** ([`rbac-admin.yaml`](rbac-admin.yaml)):
   Provides a static ServiceAccount `headlamp-breakglass` and Secret `headlamp-breakglass-token` for emergency cluster recovery when OIDC or external internet is unavailable.
 
