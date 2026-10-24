@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: headlamp-admin
+  name: headlamp-breakglass
   namespace: headlamp
   labels:
     app.kubernetes.io/name: headlamp
@@ -10,7 +10,7 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: headlamp-admin
+  name: headlamp-breakglass
   labels:
     app.kubernetes.io/name: headlamp
     app.kubernetes.io/part-of: homelab-infrastructure
@@ -20,18 +20,17 @@ roleRef:
   name: cluster-admin
 subjects:
   - kind: ServiceAccount
-    name: headlamp-admin
+    name: headlamp-breakglass
     namespace: headlamp
 ---
-# Static ServiceAccount Token Secret for headlamp-admin (Kubernetes 1.24+)
+# Static ServiceAccount Token Secret for headlamp-breakglass (emergency fallback)
 apiVersion: v1
 kind: Secret
 metadata:
-  name: headlamp-admin-token
+  name: headlamp-breakglass-token
   namespace: headlamp
   labels:
     app.kubernetes.io/name: headlamp
   annotations:
-    kubernetes.io/service-account.name: headlamp-admin
+    kubernetes.io/service-account.name: headlamp-breakglass
 type: kubernetes.io/service-account-token
-

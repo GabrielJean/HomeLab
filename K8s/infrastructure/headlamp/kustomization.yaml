@@ -3,9 +3,7 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
-  - service-account.yaml
-  - cluster-role-binding.yaml
-  - deployment.yaml
-  - service.yaml
-  - httproute.yaml
+  - helmrepository.yaml
+  - helmrelease.yaml
   - rbac-admin.yaml
+  - oidc-rbac.yaml

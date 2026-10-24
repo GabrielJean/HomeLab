@@ -1,0 +1,78 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: headlamp
+  namespace: headlamp
+spec:
+  interval: 1h
+  chart:
+    spec:
+      chart: headlamp
+      version: 0.46.0
+      sourceRef:
+        kind: HelmRepository
+        name: headlamp
+        namespace: headlamp
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    # InitContainer pre-loads the Flux plugin into Headlamp
+    initContainers:
+      - name: install-flux-plugin
+        image: ghcr.io/headlamp-k8s/headlamp-plugin-flux:v0.7.0
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+          - mkdir -p /headlamp/plugins && cp -r /plugins/* /headlamp/plugins/
+        volumeMounts:
+          - name: plugins-dir
+            mountPath: /headlamp/plugins
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+
+    # Shared plugin volume
+    volumes:
+      - name: plugins-dir
+        emptyDir: {}
+
+    volumeMounts:
+      - name: plugins-dir
+        mountPath: /headlamp/plugins
+
+    # Configuration for plugins and Microsoft Entra ID OIDC SSO
+    config:
+      pluginsDir: /headlamp/plugins
+      oidc:
+        secret:
+          create: true
+          name: headlamp-oidc
+        clientID: "e1d55ddd-3453-4a91-9842-aa7d7dc620a3"
+        clientSecret: ""
+        issuerURL: "https://login.microsoftonline.com/10b7061b-f2d0-4778-8cae-2666faf4af25/v2.0"
+        scopes: "openid profile email offline_access"
+        usePKCE: true
+
+    # Kubernetes Gateway API HTTPRoute attached to Traefik
+    httpRoute:
+      enabled: true
+      parentRefs:
+        - name: traefik-gateway
+          namespace: traefik
+      hostnames:
+        - "headlamp.${CLUSTER_NAME:=talos-1}.gwebs.ca"
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+

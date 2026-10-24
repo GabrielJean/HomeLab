@@ -1,7 +1,8 @@
+# Grant cluster-admin privileges to Microsoft Entra ID authenticated users
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: headlamp
+  name: oidc-admin
   labels:
     app.kubernetes.io/name: headlamp
     app.kubernetes.io/part-of: homelab-infrastructure
@@ -10,7 +11,7 @@ roleRef:
   kind: ClusterRole
   name: cluster-admin
 subjects:
-  - kind: ServiceAccount
-    name: headlamp
-    namespace: headlamp
-
+  # Primary cluster administrator identity from Entra ID
+  - kind: User
+    name: "${OIDC_ADMIN_EMAIL:=admin@example.com}"
+    apiGroup: rbac.authorization.k8s.io
