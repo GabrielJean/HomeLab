@@ -54,13 +54,13 @@ spec:
 
     # Configuration for multi-cluster, plugins, and Microsoft Entra ID OIDC SSO
     config:
-      inCluster: false
+      inCluster: true
+      inClusterContextName: "k8s-${CLUSTER_NAME:=talos-1}"
       pluginsDir: /headlamp/plugins
       extraArgs:
         - "-kubeconfig=/home/headlamp/.kube/config"
         - "-oidc-use-token-broadcast=true"
       oidc:
-        useCookie: true
         useTokenBroadcast: true
         secret:
           create: false
