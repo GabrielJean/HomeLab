@@ -1,0 +1,5 @@
+# Dedicated Talos v1.14+ document patch for Flannel CNI configuration.
+# Enables native Kubernetes NetworkPolicy enforcement directly in Flannel.
+apiVersion: v1alpha1
+kind: KubeFlannelCNIConfig
+kubeNetworkPoliciesEnabled: true

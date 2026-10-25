@@ -4,6 +4,28 @@
 
 This repository documents and automates my homelab environment. It is not intended to be a turnkey deployment guide or a shared operations manual. Configuration is deliberately presented at a high level: private infrastructure details, credentials, addresses, domains, and inventory data are excluded.
 
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [What I Built](#what-i-built)
+- [Technology Stack](#technology-stack)
+- [Repository Tour](#repository-tour)
+- [Documentation Index](#documentation-index-table-of-contents)
+  - [Kubernetes Infrastructure & Operations (`K8s/`)](#kubernetes-infrastructure--operations-k8s)
+  - [Docker & Host Workloads (`Docker/`)](#docker--host-workloads-docker)
+  - [Archives & Retired Experiments (`Archives/`)](#archives--retired-experiments-archives)
+- [Deployment Design](#deployment-design)
+- [Continuous Delivery](#continuous-delivery)
+- [Engineering Decisions](#engineering-decisions)
+- [Skills Demonstrated](#skills-demonstrated)
+- [Scope and Safety](#scope-and-safety)
+- [Selected Services](#selected-services)
+- [Project Status](#project-status)
+
+---
+
 ## Overview
 
 HomeLab is a practical platform for building experience with the systems that support real applications after they leave a developer's laptop. The environment combines virtual machines, Docker Compose workloads, Ansible automation, monitoring, network-facing services, and CI/CD workflows.
@@ -50,12 +72,41 @@ Metrics  ---> monitoring stack -------> dashboards
 
 | Path | Description |
 | --- | --- |
+| `K8s/` | Declarative GitOps infrastructure for Talos Linux Kubernetes clusters with Flux CD, Gateway API, Headlamp, and External Secrets Operator (Azure Workload Identity). See [`K8s/Bootstrap.md`](K8s/Bootstrap.md) for the end-to-end setup guide. |
 | `Ansible/` | The automation layer. Playbooks describe host setup, Docker application deployment, updates, networking, storage, and media-related configuration. |
 | `Ansible/roles/` | Reusable Ansible tasks for reachability checks, Docker installation, Compose deployment, and deployment cleanup. |
 | `Docker/` | Self-contained Docker Compose projects. Each application owns its Compose definition and non-sensitive supporting configuration. |
 | `.github/workflows/` | CI/CD workflows for selective Docker deployment and scheduled operating-system updates. |
 | `etc/` | Version-controlled host configuration for services such as file sharing, monitoring, snapshotting, and scheduled jobs. |
 | `Archives/` | Historical infrastructure experiments and retired configuration retained for reference. |
+
+## Documentation Index (Table of Contents)
+
+A complete index of all documentation files across this repository:
+
+### Kubernetes Infrastructure & Operations (`K8s/`)
+
+* **Core & Architecture**:
+  * [`K8s/Bootstrap.md`](K8s/Bootstrap.md) — **End-to-End Bootstrap Guide**: Complete walkthrough for provisioning Talos Linux via Omni, Azure Workload Identity OIDC federation, External Secrets Operator, and Flux CD.
+  * [`K8s/PLAN.md`](K8s/PLAN.md) — **Kubernetes Migration Plan**: Architectural specifications and phased migration roadmap from Docker Compose to Talos Linux.
+  * [`K8s/Omni/README.md`](K8s/Omni/README.md) — **Sidero Omni Operations**: Machine classes, declarative media presets, site routing patches, and Omni cluster templates.
+  * [`K8s/clusters/README.md`](K8s/clusters/README.md) — **Multi-Cluster GitOps**: Flux CD architecture, independent cluster overlays, and secretless variable substitution.
+* **Platform Infrastructure Components (`K8s/infrastructure/`)**:
+  * [`K8s/infrastructure/external-secrets/README.md`](K8s/infrastructure/external-secrets/README.md) — **External Secrets Operator**: Azure Key Vault integration, secretless Workload Identity federation, secret registry, and expiration runbook.
+  * [`K8s/infrastructure/headlamp/README.md`](K8s/infrastructure/headlamp/README.md) — **Headlamp Dashboard**: Kubernetes web UI, Microsoft Entra ID OIDC SSO, Gateway API routing, and breakglass recovery.
+  * [`K8s/infrastructure/traefik/README.md`](K8s/infrastructure/traefik/README.md) — **Traefik Ingress**: Gateway API controller, HostPort 80/443 entrypoints, and cross-namespace routing.
+  * [`K8s/infrastructure/gateway-api/README.md`](K8s/infrastructure/gateway-api/README.md) — **Kubernetes Gateway API**: Standard Gateway API CRDs and Gateway listener specifications.
+  * [`K8s/infrastructure/metrics-server/README.md`](K8s/infrastructure/metrics-server/README.md) — **Metrics Server**: In-cluster resource metrics for `kubectl top` and horizontal scaling.
+  * [`K8s/infrastructure/storage/local-path/README.md`](K8s/infrastructure/storage/local-path/README.md) — **Local Path Provisioner**: Host-path dynamic storage class configuration.
+
+### Docker & Host Workloads (`Docker/`)
+
+* [`Docker/homeassistant/README-zigbee-usb.md`](Docker/homeassistant/README-zigbee-usb.md) — **Home Assistant Zigbee USB**: Hardware passthrough and device mapping guide for Zigbee coordinators.
+* [`Docker/plex/scripts/README.md`](Docker/plex/scripts/README.md) — **Plex Maintenance Scripts**: Helper scripts for Plex media server management.
+
+### Archives & Retired Experiments (`Archives/`)
+
+* [`Archives/Terraform/modules/proxmox_vm/README.md`](Archives/Terraform/modules/proxmox_vm/README.md) — **Terraform Proxmox VM Module**: Historical Terraform module for provisioning Proxmox virtual machines.
 
 ## Deployment Design
 

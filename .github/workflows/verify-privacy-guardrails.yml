@@ -1,0 +1,32 @@
+name: Privacy & Secret Guardrails
+
+on:
+  push:
+    branches:
+      - main
+      - k8s-migration
+  pull_request:
+    branches:
+      - main
+      - k8s-migration
+
+jobs:
+  privacy-check:
+    name: Verify Zero Personal Email Leaks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Run Privacy & Email Leak Scanner
+        run: |
+          chmod +x scripts/check-privacy-leaks.py
+          python3 scripts/check-privacy-leaks.py --all
+

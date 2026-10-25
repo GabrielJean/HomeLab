@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Git pre-push hook to block accidental pushes of personal email addresses or credentials
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+PYTHON_BIN="$(which python3 || echo "python")"
+
+if [ -f "$REPO_ROOT/scripts/check-privacy-leaks.py" ]; then
+    "$PYTHON_BIN" "$REPO_ROOT/scripts/check-privacy-leaks.py" --pre-push
+    exit $?
+fi
+
+exit 0
+

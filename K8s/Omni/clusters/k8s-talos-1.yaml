@@ -1,0 +1,27 @@
+kind: Cluster
+name: k8s-talos-1
+kubernetes:
+  version: v1.37.1
+talos:
+  version: v1.14.4
+systemExtensions:
+  - siderolabs/qemu-guest-agent
+features:
+  backupConfiguration:
+    interval: 1h
+patches:
+  - name: allow-controlplane-workloads
+    file: patches/allow-controlplane.yaml
+  - name: flannel-network-policies
+    file: patches/flannel-network-policies.yaml
+  - name: site-to-site-routes
+    file: patches/routes-talos-1.yaml
+  - name: sa-issuer
+    file: patches/service-account-issuer-talos-1.yaml
+  - name: oidc-auth
+    file: patches/oidc-azure-ad.yaml
+---
+kind: ControlPlane
+machineClass:
+  name: pve-1
+  size: 1

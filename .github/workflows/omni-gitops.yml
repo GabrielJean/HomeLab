@@ -1,0 +1,70 @@
+name: Sidero Omni GitOps
+
+on:
+  push:
+    branches:
+      - main
+      - k8s-migration
+    paths:
+      - 'K8s/Omni/**'
+  pull_request:
+    branches:
+      - main
+      - k8s-migration
+    paths:
+      - 'K8s/Omni/**'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Validate Templates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install omnictl
+        run: |
+          curl -fsSLO "https://github.com/siderolabs/omni/releases/latest/download/omnictl-linux-amd64"
+          chmod +x omnictl-linux-amd64
+          sudo mv omnictl-linux-amd64 /usr/local/bin/omnictl
+          omnictl --version
+
+      - name: Validate Cluster Templates
+        run: |
+          for template in K8s/Omni/clusters/*.yaml; do
+            echo "Validating ${template}..."
+            omnictl cluster template validate -f "${template}"
+          done
+
+  sync:
+    name: Sync to Omni SaaS
+    needs: validate
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      OMNI_ENDPOINT: ${{ secrets.OMNI_ENDPOINT }}
+      OMNI_SERVICE_ACCOUNT_KEY: ${{ secrets.OMNI_SERVICE_ACCOUNT_KEY }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install omnictl
+        run: |
+          curl -fsSLO "https://github.com/siderolabs/omni/releases/latest/download/omnictl-linux-amd64"
+          chmod +x omnictl-linux-amd64
+          sudo mv omnictl-linux-amd64 /usr/local/bin/omnictl
+          omnictl --version
+
+      - name: Apply Omni Media Presets & Machine Classes
+        run: |
+          omnictl apply -f K8s/Omni/media/
+          omnictl apply -f K8s/Omni/classes/
+
+      - name: Sync Cluster Templates
+        run: |
+          for template in K8s/Omni/clusters/*.yaml; do
+            echo "Syncing ${template}..."
+            omnictl cluster template sync -f "${template}" -v
+          done
+

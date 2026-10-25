@@ -1,0 +1,10 @@
+# MachineClass for Talos 1 (pve-1)
+# Matches any Talos machine labeled with "pve-1" in Omni.
+metadata:
+  namespace: default
+  type: MachineClasses.omni.sidero.dev
+  id: pve-1
+spec:
+  matchlabels:
+    - pve-1
+
