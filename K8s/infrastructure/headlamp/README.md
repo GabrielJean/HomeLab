@@ -43,10 +43,9 @@ Headlamp provides a clean, extensible, multi-cluster web dashboard for monitorin
 infrastructure/headlamp/
 ├── README.md                      # Documentation & operational guide
 ├── namespace.yaml                 # Dedicated 'headlamp' namespace
-├── clusters-config.yaml           # Multi-cluster kubeconfig ConfigMap (talos-1 & talos-2)
 ├── helmrepository.yaml            # Official Headlamp Helm repository
 ├── helmrelease.yaml               # Headlamp HelmRelease (v0.46.0, Flux plugin, Gateway API, OIDC)
-├── external-secret.yaml           # ExternalSecret syncing client secret from Azure Key Vault
+├── external-secret.yaml           # ExternalSecret syncing client secret & templating multi-cluster kubeconfig
 ├── oidc-rbac.yaml                 # ClusterRoleBinding granting cluster-admin to Entra ID users
 ├── rbac-admin.yaml                # Emergency breakglass ServiceAccount & static token
 └── kustomization.yaml             # Kustomize entrypoint bundling all manifests
@@ -65,7 +64,7 @@ flowchart TD
     subgraph Headlamp_Instance["Headlamp Server (In-Cluster)"]
         UI["UI Cluster Switcher Dropdown"]
         TB["OIDC Token Broadcaster<br/>(-oidc-use-token-broadcast=true)"]
-        KC["Multi-Cluster Kubeconfig<br/>(/home/headlamp/.kube/config)"]
+        KC["Multi-Cluster Kubeconfig Secret<br/>(/home/headlamp/.kube/config)"]
     end
 
     Browser --> UI
@@ -86,8 +85,8 @@ flowchart TD
 
 ### How Multi-Cluster Federation Works:
 
-1. **Declarative Multi-Cluster Kubeconfig**:
-   [`clusters-config.yaml`](clusters-config.yaml) defines contexts for both `k8s-talos-1` (`https://192.168.10.15:6443`) and `k8s-talos-2` (`https://192.168.15.15:6443`) with their respective cluster root CA certificates.
+1. **Templated Multi-Cluster Kubeconfig**:
+   [`external-secret.yaml`](external-secret.yaml) defines contexts for both `k8s-talos-1` (`https://192.168.10.15:6443`) and `k8s-talos-2` (`https://192.168.15.15:6443`) with their respective cluster root CA certificates. Crucially, the External Secrets Operator injects `client-secret` into the auth-provider configuration directly from Azure Key Vault at runtime, maintaining 100% zero-secrets in Git while allowing OAuth2 authorization code exchange and token refresh across both clusters.
 2. **Dynamic Default Context**:
    `current-context: k8s-${CLUSTER_NAME:=talos-1}` defaults to the local cluster where that specific Headlamp instance is deployed, but both clusters are always registered and active.
 3. **OIDC Token Broadcasting (`-oidc-use-token-broadcast=true`)**:

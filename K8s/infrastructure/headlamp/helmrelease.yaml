@@ -42,8 +42,11 @@ spec:
       - name: plugins-dir
         emptyDir: {}
       - name: multi-cluster-kubeconfig
-        configMap:
-          name: headlamp-clusters-config
+        secret:
+          secretName: headlamp-oidc
+          items:
+            - key: config
+              path: config
 
     volumeMounts:
       - name: plugins-dir
