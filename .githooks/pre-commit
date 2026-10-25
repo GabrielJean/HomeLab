@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Git pre-commit hook to block accidental leaks of personal email addresses or credentials
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+PYTHON_BIN="$(which python3 || echo "python")"
+
+if [ -f "$REPO_ROOT/scripts/check-privacy-leaks.py" ]; then
+    "$PYTHON_BIN" "$REPO_ROOT/scripts/check-privacy-leaks.py" --staged
+    exit $?
+fi
+
+exit 0
