@@ -10,3 +10,4 @@ if [ -f "$REPO_ROOT/scripts/check-privacy-leaks.py" ]; then
 fi
 
 exit 0
+

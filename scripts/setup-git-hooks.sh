@@ -12,3 +12,4 @@ chmod +x .githooks/* scripts/*.py
 
 echo "✅ Git hooks successfully installed and active!"
 echo "Privacy guardrail will now prevent committing or pushing unauthorized email addresses."
+
