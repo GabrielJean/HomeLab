@@ -89,12 +89,12 @@ flowchart LR
 - [x] **Verify Headlamp SSO**: Test Microsoft Entra ID sign-in on `https://headlamp.talos-2.gwebs.ca`.
 - [x] **Multi-Cluster Federation in Headlamp**: Enabled bidirectional cross-cluster management and OIDC token broadcasting across both `k8s-talos-1` and `k8s-talos-2` via External Secrets Operator templated kubeconfig with zero credentials committed to Git.
 
-### Phase 3: Platform Ingress TLS & Disaster Recovery — READY TO START
-- [ ] **cert-manager Deployment**: Deploy cert-manager via Flux in [`infrastructure/cert-manager/`](infrastructure/cert-manager/) with CRDs enabled.
-- [ ] **Azure DNS Secret / Credentials**: Configure Azure DNS SP credentials or Workload Identity via External Secrets Operator (`azure-dns-secret`).
-- [ ] **Let's Encrypt ClusterIssuers**:
+### Phase 3: Platform Ingress TLS & Disaster Recovery — IN PROGRESS
+- [x] **cert-manager Deployment**: Deploy cert-manager via Flux in [`infrastructure/cert-manager/`](infrastructure/cert-manager/) with CRDs enabled.
+- [x] **Azure DNS Secret / Credentials**: Configure Azure DNS SP credentials via External Secrets Operator (`azure-dns-secret` syncing `k8s-app-secret`).
+- [x] **Let's Encrypt ClusterIssuers**:
   - Deploy `letsencrypt-staging` and `letsencrypt-prod` `ClusterIssuer` with Azure DNS DNS-01 ACME solver for `gwebs.ca`.
-- [ ] **Wildcard TLS Certificates**:
+- [x] **Wildcard TLS Certificates**:
   - Deploy wildcard `Certificate` for `*.talos-1.gwebs.ca` on `k8s-talos-1` and attach to `traefik-gateway`.
   - Deploy wildcard `Certificate` for `*.talos-2.gwebs.ca` on `k8s-talos-2` and attach to `traefik-gateway`.
 - [ ] **Velero Deployment**: Deploy Velero via Flux in [`infrastructure/velero/`](infrastructure/velero/) with node-agent (Kopia/Restic) enabled for PVC volume backups.

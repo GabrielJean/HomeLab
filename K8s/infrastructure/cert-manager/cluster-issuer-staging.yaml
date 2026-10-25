@@ -1,0 +1,22 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      - dns01:
+          azureDNS:
+            clientID: "e1d55ddd-3453-4a91-9842-aa7d7dc620a3"
+            tenantID: "10b7061b-f2d0-4778-8cae-2666faf4af25"
+            subscriptionID: "${AZURE_SUBSCRIPTION_ID}"
+            resourceGroupName: "GJ-DNS-RG"
+            hostedZoneName: "gwebs.ca"
+            environment: AzurePublicCloud
+            clientSecretSecretRef:
+              name: azure-dns-secret
+              key: client-secret
+

@@ -262,7 +262,7 @@ In Azure Key Vault (`https://gjtaloskv.vault.azure.net/`) ➔ **Objects** ➔ **
 
 | Secret Name | Value | Purpose |
 | :--- | :--- | :--- |
-| **`headlamp-oidc-client-secret`** | *Client Secret Value from Entra ID* | Used by Headlamp backend for OAuth code exchange. *(Valid until Oct 23, 2028)*. |
+| **`k8s-app-secret`** | *Client Secret Value from Entra ID* | Used by Headlamp (OIDC) and cert-manager (Azure DNS). *(Valid until Oct 23, 2028)*. |
 | **`headlamp-admin-email`** | *Admin email address* | Injected dynamically by Flux into Kubernetes RBAC (`oidc-admin` ClusterRoleBinding) so personal emails never appear in Git. |
 
 ---
@@ -314,7 +314,7 @@ kubectl --context admin@k8s-talos-2 apply -k K8s/clusters/k8s-talos-2
    - **Metrics Server**: API metrics for `kubectl top`.
    - **External Secrets Operator**: Authenticates to Azure Key Vault via secretless Workload Identity.
    - **ClusterSecrets**: ESO pulls `headlamp-admin-email` and writes Secret `flux-system/cluster-secrets`.
-   - **Headlamp**: ESO pulls `headlamp-oidc-client-secret` and starts the Headlamp dashboard.
+   - **Headlamp**: ESO pulls `k8s-app-secret` and starts the Headlamp dashboard.
    - **Dynamic RBAC**: Flux substitutes `${OIDC_ADMIN_EMAIL}` into `oidc-rbac.yaml`, binding `cluster-admin` to your email.
 4. Flux reconciles cluster-specific applications under [`K8s/apps/`](apps/).
 
@@ -363,7 +363,7 @@ echo ""
 
 > [!WARNING]
 > **Client Secret Expiration**:
-> The Entra ID client secret (`headlamp-oidc-client-secret`) is valid until **October 23, 2028**.
+> The Entra ID client secret (`k8s-app-secret`) is valid until **October 23, 2028**.
 
 If authentication suddenly fails:
 1. **Symptom**: Microsoft returns error `AADSTS7000222` ("The provided client secret keys are expired").
@@ -371,7 +371,7 @@ If authentication suddenly fails:
 3. **Renewal Procedure**:
    - In Microsoft Entra ID App Registration ➔ **Certificates & secrets** ➔ **+ New client secret**.
    - Copy the value.
-   - In Azure Key Vault (`gjtaloskv`) ➔ **Secrets** ➔ `headlamp-oidc-client-secret` ➔ **+ New version** and paste the value.
+   - In Azure Key Vault (`gjtaloskv`) ➔ **Secrets** ➔ `k8s-app-secret` ➔ **+ New version** and paste the value.
    - ESO will automatically sync the new secret within 1 hour (or run `kubectl annotate externalsecret -n headlamp headlamp-oidc force-sync=$(date +%s) --overwrite`).
    - Restart Headlamp: `kubectl rollout restart deployment/headlamp -n headlamp`.
 
