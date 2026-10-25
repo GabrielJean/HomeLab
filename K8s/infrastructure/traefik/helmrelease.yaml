@@ -85,6 +85,7 @@ spec:
           port: 8443
           protocol: HTTPS
           certificateRefs:
+            - name: wildcard-cluster-tls
             - name: traefik-default-cert
           namespacePolicy:
             from: All

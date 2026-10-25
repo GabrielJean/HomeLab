@@ -117,8 +117,9 @@ The following secrets must exist in Azure Key Vault (`https://gjtaloskv.vault.az
 
 | Secret Name in Key Vault | Target Kubernetes Secret | Target Namespace | Expiration | Purpose |
 | :--- | :--- | :--- | :--- | :--- |
-| **`headlamp-oidc-client-secret`** | `headlamp-oidc` (`OIDC_CLIENT_SECRET`) | `headlamp` | **Oct 23, 2028** | Client secret required by Headlamp backend for the `/oidc-callback` authorization code exchange with Microsoft Entra ID. |
+| **`k8s-app-secret`** | `headlamp-oidc` / `azure-dns-secret` | `headlamp` / `cert-manager` | **Oct 23, 2028** | Client secret for Entra ID app `e1d55ddd...` used by Headlamp backend (OIDC) and cert-manager (Azure DNS ACME solver). |
 | **`headlamp-admin-email`** | `cluster-secrets` (`OIDC_ADMIN_EMAIL`) | `flux-system` | Never | Admin email address injected dynamically into Kubernetes RBAC (`oidc-admin` ClusterRoleBinding) so personal emails never appear in Git. |
+| **`azure-subscription-id`** | `cluster-secrets` (`AZURE_SUBSCRIPTION_ID`) | `flux-system` | Never | Azure Subscription GUID where Resource Group `GJ-DNS-RG` and DNS Zone `gwebs.ca` reside, dynamically substituted into ClusterIssuers. |
 
 ---
 
@@ -126,7 +127,7 @@ The following secrets must exist in Azure Key Vault (`https://gjtaloskv.vault.az
 
 > [!WARNING]
 > **Client Secret Expiration Notice**:
-> The Microsoft Entra ID Client Secret (`headlamp-oidc-client-secret`) is valid until **October 23, 2028**.
+> The Microsoft Entra ID Client Secret (`k8s-app-secret`) is valid until **October 23, 2028**.
 > If authentication suddenly fails around or after this date, consult the diagnostics below.
 
 ### How to Diagnose an Expired or Broken Secret
@@ -152,7 +153,7 @@ The following secrets must exist in Azure Key Vault (`https://gjtaloskv.vault.az
    1. Open **Microsoft Entra ID** ➔ **App registrations** ➔ `e1d55ddd-3453-4a91-9842-aa7d7dc620a3`.
    2. Navigate to **Certificates & secrets** ➔ **+ New client secret**.
    3. Copy the new secret **Value**.
-   4. Open **Azure Key Vault** (`gjtaloskv`) ➔ **Secrets** ➔ `headlamp-oidc-client-secret` ➔ **+ New version**.
+   4. Open **Azure Key Vault** (`gjtaloskv`) ➔ **Secrets** ➔ `k8s-app-secret` ➔ **+ New version**.
    5. Paste the new secret value and click **Create**.
    6. ESO automatically detects and updates the Kubernetes Secret (or run `kubectl annotate externalsecret -n headlamp headlamp-oidc force-sync=$(date +%s) --overwrite`).
    7. Restart the Headlamp pod: `kubectl rollout restart deployment/headlamp -n headlamp`.
