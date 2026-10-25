@@ -264,3 +264,24 @@ Paste this token into the Headlamp login page to regain full administrative cont
 - **Symptom**: `kubectl get nodes` returns `an error on the server ("proxy error") has prevented the request from succeeding`.
 - **Root Cause**: The API server static pod manifest was rendered with an invalid `AuthenticationConfiguration` schema (e.g. `audiences` improperly nested outside `issuer`, or an invalid CEL expression requiring `email_verified`). The static pod failed to start, taking down the Omni proxy.
 - **Fix**: Verify the configuration schema against `registry.k8s.io/kube-apiserver:v1.37.1` in Docker. Ensure `audiences` is nested under `issuer:`, and allow ~60 seconds for Talos static pod recreation to complete.
+
+### 4. `AADSTS7000218: The request body must contain 'client_assertion' or 'client_secret'.`
+
+- **Symptom**: After authenticating with Microsoft, Headlamp displays error:
+  `Failed to exchange token: oauth2: "invalid_client" "AADSTS7000218: The request body must contain the following parameter: 'client_assertion' or 'client_secret'"`
+  Both clusters display `Unavailable` in the Headlamp UI.
+- **Root Cause**: When Headlamp loads multi-cluster contexts from an external kubeconfig (`-kubeconfig=/home/headlamp/.kube/config`), it reads OAuth2 credentials from `users[].user.auth-provider.config["client-secret"]` for each cluster context, rather than Headlamp's global CLI flags. If the kubeconfig lacks `client-secret` (or if static config maps are used without secrets), Headlamp attempts an unauthenticated code exchange, which Microsoft Entra ID rejects for confidential Web app registrations.
+- **Fix**: Template the entire multi-cluster kubeconfig inside [`external-secret.yaml`](external-secret.yaml) using External Secrets Operator. ESO dynamically injects `client-secret: "{{ .OIDC_CLIENT_SECRET }}"` into the secret volume `/home/headlamp/.kube/config` directly from Azure Key Vault at runtime. This keeps 100% of credentials out of Git while supplying both cluster contexts with valid client secrets for OAuth code exchange and background token refresh.
+
+---
+
+## Security Posture & Hardening Verification
+
+| Security Boundary | Implementation & Enforcement | Verification Method |
+| :--- | :--- | :--- |
+| **Zero Secrets in Git** | Credentials originate in Azure Key Vault (`headlamp-oidc-client-secret`) and are templated in-memory via External Secrets Operator. No static secrets or ConfigMaps with sensitive fields exist in Git. | `git log -S` and repository scanning confirm 0 tokens/secrets committed. |
+| **Least-Privilege Pod Execution** | Container runs non-root as UID `100` (`runAsNonRoot: true`, `privileged: false`), with all Linux capabilities dropped (`drop: ["ALL"]`) in both init and app containers. | `kubectl get pod -n headlamp -o yaml` verifies strict securityContext. |
+| **Encrypted Transit (Network Security)** | Cross-site cluster API communication (`192.168.10.15:6443` <-> `192.168.15.15:6443`) traverses private subnets across the encrypted WireGuard site-to-site tunnel. Apiservers are never exposed to the public internet. | TLS certificate validation with embedded root CAs; private IP endpoints only. |
+| **Scoped Token Broadcasting** | Token broadcasting (`-oidc-use-token-broadcast=true`) strictly evaluates target contexts and will only broadcast the auth cookie if the target cluster's OIDC issuer URL and client ID match the source cluster. | Code audit of `backend/pkg/auth/broadcast.go` confirms strict issuer + clientID validation before cookie replication. |
+| **Strict Claim Mapping & RBAC** | Kubernetes Structured Authentication maps `preferred_username` to the Kubernetes User identity without arbitrary prefixing. `oidc-rbac.yaml` restricts `cluster-admin` strictly to the verified administrator account (`admin@example.com`). | ClusterRoleBinding `oidc-admin` enforces explicit subject authorization. |
+| **ClusterIP Isolation** | Headlamp services are deployed strictly as internal `ClusterIP` services, protected behind Traefik reverse proxy and Gateway API HTTPRoutes. | `kubectl get svc -n headlamp` confirms no external LoadBalancer or NodePort exposure. |

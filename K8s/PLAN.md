@@ -87,6 +87,7 @@ flowchart LR
 - [x] **Bootstrap Flux CD**: Run `kubectl apply -k K8s/clusters/k8s-talos-2` to install Flux controllers on `k8s-talos-2`.
 - [x] **Reconcile Platform Infrastructure**: Flux reconciliation of Traefik, Local Path Storage, External Secrets Operator, and Headlamp on `k8s-talos-2`.
 - [x] **Verify Headlamp SSO**: Test Microsoft Entra ID sign-in on `https://headlamp.talos-2.gwebs.ca`.
+- [x] **Multi-Cluster Federation in Headlamp**: Enabled bidirectional cross-cluster management and OIDC token broadcasting across both `k8s-talos-1` and `k8s-talos-2` via External Secrets Operator templated kubeconfig with zero credentials committed to Git.
 
 ### Phase 3: Platform Ingress TLS & Disaster Recovery — READY TO START
 - [ ] **cert-manager Deployment**: Deploy cert-manager via Flux in [`infrastructure/cert-manager/`](infrastructure/cert-manager/) with CRDs enabled.
