@@ -1,4 +1,4 @@
-FROM qmcgaw/gluetun:v3.41.1
+FROM qmcgaw/gluetun:v3.41.3
 
 RUN apk add --no-cache bash curl jq wireguard-tools coreutils
 
