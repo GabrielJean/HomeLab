@@ -7,7 +7,10 @@ metadata:
     app.kubernetes.io/part-of: homelab-apps
 rules:
   - apiGroups: [""]
-    resources: ["namespaces", "pods", "nodes"]
+    resources: ["namespaces", "pods", "nodes", "services"]
+    verbs: ["get", "list"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
     verbs: ["get", "list"]
   - apiGroups: ["metrics.k8s.io"]
     resources: ["nodes", "pods"]
