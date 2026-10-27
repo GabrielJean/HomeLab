@@ -107,7 +107,7 @@ flowchart LR
 - [ ] **Joke de Jean**: Fun web tools.
 - [x] **Termix**: Web-based SSH terminal with VolSync cross-cluster replication (Active on `k8s-talos-1`, Warm Standby on `k8s-talos-2`).
 - [ ] **Open WebUI**: Local AI interface.
-- [ ] **Homepage**: Cluster and homelab dashboard.
+- [x] **Homepage**: Single unified multi-home dashboard running statelessly on `k8s-talos-1` and `k8s-talos-2`.
 - [ ] **DNS Cutover**: Switch local DNS records in AdGuard Home to cluster IPs.
 
 ### Phase 5: Stateful & Media Workloads (Pending)
