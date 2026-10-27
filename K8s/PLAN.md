@@ -40,23 +40,23 @@
 ## Current Status & Implementation Checklist
 
 > [!NOTE]
-> **Active Branch**: `k8s-migration`  
-> **Overall Progress**: **Phase 0, 1 & 2 Complete (100%)** | **Phase 3 Ready to Start (0%)**
+> **Active Branch**: `main`  
+> **Overall Progress**: **Phase 0, 1, 2 & 3 Complete (100%)** | **Phase 4 In Progress**
 
 ```mermaid
 flowchart LR
     P0["Phase 0: Omni & GitOps<br/>(Complete)"] --> P1["Phase 1: talos-1 Core<br/>(Complete)"]
     P1 --> P2["Phase 2: talos-2 Core<br/>(Complete)"]
-    P2 --> P3["Phase 3: TLS & Backups<br/>(Ready to Start)"]
-    P3 --> P4["Phase 4: Web Apps<br/>(Pending)"]
+    P2 --> P3["Phase 3: TLS & Backups<br/>(Complete)"]
+    P3 --> P4["Phase 4: Web Apps<br/>(In Progress)"]
     P4 --> P5["Phase 5: Media & NAS<br/>(Pending)"]
     P5 --> P6["Phase 6: GPU & Edge<br/>(Pending)"]
     classDef done fill:#2e7d32,stroke:#1b5e20,color:#ffffff;
     classDef inprog fill:#f57f17,stroke:#e65100,color:#ffffff;
     classDef todo fill:#424242,stroke:#212121,color:#ffffff;
-    class P0,P1,P2 done;
-    class P3 inprog;
-    class P4,P5,P6 todo;
+    class P0,P1,P2,P3 done;
+    class P4 inprog;
+    class P5,P6 todo;
 ```
 
 ### Phase 0: Prerequisites & Automation
@@ -89,7 +89,7 @@ flowchart LR
 - [x] **Verify Headlamp SSO**: Test Microsoft Entra ID sign-in on `https://headlamp.talos-2.gwebs.ca`.
 - [x] **Multi-Cluster Federation in Headlamp**: Enabled bidirectional cross-cluster management and OIDC token broadcasting across both `k8s-talos-1` and `k8s-talos-2` via External Secrets Operator templated kubeconfig with zero credentials committed to Git.
 
-### Phase 3: Platform Ingress TLS & Disaster Recovery — IN PROGRESS
+### Phase 3: Platform Ingress TLS & Disaster Recovery — COMPLETE
 - [x] **cert-manager Deployment**: Deploy cert-manager via Flux in [`infrastructure/cert-manager/`](infrastructure/cert-manager/) with CRDs enabled.
 - [x] **Azure DNS Secret / Credentials**: Configure Azure DNS SP credentials via External Secrets Operator (`azure-dns-secret` syncing `k8s-app-secret`).
 - [x] **Let's Encrypt ClusterIssuers**:
@@ -97,10 +97,9 @@ flowchart LR
 - [x] **Wildcard TLS Certificates**:
   - Deploy wildcard `Certificate` for `*.talos-1.gwebs.ca` on `k8s-talos-1` and attach to `traefik-gateway`.
   - Deploy wildcard `Certificate` for `*.talos-2.gwebs.ca` on `k8s-talos-2` and attach to `traefik-gateway`.
-- [ ] **Velero Deployment**: Deploy Velero via Flux in [`infrastructure/velero/`](infrastructure/velero/) with node-agent (Kopia/Restic) enabled for PVC volume backups.
-- [ ] **Backup Storage Location (BSL)**: Configure Velero BSL targeting Azure Blob Storage (or S3/MinIO) and verify authenticated bucket connection.
-- [ ] **Backup Schedules & Policies**: Define daily cluster-wide backup schedules with retention policies.
-- [ ] **Disaster Recovery Dry-Run**: Execute an ad-hoc test backup and verify volume snapshot / metadata upload.
+- [x] **VolSync Operator Deployment**: Deploy VolSync via Flux in [`infrastructure/storage/volsync/`](infrastructure/storage/volsync/) with CRDs enabled across `k8s-talos-1` and `k8s-talos-2`.
+- [x] **Cloud Storage Secret Configuration**: Configure Azure Blob Storage (`gjtalossa`) repository secret and Restic credentials (`volsync-restic-password`) via External Secrets Operator.
+- [x] **Data Replication & Standby Verification**: Validate asynchronous cross-cluster volume replication and offsite snapshots (`ReplicationSource` on `k8s-talos-1`, `ReplicationDestination` on `k8s-talos-2` via Termix workload).
 
 ### Phase 4: Lower-Risk Application Migration (In Progress)
 - [ ] **Stirling-PDF**: Deploy PDF manipulation suite with Local Path PVC and TLS Gateway route.
@@ -554,51 +553,70 @@ A multi-tiered backup design protects against data loss:
 2. **Proxmox Backup Server (PBS)**:
    - PBS takes nightly image-level backups of the `talos-1` and `talos-2` virtual machines on `pve-1` and `pve-2`.
    - In a complete VM corruption or hardware failure, the VM can be restored from PBS in minutes.
-3. **Application State & Persistent Volumes (Velero Disaster Recovery)**:
-   - Workloads with critical SQLite/Postgres databases (Gitea, Grafana, Home Assistant) and configuration PVCs use Velero for scheduled cluster-wide state and volume backups.
+3. **Application State & Persistent Volumes (VolSync Disaster Recovery & Replication)**:
+   - Workloads with critical SQLite/Postgres databases (Gitea, Grafana, Home Assistant) and configuration PVCs use VolSync for scheduled offsite Restic backups to Azure Blob Storage and cross-cluster replication to warm-standby targets.
 4. **GitOps As Desired State**:
    - Cluster configuration, manifests, routes, and policies are 100% codified in Git. A replaced node reconciles its entire workload set automatically upon joining Flux.
 
-### Velero Disaster Recovery Architecture (Azure Blob / S3)
+### VolSync Volume Replication & Disaster Recovery Architecture (Azure Blob)
 
-To protect stateful applications and local persistent volumes against data loss or VM corruption, **Velero** is deployed as an in-cluster platform service:
+To protect stateful applications and local persistent volumes against data loss or VM corruption, **VolSync** is deployed as an in-cluster platform service:
 
 ```text
   +-------------------------------------------------------------------------+
-  |                     Kubernetes Cluster (talos-1 / talos-2)              |
+  |                   Home 1 Cluster (k8s-talos-1 - Active)                 |
   |                                                                         |
   |   +-----------------------+              +--------------------------+   |
-  |   |    Velero Server      |              |    Velero Node-Agent     |   |
-  |   |  (Metadata & State)   |              |   (Kopia/Restic PVC)     |   |
+  |   |   Application Pod     |              |    VolSync Data Mover    |   |
+  |   |   (e.g., Termix)      |              |   (Direct PVC Copy Pod)  |   |
   |   +-----------+-----------+              +------------+-------------+   |
   |               |                                       |                 |
-  |               | Dumps CRDs, Namespaces, PVC specs     | File-level sync |
-  |               v                                       v                 |
+  |               | Mounts volume                         | Restic direct   |
+  |               v                                       v access          |
   |         +---------------------------------------------------+           |
-  |         |        BackupStorageLocation (BSL: Azure / S3)    |           |
-  |         +-------------------------+-------------------------+           |
+  |         |        Node-Local PVC (local-path on talos-1)     |           |
+  |         +---------------------------------------------------+           |
+  |                                   |                                     |
+  |                                   | Managed by ReplicationSource CRD    |
   +-----------------------------------|-------------------------------------+
                                       | Encrypted HTTPS Transfer
                                       v
   +-------------------------------------------------------------------------+
   |                      Offsite Cloud Object Storage                       |
-  |            Azure Blob Storage Container (or S3 Compatible Bucket)       |
-  |        - Daily cluster metadata snapshots                               |
-  |        - Deduplicated, encrypted PVC filesystem archives (Kopia)        |
+  |                    Azure Blob Storage (gjtalossa)                       |
+  |        - Deduplicated, encrypted Restic repository                      |
+  |        - Periodic point-in-time snapshots of application volumes        |
+  +-----------------------------------+-------------------------------------+
+                                      |
+                                      | Restored via ReplicationDestination CRD
+                                      v
+  +-------------------------------------------------------------------------+
+  |                 Home 2 Cluster (k8s-talos-2 - Warm Standby)             |
+  |                                                                         |
+  |   +-----------------------+              +--------------------------+   |
+  |   | Standby / Target Pod  |              |    VolSync Data Mover    |   |
+  |   +-----------+-----------+              +------------+-------------+   |
+  |               |                                       |                 |
+  |               | Restored PVC                          | Restic restore  |
+  |               v                                       v                 |
+  |         +---------------------------------------------------+           |
+  |         |        Node-Local PVC (local-path on talos-2)     |           |
+  |         +---------------------------------------------------+           |
   +-------------------------------------------------------------------------+
 ```
 
 - **Architecture Details**:
-  - **`velero` Deployment**: Deployed via official Helm chart in `infrastructure/velero/`.
-  - **Node-Agent (Kopia Engine)**: Deployed as a DaemonSet to perform efficient, deduplicated, file-level backups of node-local `local-path` PVCs without requiring storage-array CSI snapshots.
-  - **Storage Provider**:
-    - **Primary Target**: Azure Blob Storage container (or S3 bucket) using the `velero-plugin-for-microsoft-azure` (or `velero-plugin-for-aws`).
-    - **Authentication**: Azure Storage Account credentials pulled securely from Azure Key Vault via External Secrets Operator into `Secret/velero-credentials`.
-  - **Automated Backup Schedules (`Schedule` CRs)**:
-    - **Daily Cluster Backup**: Takes nightly full snapshots of all namespaces, persistent volume data, and custom resources with 14-day retention.
-    - **Pre-Upgrade Snapshots**: Ad-hoc snapshots before performing Talos or Kubernetes version upgrades.
+  - **`volsync` Deployment**: Deployed via official Helm chart in `infrastructure/storage/volsync/` into namespace `volsync-system`.
+  - **Direct Copy Method (`copyMethod: Direct`)**: Because the homelab uses `local-path` storage on Talos Linux (which lacks native CSI volume snapshots), VolSync attaches a lightweight data mover pod directly to the target volume to snapshot or restore data without requiring CSI snapshot drivers or privileged node daemonsets.
+  - **Storage Provider & Encryption**:
+    - **Primary Target**: Azure Blob Storage container (`gjtalossa`) using Restic.
+    - **Authentication & Encryption**: Storage account keys and the Restic repository encryption key are stored in Azure Key Vault and synchronized securely into application namespaces via External Secrets Operator (`volsync-restic-password`).
+  - **Automated Backup & Replication (`ReplicationSource` / `ReplicationDestination`)**:
+    - **Point-in-Time Volume Snapshots**: Takes deduplicated, incremental Restic backups on a defined schedule (e.g. hourly or daily) with configurable retention policies (`pruneIntervalDays`, `retain`).
+    - **Cross-Cluster Standby**: Facilitates active-passive warm failover between `k8s-talos-1` and `k8s-talos-2` by restoring to secondary PVCs asynchronously.
   - **Disaster Recovery Workflow**:
-    - In case of total VM loss, a fresh Talos node bootstrapped with Flux and Velero can restore all PVC data and workloads in a single command: `velero restore create --from-backup <backup-name>`.
+    - GitOps (Flux) restores 100% of the cluster manifests, CRDs, and ExternalSecrets.
+    - Upon reconciliation, VolSync automatically executes the initial restore from the Azure Blob Restic repository into newly provisioned PVCs, achieving full application and volume recovery without manual intervention.
 
 ---
 
@@ -622,8 +640,7 @@ K8s/
 │   ├── ingress/                        # Traefik Ingress Controller HelmRelease
 │   ├── cert-manager/                   # ACME cert-manager & Azure DNS solver
 │   ├── external-secrets/               # External Secrets Operator & Azure Key Vault Store
-│   ├── storage/                        # Local Path Provisioner & SMB CSI
-│   ├── velero/                         # Velero cluster & volume disaster recovery backups
+│   ├── storage/                        # Local Path Provisioner, VolSync Operator & SMB CSI
 │   ├── headlamp/                       # Headlamp web dashboard
 │   └── monitoring/                     # Prometheus & Grafana stack
 │
@@ -709,13 +726,13 @@ K8s/
    - Deploy `Certificate` custom resource for `*.talos-1.gwebs.ca` on `k8s-talos-1` and `*.talos-2.gwebs.ca` on `k8s-talos-2`.
    - Bind wildcard certificates to Traefik Gateway (`traefik-gateway`) HTTPS listener on port 443.
    - Verify zero-downtime certificate issuance and confirm browser trust.
-3. **Deploy Velero & Node-Agent**:
-   - Install Velero via HelmRelease in `infrastructure/velero/` with the Azure (or AWS S3) object store plugin and node-agent (Kopia/Restic).
-   - Sync cloud storage account credentials from Azure Key Vault via ESO.
-   - Establish `BackupStorageLocation` targeting offsite container/bucket.
-4. **Disaster Recovery Validation**:
-   - Create recurring daily cluster backup schedules.
-   - Trigger manual test backup, inspect logs, and verify volume snapshot upload to object storage.
+3. **Deploy VolSync Operator**:
+   - Install VolSync via HelmRelease in `infrastructure/storage/volsync/` (`volsync.backube` chart) with CRDs enabled across `k8s-talos-1` and `k8s-talos-2`.
+   - Synchronize Azure Blob Storage credentials and Restic repository password from Azure Key Vault via External Secrets Operator (`volsync-restic-password`).
+4. **Volume Replication & Disaster Recovery Validation**:
+   - Define declarative `ReplicationSource` CRD (with `copyMethod: Direct` and `restic`) for stateful workloads on `k8s-talos-1`.
+   - Define matching `ReplicationDestination` CRD on `k8s-talos-2` for warm-standby restoration.
+   - Verify snapshot upload to Azure Blob Storage (`gjtalossa`) and successful data restoration on the secondary cluster.
 
 ### Phase 4: Lower-Risk Application Migration
 
@@ -732,7 +749,7 @@ Migrate stateless and low-risk web services from Docker Compose to Kubernetes:
 
 Migrate stateful applications and media companion services on `k8s-talos-1`:
 - **Monitoring & Developer Tools**: Prometheus/Grafana stack and Gitea.
-  - Test database export/import, verify Local Path PVC backups, and configure Velero volume protection.
+  - Test database export/import, verify Local Path PVC backups, and configure VolSync volume protection and replication.
 - **Media Companion Stack**: Overseerr, Radarr, Sonarr, Jackett, FlareSolverr.
   - Mount NAS SMB share via SMB CSI (`//192.168.10.12/Medias`).
   - Verify UID/GID permissions, directory write access, hardlink/rename support, and API integrations.
@@ -774,7 +791,7 @@ The migration of each phase will be deemed complete once all of the following cr
    - Local Path Provisioner dynamically provisions node-local volumes.
    - Pod restart retains all SQLite and configuration data.
    - SMB CSI successfully mounts `//192.168.10.12/Medias` with expected read/write permissions.
-   - Velero successfully captures cluster state and PVC volume backups to Azure Blob / S3 storage.
+   - VolSync successfully captures volume snapshots to Azure Blob Storage and replicates state between clusters.
 6. **Operations & Observability**:
    - Headlamp web UI is reachable via HTTPS and secured by Entra ID OIDC.
    - PBS successfully backs up both Kubernetes VMs nightly.
@@ -791,7 +808,7 @@ The migration of each phase will be deemed complete once all of the following cr
 - **GitOps**: Flux CD in a monorepo managing both clusters independently.
 - **Networking**: Omni Default CNI (Flannel) with native NetworkPolicies (`kubeNetworkPoliciesEnabled: true`) + Traefik Ingress Controller (using `hostPort: 80/443`).
 - **TLS Certificates**: cert-manager with Azure DNS DNS-01 ACME challenges and wildcard certificates per cluster (`*.talos-1.gwebs.ca` and `*.talos-2.gwebs.ca`).
-- **Disaster Recovery**: Velero with node-agent (Kopia/Restic) backing up cluster metadata and local-path PVCs to Azure Blob Storage or S3.
+- **Disaster Recovery & Replication**: VolSync with Restic (`copyMethod: Direct`) replicating and backing up `local-path` PVCs to Azure Blob Storage (`gjtalossa`) for cross-cluster failover and disaster recovery, combined with Flux GitOps as the authoritative source of truth for cluster state.
 - **Secrets**: Azure Key Vault + External Secrets Operator + SOPS.
 - **Storage**: Local Path Provisioner (local PVCs) + SMB CSI Driver (NAS shares).
 - **DNS & Ingress Isolation**: Strict separation of hostnames per cluster (`<app>.talos-1.gwebs.ca` vs `<app>.talos-2.gwebs.ca`) using Flux `postBuild.substitute` (`CLUSTER_NAME`) to prevent cross-cluster routing confusion and duplicate TLS certificate requests.
