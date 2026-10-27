@@ -1,0 +1,23 @@
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Alert
+metadata:
+  name: pushover-alerts
+  namespace: flux-system
+spec:
+  providerRef:
+    name: pushover
+  eventSeverity: error
+  summary: "[${CLUSTER_NAME:=talos-1}] Flux Reconciliation Failure"
+  eventSources:
+    - kind: Kustomization
+      name: '*'
+      namespace: flux-system
+    - kind: HelmRelease
+      name: '*'
+      namespace: '*'
+    - kind: GitRepository
+      name: '*'
+      namespace: flux-system
+    - kind: HelmRepository
+      name: '*'
+      namespace: '*'

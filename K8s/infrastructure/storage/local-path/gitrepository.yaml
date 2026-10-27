@@ -1,0 +1,11 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: local-path-provisioner
+  namespace: local-path-storage
+spec:
+  interval: 24h
+  url: https://github.com/rancher/local-path-provisioner.git
+  ref:
+    tag: v0.0.37
+

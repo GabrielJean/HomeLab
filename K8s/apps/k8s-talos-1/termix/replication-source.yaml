@@ -6,11 +6,10 @@ metadata:
 spec:
   sourcePVC: termix-data
   trigger:
-    schedule: "*/15 * * * *"
+    schedule: "0 * * * *"
   restic:
     repository: volsync-termix-secret
     copyMethod: Direct
     retain:
       hourly: 24
       daily: 7
-

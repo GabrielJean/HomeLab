@@ -14,7 +14,7 @@ Traefik acts as the external HTTP(S) entrypoint and reverse proxy for each Talos
 
 ```
 ├── namespace.yaml        # 'traefik' namespace with privileged PSA for hostPort
-├── default-cert.yaml     # Wildcard fallback TLS secret (*.gwebs.ca)
+├── default-cert.yaml     # Self-signed fallback TLS cert-manager Issuer & Certificate (*.gwebs.ca)
 ├── helmrepository.yaml   # Traefik official Helm repository
 ├── helmrelease.yaml      # Traefik HelmRelease with single-node values
 ├── kustomization.yaml    # Kustomize aggregation

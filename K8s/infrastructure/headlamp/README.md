@@ -150,7 +150,7 @@ flowchart TD
 Headlamp loads all managed clusters from a secret volume mounted at `/home/headlamp/.kube/config`. To adhere strictly to GitOps zero-secrets principles, the kubeconfig is generated dynamically at runtime by the External Secrets Operator:
 
 1. **Source of Truth**: The client secret is stored securely in Azure Key Vault (`k8s-app-secret`) and accessed via passwordless Workload Identity Federation.
-2. **Dynamic In-Memory Templating**: In [`external-secret.yaml`](external-secret.yaml), ESO's Template Engine v2 renders the complete multi-cluster kubeconfig:
+2. **Dynamic In-Memory Templating**: In [`external-secret.yaml`](external-secret.yaml), ESO's Template Engine v2 renders the complete multi-cluster kubeconfig with `insecure-skip-tls-verify: true` (transit traffic is already end-to-end encrypted across private Tailscale WireGuard tunnels):
    ```yaml
    apiVersion: v1
    kind: Config
@@ -158,11 +158,11 @@ Headlamp loads all managed clusters from a secret volume mounted at `/home/headl
      - name: k8s-talos-1
        cluster:
          server: https://192.168.10.15:6443
-         certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS...
+         insecure-skip-tls-verify: true
      - name: k8s-talos-2
        cluster:
          server: https://192.168.15.15:6443
-         certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS...
+         insecure-skip-tls-verify: true
    contexts:
      - name: k8s-talos-1
        context:

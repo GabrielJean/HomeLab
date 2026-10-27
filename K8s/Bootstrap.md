@@ -264,6 +264,8 @@ In Azure Key Vault (`https://gjtaloskv.vault.azure.net/`) ➔ **Objects** ➔ **
 | :--- | :--- | :--- |
 | **`k8s-app-secret`** | *Client Secret Value from Entra ID* | Used by Headlamp (OIDC) and cert-manager (Azure DNS). *(Valid until Oct 23, 2028)*. |
 | **`headlamp-admin-email`** | *Admin email address* | Injected dynamically by Flux into Kubernetes RBAC (`oidc-admin` ClusterRoleBinding) so personal emails never appear in Git. |
+| **`pushover-token`** | *Pushover Application API Token* | API token generated for Flux in Pushover dashboard under "Your Applications". |
+| **`pushover-user-key`** | *Pushover User Key* | 30-character Pushover User Key to route notifications to your devices. |
 
 ---
 

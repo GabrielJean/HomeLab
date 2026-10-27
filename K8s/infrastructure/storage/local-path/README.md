@@ -26,7 +26,7 @@ Talos Linux has an immutable, read-only root filesystem (`/`).
 
 Upstream default manifests attempt to use `/opt/local-path-provisioner`, which fails immediately on Talos with a `Read-only file system` error.
 
-In our [`configmap.yaml`](configmap.yaml) and [`storageclass.yaml`](storageclass.yaml), the provisioner is dynamically configured for all nodes with a clean path template:
+In our [`helmrelease.yaml`](helmrelease.yaml), the provisioner is configured with nodePathMap and pathPattern templates:
 
 ```text
 /var/local-path-provisioner/<namespace>/<pvc-name>
@@ -83,6 +83,31 @@ spec:
         - name: gitea-storage
           persistentVolumeClaim:
             claimName: gitea-data
+```
+
+---
+
+## Deployment Architecture: GitOps Helm via Upstream Git
+
+Local Path Provisioner is deployed via Flux `HelmRelease` sourcing the chart directly from Rancher's upstream GitHub repository:
+
+- **Repository**: `https://github.com/rancher/local-path-provisioner.git`
+- **Revision / Tag**: `v0.0.37`
+- **Chart Path**: `./deploy/chart/local-path-provisioner`
+- **StorageClass Configuration**:
+  - `storageClass.pathPattern: "{{ .PVC.Namespace }}/{{ .PVC.Name }}"`
+  - `storageClass.annotations.allowUnsafePathPattern: "true"` (required for Talos `/var` subpaths to satisfy CVE-2025-62878 path traversal validation)
+  - `nodePathMap`: configured for all nodes pointing to `/var/local-path-provisioner`
+- **Security Context**: `allowPrivilegeEscalation: false`, `drop: ALL` capabilities.
+
+### Directory Structure
+
+```
+├── namespace.yaml        # 'local-path-storage' namespace with privileged PSA
+├── gitrepository.yaml    # Flux GitRepository tracking upstream rancher/local-path-provisioner
+├── helmrelease.yaml      # Flux HelmRelease referencing deploy/chart/local-path-provisioner
+├── kustomization.yaml    # Kustomize aggregation
+└── README.md             # Documentation
 ```
 
 ---
