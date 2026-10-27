@@ -102,10 +102,11 @@ flowchart LR
 - [ ] **Backup Schedules & Policies**: Define daily cluster-wide backup schedules with retention policies.
 - [ ] **Disaster Recovery Dry-Run**: Execute an ad-hoc test backup and verify volume snapshot / metadata upload.
 
-### Phase 4: Lower-Risk Application Migration (Pending)
+### Phase 4: Lower-Risk Application Migration (In Progress)
 - [ ] **Stirling-PDF**: Deploy PDF manipulation suite with Local Path PVC and TLS Gateway route.
 - [ ] **FinGlass / StockBot**: Financial tracking and alerting tools.
-- [ ] **Joke de Jean / Termix**: Utility web tools.
+- [ ] **Joke de Jean**: Fun web tools.
+- [x] **Termix**: Web-based SSH terminal with VolSync cross-cluster replication (Active on `k8s-talos-1`, Warm Standby on `k8s-talos-2`).
 - [ ] **Open WebUI**: Local AI interface.
 - [ ] **Homepage**: Cluster and homelab dashboard.
 - [ ] **DNS Cutover**: Switch local DNS records in AdGuard Home to cluster IPs.
@@ -539,6 +540,7 @@ Because each home runs a single-node cluster, storage architecture is clean, hig
 | Storage Type | Purpose | Implementation | Provisioner Behavior |
 | --- | --- | --- | --- |
 | **Node-Local PVCs** | Databases, app configuration, SQLite files, logs | **Local Path Provisioner** (or OpenEBS LocalPV) | Dynamically provisions volumes backed by the VM's high-speed virtual disk. Zero network storage latency. |
+| **Volume Replication** | Asynchronous cross-cluster & offsite PVC sync | **VolSync Operator** (`volsync.backube`) | Declarative CRDs (`ReplicationSource` / `ReplicationDestination`) replicating PVCs via Restic to Azure Blob. |
 | **Shared SMB Storage** | Bulk media (`//192.168.10.12/Medias`), shared archives | **SMB CSI Driver** | Mounts NAS shares directly into pods. Used primarily in Home 1. |
 | **Offsite Backup** | Encrypted recovery archives | **Azure Blob Storage / PBS** | Scheduled object/VM backups for offsite disaster recovery. |
 

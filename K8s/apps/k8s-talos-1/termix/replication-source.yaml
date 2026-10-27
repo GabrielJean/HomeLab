@@ -1,0 +1,16 @@
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: termix-replication
+  namespace: termix
+spec:
+  sourcePVC: termix-data
+  trigger:
+    schedule: "*/15 * * * *"
+  restic:
+    repository: volsync-termix-secret
+    copyMethod: Direct
+    retain:
+      hourly: 24
+      daily: 7
+
