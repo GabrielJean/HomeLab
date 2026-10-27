@@ -37,10 +37,7 @@ data:
           showLabel: true
           label: "k8s"
         nodes:
-          show: true
-          cpu: true
-          memory: true
-          showLabel: true
+          show: false
 
   settings.yaml: |
     title: My Homelab Dashboard
