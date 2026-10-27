@@ -11,10 +11,82 @@
   "minimumReleaseAge": "3 days",
   "prHourlyLimit": 0,
   "labels": [
-    "dependencies",
-    "docker"
+    "dependencies"
+  ],
+  "flux": {
+    "fileMatch": [
+      "(^|/)K8s/.+\\.ya?ml$"
+    ]
+  },
+  "kubernetes": {
+    "fileMatch": [
+      "(^|/)K8s/.+\\.ya?ml$"
+    ]
+  },
+  "kustomize": {
+    "fileMatch": [
+      "(^|/)K8s/.+kustomization\\.ya?ml$"
+    ]
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update Talos Linux versions in Omni manifests",
+      "fileMatch": [
+        "(^|/)K8s/Omni/.+\\.ya?ml$"
+      ],
+      "matchStrings": [
+        "talos:\\s+version:\\s+[\"']?(?<currentValue>v[0-9.]+)[\"']?",
+        "talosVersion:\\s+[\"']?(?<currentValue>v[0-9.]+)[\"']?"
+      ],
+      "depNameTemplate": "siderolabs/talos",
+      "datasourceTemplate": "github-releases"
+    },
+    {
+      "customType": "regex",
+      "description": "Update Kubernetes versions in Omni manifests",
+      "fileMatch": [
+        "(^|/)K8s/Omni/clusters/.+\\.ya?ml$"
+      ],
+      "matchStrings": [
+        "kubernetes:\\s+version:\\s+[\"']?(?<currentValue>v[0-9.]+)[\"']?"
+      ],
+      "depNameTemplate": "kubernetes/kubernetes",
+      "datasourceTemplate": "github-releases"
+    }
   ],
   "packageRules": [
+    {
+      "description": "Label Docker Compose updates",
+      "matchPaths": [
+        "Docker/**"
+      ],
+      "labels": [
+        "dependencies",
+        "docker"
+      ]
+    },
+    {
+      "description": "Label Kubernetes manifest and container updates",
+      "matchPaths": [
+        "K8s/**"
+      ],
+      "labels": [
+        "dependencies",
+        "kubernetes"
+      ]
+    },
+    {
+      "description": "Label Flux and Helm chart updates",
+      "matchManagers": [
+        "flux"
+      ],
+      "labels": [
+        "dependencies",
+        "kubernetes",
+        "helm"
+      ]
+    },
     {
       "description": "Disable updates for local custom builds and private registry images",
       "matchDatasources": [
@@ -28,7 +100,10 @@
       "enabled": false
     },
     {
-      "description": "Group and auto-merge all minor, patch, and digest Docker updates on Saturdays",
+      "description": "Group and auto-merge all non-major Docker Compose updates on Saturdays",
+      "matchPaths": [
+        "Docker/**"
+      ],
       "matchDatasources": [
         "docker"
       ],
@@ -46,7 +121,10 @@
       ]
     },
     {
-      "description": "Hold back major updates for manual PR review on Saturdays",
+      "description": "Hold back major Docker Compose updates for manual PR review on Saturdays",
+      "matchPaths": [
+        "Docker/**"
+      ],
       "matchDatasources": [
         "docker"
       ],
@@ -59,7 +137,10 @@
       ]
     },
     {
-      "description": "Never auto-merge critical infrastructure, stateful services, databases, or game servers",
+      "description": "Never auto-merge critical infrastructure, stateful services, databases, or game servers in Docker",
+      "matchPaths": [
+        "Docker/**"
+      ],
       "matchDatasources": [
         "docker"
       ],
@@ -82,6 +163,86 @@
         "/authelia/"
       ],
       "groupName": null,
+      "automerge": false,
+      "schedule": [
+        "before 6am on saturday"
+      ]
+    },
+    {
+      "description": "Group Flux CD controller updates together and hold for manual review",
+      "matchPackageNames": [
+        "ghcr.io/fluxcd/*"
+      ],
+      "groupName": "Flux CD controllers",
+      "groupSlug": "flux-controllers",
+      "automerge": false,
+      "schedule": [
+        "before 6am on saturday"
+      ]
+    },
+    {
+      "description": "Group non-major Helm chart updates on Saturdays",
+      "matchManagers": [
+        "flux"
+      ],
+      "matchDatasources": [
+        "helm"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "all non-major helm charts",
+      "groupSlug": "helm-non-major",
+      "automerge": false,
+      "schedule": [
+        "before 6am on saturday"
+      ]
+    },
+    {
+      "description": "Hold back major Helm chart updates for manual PR review on Saturdays",
+      "matchManagers": [
+        "flux"
+      ],
+      "matchDatasources": [
+        "helm"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false,
+      "schedule": [
+        "before 6am on saturday"
+      ]
+    },
+    {
+      "description": "Never auto-merge Kubernetes critical platform infrastructure",
+      "matchManagers": [
+        "flux"
+      ],
+      "matchPackageNames": [
+        "traefik",
+        "cert-manager",
+        "external-secrets",
+        "headlamp",
+        "metrics-server",
+        "volsync",
+        "local-path-provisioner"
+      ],
+      "groupName": null,
+      "automerge": false,
+      "schedule": [
+        "before 6am on saturday"
+      ]
+    },
+    {
+      "description": "Hold Talos Linux and Kubernetes version bumps for manual review",
+      "matchPackageNames": [
+        "siderolabs/talos",
+        "kubernetes/kubernetes"
+      ],
+      "groupName": "Talos & Kubernetes versions",
+      "groupSlug": "talos-k8s",
       "automerge": false,
       "schedule": [
         "before 6am on saturday"
