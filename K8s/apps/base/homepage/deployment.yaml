@@ -29,10 +29,6 @@ spec:
               value: "*"
             - name: LOG_TARGETS
               value: "stdout"
-          envFrom:
-            - secretRef:
-                name: homepage-env
-                optional: true
           ports:
             - containerPort: 3000
               name: http

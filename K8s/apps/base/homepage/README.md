@@ -9,7 +9,7 @@ Stateless, unified dashboard deployed across both `k8s-talos-1` and `k8s-talos-2
 - **Single Source of Truth**: All dashboard settings, layouts, widgets, and services are defined once in [`configmap.yaml`](configmap.yaml) and mounted directly into the container.
 - **Unified Multi-Home View**: Consolidates both Home 1 (`pve-1`, `talos-1`, `docker-1`) and Home 2 (`pve-2`, `talos-2`, `docker-2`) into a single view.
 - **Stateless & High Availability**: Deployed natively to both clusters (`k8s-talos-1` and `k8s-talos-2`) through Flux CD without requiring persistent volumes or synchronization daemons.
-- **Zero Secrets in Git**: Sensitive API keys and credentials are abstracted into environment variables (`{{HOMEPAGE_VAR_...}}`) injected optionally from a Kubernetes secret (`homepage-env`).
+- **Zero Secrets Dependency**: Clean, lightweight service link navigation without requiring API keys or secret stores. App link cards load instantly without external API polling.
 - **Kubernetes Native Metrics**: Homepage utilizes an in-cluster `ServiceAccount` with RBAC permissions to query `metrics-server` for real-time node and cluster utilization.
 
 ---

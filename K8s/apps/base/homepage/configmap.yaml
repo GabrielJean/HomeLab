@@ -65,268 +65,158 @@ data:
     hideQuickLaunch: true
 
     layout:
-      Home 1:
-        icon: mdi-home
-        style: column
-        columns: 1
-        Infrastructure:
-          icon: mdi-server
-          style: row
-          columns: 4
-        Media:
-          icon: mdi-play-circle-outline
-          style: row
-          columns: 4
-        Monitoring:
-          icon: mdi-chart-areaspline
-          style: row
-          columns: 4
-        Tools:
-          icon: mdi-tools
-          style: row
-          columns: 4
-        Network:
-          icon: mdi-shield-check-outline
-          style: row
-          columns: 4
-        Home Automation:
-          icon: mdi-home-assistant
-          style: row
-          columns: 4
+      Infrastructure:
+        icon: mdi-server
+        style: row
+        columns: 5
 
-      Home 2:
+      Media:
+        icon: mdi-play-circle-outline
+        style: row
+        columns: 4
+
+      Monitoring:
+        icon: mdi-chart-areaspline
+        style: row
+        columns: 4
+
+      Network & Automation:
+        icon: mdi-shield-home-outline
+        style: row
+        columns: 4
+
+      Tools:
+        icon: mdi-tools
+        style: row
+        columns: 4
+
+      Home 2 (Occasional):
         icon: mdi-home-outline
-        style: column
-        columns: 1
-        Infrastructure:
-          icon: mdi-server
-          style: row
-          columns: 4
-        Monitoring:
-          icon: mdi-chart-areaspline
-          style: row
-          columns: 4
-        Tools:
-          icon: mdi-tools
-          style: row
-          columns: 4
-        Network:
-          icon: mdi-shield-check-outline
-          style: row
-          columns: 4
-        Home Automation:
-          icon: mdi-home-assistant
-          style: row
-          columns: 4
+        style: row
+        columns: 4
+        initiallyCollapsed: true
 
     customCss: []
     customJs: []
 
   services.yaml: |
-    - Home 1:
-        - Infrastructure:
-            - Traefik:
-                href: https://traefik.docker-1.gwebs.ca
-                icon: traefik.png
-                description: Reverse proxy and ingress routing
-                widget:
-                  type: traefik
-                  url: https://traefik.docker-1.gwebs.ca
-            - Proxmox (PVE 1):
-                href: https://pve-1.gwebs.ca:8006
-                icon: proxmox.png
-                description: Virtualization host management
-                widget:
-                  type: proxmox
-                  url: https://pve-1.gwebs.ca:8006
-                  username: "root@pam!homepage"
-                  password: "{{HOMEPAGE_VAR_PVE1_PASSWORD}}"
-            - Proxmox Datacenter Manager:
-                href: https://pdm-1.gwebs.ca:8443/
-                icon: proxmox.png
-                description: Multi-node Proxmox fleet management
-            - Proxmox Backup Server:
-                href: https://pbs-2.gwebs.ca:8007
-                icon: proxmox.png
-                description: Backup server management
-            - Portainer:
-                href: https://portainer.docker-1.gwebs.ca
-                icon: portainer.png
-                description: Container and stack management
-                widget:
-                  type: portainer
-                  url: https://portainer.docker-1.gwebs.ca
-                  env: 2
-                  key: "{{HOMEPAGE_VAR_PORTAINER1_KEY}}"
-            - Termix:
-                href: https://termix.talos-1.gwebs.ca
-                icon: termix.png
-                description: Browser-based terminal access
-            - Headlamp:
-                href: https://headlamp.talos-1.gwebs.ca
-                icon: headlamp.png
-                description: Kubernetes cluster dashboard
-            - Backblaze:
-                href: https://secure.backblaze.com/
-                icon: backblaze.png
-                description: Cloud backup and storage
+    - Infrastructure:
+        - Proxmox (PVE 1):
+            href: https://pve-1.gwebs.ca:8006
+            icon: proxmox.png
+            description: Virtualization host management
+        - Proxmox Backup Server:
+            href: https://pbs-2.gwebs.ca:8007
+            icon: proxmox.png
+            description: Backup server management
+        - Headlamp:
+            href: https://headlamp.talos-1.gwebs.ca
+            icon: headlamp.png
+            description: Kubernetes cluster dashboard
+        - Termix:
+            href: https://termix.talos-1.gwebs.ca
+            icon: termix.png
+            description: Browser-based terminal access
+        - Backblaze:
+            href: https://secure.backblaze.com/
+            icon: backblaze.png
+            description: Cloud backup and storage
 
-        - Media:
-            - Plex:
-                href: https://app.plex.tv
-                icon: plex.png
-                description: Personal media streaming server
-            - Overseerr:
-                href: https://overseerr.docker-1.gwebs.ca
-                icon: overseerr.png
-                description: Media request management
-            - Sonarr:
-                href: https://sonarr.docker-1.gwebs.ca
-                icon: sonarr.png
-                description: TV series library automation
-                widget:
-                  type: sonarr
-                  url: https://sonarr.docker-1.gwebs.ca
-                  key: "{{HOMEPAGE_VAR_SONARR_KEY}}"
-            - Radarr:
-                href: https://radarr.docker-1.gwebs.ca
-                icon: radarr.png
-                description: Movie library automation
-                widget:
-                  type: radarr
-                  url: https://radarr.docker-1.gwebs.ca
-                  key: "{{HOMEPAGE_VAR_RADARR_KEY}}"
-            - Jackett:
-                href: https://jackett.docker-1.gwebs.ca
-                icon: jackett.png
-                description: Torrent indexer aggregation
-                widget:
-                  type: jackett
-                  url: https://jackett.docker-1.gwebs.ca
-            - Transmission:
-                href: https://transmission.docker-1.gwebs.ca/transmission/web/
-                icon: transmission.png
-                description: BitTorrent download client
-            - qBittorrent:
-                href: https://qbittorrent.docker-1.gwebs.ca
-                icon: qbittorrent.png
-                description: BitTorrent download client
+    - Media:
+        - Plex:
+            href: https://app.plex.tv
+            icon: plex.png
+            description: Personal media streaming server
+        - Overseerr:
+            href: https://overseerr.docker-1.gwebs.ca
+            icon: overseerr.png
+            description: Media request management
+        - Sonarr:
+            href: https://sonarr.docker-1.gwebs.ca
+            icon: sonarr.png
+            description: TV series library automation
+        - Radarr:
+            href: https://radarr.docker-1.gwebs.ca
+            icon: radarr.png
+            description: Movie library automation
+        - Jackett:
+            href: https://jackett.docker-1.gwebs.ca
+            icon: jackett.png
+            description: Torrent indexer aggregation
+        - Transmission:
+            href: https://transmission.docker-1.gwebs.ca/transmission/web/
+            icon: transmission.png
+            description: BitTorrent download client
+        - qBittorrent:
+            href: https://qbittorrent.docker-1.gwebs.ca
+            icon: qbittorrent.png
+            description: BitTorrent download client
 
-        - Monitoring:
-            - Grafana:
-                href: https://grafana.docker-1.gwebs.ca
-                icon: grafana.png
-                description: Metrics dashboards and visualization
-            - Prometheus:
-                href: https://prometheus.docker-1.gwebs.ca
-                icon: prometheus.png
-                description: Metrics collection and alerting
-                widget:
-                  type: prometheus
-                  url: https://prometheus.docker-1.gwebs.ca
-            - Healthchecks:
-                href: https://healthchecks.docker-1.gwebs.ca
-                icon: healthchecks.png
-                description: Cron and job monitoring
-            - Upsnap:
-                href: http://192.168.10.11:8090
-                icon: upsnap.png
-                description: Wake-on-LAN device control
+    - Monitoring:
+        - Grafana:
+            href: https://grafana.docker-1.gwebs.ca
+            icon: grafana.png
+            description: Metrics dashboards and visualization
+        - Prometheus:
+            href: https://prometheus.docker-1.gwebs.ca
+            icon: prometheus.png
+            description: Metrics collection and alerting
+        - Healthchecks:
+            href: https://healthchecks.docker-1.gwebs.ca
+            icon: healthchecks.png
+            description: Cron and job monitoring
+        - Upsnap:
+            href: http://192.168.10.11:8090
+            icon: upsnap.png
+            description: Wake-on-LAN device control
 
-        - Tools:
-            - Stirling-PDF:
-                href: https://pdf.docker-1.gwebs.ca
-                icon: stirling-pdf.png
-                description: PDF conversion and editing tools
-            - Gitea:
-                href: https://gitea.docker-1.gwebs.ca
-                icon: gitea.png
-                description: Self-hosted Git service
-            - AI:
-                href: https://ai.docker-1.gwebs.ca
-                icon: open-webui.png
-                description: AI chat and model interface
-            - n8n:
-                href: https://n8n.docker-1.gwebs.ca
-                icon: n8n.png
-                description: Workflow automation platform
+    - Network & Automation:
+        - AdGuard Home:
+            href: http://192.168.10.5:3080
+            icon: adguard-home.png
+            description: Network-wide DNS filtering
+        - HomeAssistant:
+            href: http://192.168.10.11:8123
+            icon: home-assistant.png
+            description: Smart home automation hub
 
-        - Network:
-            - AdGuard Home:
-                href: http://192.168.10.5:3080
-                icon: adguard-home.png
-                description: Network-wide DNS filtering
-                widget:
-                  type: adguard
-                  url: http://192.168.10.5:3080
-                  username: "gabriel"
-                  password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"
+    - Tools:
+        - Gitea:
+            href: https://gitea.docker-1.gwebs.ca
+            icon: gitea.png
+            description: Self-hosted Git service
+        - Stirling-PDF:
+            href: https://pdf.docker-1.gwebs.ca
+            icon: stirling-pdf.png
+            description: PDF conversion and editing tools
 
-        - Home Automation:
-            - HomeAssistant:
-                href: http://192.168.10.11:8123
-                icon: home-assistant.png
-                description: Smart home automation hub
-
-    - Home 2:
-        - Infrastructure:
-            - Proxmox (PVE 2):
-                href: https://pve-2.gwebs.ca:8006
-                icon: proxmox.png
-                description: Virtualization host management
-                widget:
-                  type: proxmox
-                  url: https://pve-2.gwebs.ca:8006
-                  username: "root@pam!homepage"
-                  password: "{{HOMEPAGE_VAR_PVE2_PASSWORD}}"
-            - Proxmox Datacenter Manager:
-                href: https://pdm-1.gwebs.ca:8443/
-                icon: proxmox.png
-                description: Multi-node Proxmox fleet management
-            - Portainer:
-                href: https://portainer.docker-2.gwebs.ca
-                icon: portainer.png
-                description: Container and stack management
-                widget:
-                  type: portainer
-                  url: https://portainer.docker-2.gwebs.ca
-                  env: 2
-                  key: "{{HOMEPAGE_VAR_PORTAINER2_KEY}}"
-            - Termix:
-                href: https://termix.talos-2.gwebs.ca
-                icon: termix.png
-                description: Browser-based terminal access
-            - Headlamp:
-                href: https://headlamp.talos-2.gwebs.ca
-                icon: headlamp.png
-                description: Kubernetes cluster dashboard
-
-        - Monitoring:
-            - Upsnap:
-                href: http://192.168.15.11:8090
-                icon: upsnap.png
-                description: Wake-on-LAN device control
-
-        - Tools:
-            - Stirling-PDF:
-                href: https://pdf.docker-2.gwebs.ca
-                icon: stirling-pdf.png
-                description: PDF conversion and editing tools
-
-        - Network:
-            - AdGuard Home:
-                href: http://192.168.15.5:3080
-                icon: adguard-home.png
-                description: Network-wide DNS filtering
-                widget:
-                  type: adguard
-                  url: http://192.168.15.5:3080
-                  username: "gabriel"
-                  password: "{{HOMEPAGE_VAR_ADGUARD_PASSWORD}}"
-
-        - Home Automation:
-            - HomeAssistant:
-                href: http://192.168.15.11:8123
-                icon: home-assistant.png
-                description: Smart home automation hub
+    - Home 2 (Occasional):
+        - Proxmox (PVE 2):
+            href: https://pve-2.gwebs.ca:8006
+            icon: proxmox.png
+            description: Virtualization host management
+        - Headlamp (Talos 2):
+            href: https://headlamp.talos-2.gwebs.ca
+            icon: headlamp.png
+            description: Kubernetes cluster dashboard
+        - Termix (Talos 2):
+            href: https://termix.talos-2.gwebs.ca
+            icon: termix.png
+            description: Browser-based terminal access
+        - AdGuard Home (Home 2):
+            href: http://192.168.15.5:3080
+            icon: adguard-home.png
+            description: Network-wide DNS filtering
+        - HomeAssistant (Home 2):
+            href: http://192.168.15.11:8123
+            icon: home-assistant.png
+            description: Smart home automation hub
+        - Upsnap (Home 2):
+            href: http://192.168.15.11:8090
+            icon: upsnap.png
+            description: Wake-on-LAN device control
+        - Stirling-PDF (Home 2):
+            href: https://pdf.docker-2.gwebs.ca
+            icon: stirling-pdf.png
+            description: PDF conversion and editing tools
 
