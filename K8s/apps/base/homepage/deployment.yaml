@@ -27,6 +27,8 @@ spec:
               value: "3000"
             - name: HOMEPAGE_ALLOWED_HOSTS
               value: "*"
+            - name: LOG_TARGETS
+              value: "stdout"
           envFrom:
             - secretRef:
                 name: homepage-env
@@ -75,12 +77,30 @@ spec:
               memory: 512Mi
           volumeMounts:
             - name: config
-              mountPath: /app/config
+              mountPath: /app/config/settings.yaml
+              subPath: settings.yaml
+            - name: config
+              mountPath: /app/config/services.yaml
+              subPath: services.yaml
+            - name: config
+              mountPath: /app/config/widgets.yaml
+              subPath: widgets.yaml
+            - name: config
+              mountPath: /app/config/kubernetes.yaml
+              subPath: kubernetes.yaml
+            - name: config
+              mountPath: /app/config/bookmarks.yaml
+              subPath: bookmarks.yaml
+            - name: logs
+              mountPath: /app/config/logs
             - name: data
               mountPath: /app/data
       volumes:
         - name: config
           configMap:
             name: homepage-config
+        - name: logs
+          emptyDir: {}
         - name: data
           emptyDir: {}
+
