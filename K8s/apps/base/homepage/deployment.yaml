@@ -26,7 +26,7 @@ spec:
             - name: PORT
               value: "3000"
             - name: HOMEPAGE_ALLOWED_HOSTS
-              value: "homepage.${CLUSTER_NAME:=talos-1}.gwebs.ca,homepage.talos-1.gwebs.ca,homepage.talos-2.gwebs.ca,homepage.docker-1.gwebs.ca,homepage.docker-2.gwebs.ca,homepage.gwebs.ca,localhost,127.0.0.1"
+              value: "*"
           envFrom:
             - secretRef:
                 name: homepage-env
@@ -38,6 +38,9 @@ spec:
             httpGet:
               path: /
               port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost
             initialDelaySeconds: 5
             periodSeconds: 5
             failureThreshold: 12
@@ -45,6 +48,9 @@ spec:
             httpGet:
               path: /
               port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost
             initialDelaySeconds: 10
             periodSeconds: 20
             timeoutSeconds: 5
@@ -53,6 +59,9 @@ spec:
             httpGet:
               path: /
               port: http
+              httpHeaders:
+                - name: Host
+                  value: localhost
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 3

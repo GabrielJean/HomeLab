@@ -35,3 +35,4 @@ Stateless, unified dashboard deployed across both `k8s-talos-1` and `k8s-talos-2
 ├── kustomization.yaml    # Kustomize aggregation
 └── README.md             # Documentation
 ```
+
