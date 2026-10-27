@@ -12,8 +12,15 @@ data:
 
   bookmarks.yaml: |
     ---
-    # Bookmarks configuration
-    # For options, see https://gethomepage.dev/configs/bookmarks/
+    - Infrastructure Bookmarks:
+        - Azure Portal:
+            - icon: azure.png
+              href: https://portal.azure.com/#home
+              description: Microsoft Azure Cloud
+        - Backblaze:
+            - icon: backblaze.png
+              href: https://secure.backblaze.com/
+              description: Cloud backup and storage
 
   widgets.yaml: |
     - resources:
@@ -68,7 +75,11 @@ data:
       Infrastructure:
         icon: mdi-server
         style: row
-        columns: 5
+        columns: 4
+
+      Infrastructure Bookmarks:
+        style: row
+        columns: 4
 
       Media:
         icon: mdi-play-circle-outline
@@ -117,10 +128,6 @@ data:
             href: https://termix.talos-1.gwebs.ca
             icon: termix.png
             description: Browser-based terminal access
-        - Backblaze:
-            href: https://secure.backblaze.com/
-            icon: backblaze.png
-            description: Cloud backup and storage
 
     - Media:
         - Plex:
@@ -162,7 +169,7 @@ data:
             icon: prometheus.png
             description: Metrics collection and alerting
         - Healthchecks:
-            href: https://healthchecks.docker-1.gwebs.ca
+            href: https://healthchecks.io/
             icon: healthchecks.png
             description: Cron and job monitoring
         - Upsnap:
