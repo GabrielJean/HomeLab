@@ -90,7 +90,7 @@ data:
         style: row
         columns: 4
 
-      Home 2 (Occasional):
+      Home 2:
         icon: mdi-home-outline
         style: row
         columns: 4
@@ -190,32 +190,32 @@ data:
             icon: stirling-pdf.png
             description: PDF conversion and editing tools
 
-    - Home 2 (Occasional):
+    - Home 2:
         - Proxmox (PVE 2):
             href: https://pve-2.gwebs.ca:8006
             icon: proxmox.png
             description: Virtualization host management
-        - Headlamp (Talos 2):
+        - Headlamp:
             href: https://headlamp.talos-2.gwebs.ca
             icon: headlamp.png
             description: Kubernetes cluster dashboard
-        - Termix (Talos 2):
+        - Termix:
             href: https://termix.talos-2.gwebs.ca
             icon: termix.png
             description: Browser-based terminal access
-        - AdGuard Home (Home 2):
+        - AdGuard Home:
             href: http://192.168.15.5:3080
             icon: adguard-home.png
             description: Network-wide DNS filtering
-        - HomeAssistant (Home 2):
+        - HomeAssistant:
             href: http://192.168.15.11:8123
             icon: home-assistant.png
             description: Smart home automation hub
-        - Upsnap (Home 2):
+        - Upsnap:
             href: http://192.168.15.11:8090
             icon: upsnap.png
             description: Wake-on-LAN device control
-        - Stirling-PDF (Home 2):
+        - Stirling-PDF:
             href: https://pdf.docker-2.gwebs.ca
             icon: stirling-pdf.png
             description: PDF conversion and editing tools
