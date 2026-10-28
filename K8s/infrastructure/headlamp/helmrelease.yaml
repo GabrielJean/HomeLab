@@ -58,7 +58,7 @@ spec:
     # Configuration for multi-cluster, plugins, and Microsoft Entra ID OIDC SSO
     config:
       inCluster: true
-      inClusterContextName: "k8s-${CLUSTER_NAME:=talos-1}"
+      inClusterContextName: "${CLUSTER_NAME:=k8s-talos-1}"
       pluginsDir: /headlamp/plugins
       extraArgs:
         - "-kubeconfig=/home/headlamp/.kube/config"
@@ -71,7 +71,7 @@ spec:
           enabled: true
           name: headlamp-oidc
           hasScopes: true
-        callbackURL: "https://headlamp.${CLUSTER_NAME:=talos-1}.gwebs.ca/oidc-callback"
+        callbackURL: "https://headlamp.${CLUSTER_DOMAIN:=talos-1}.gwebs.ca/oidc-callback"
 
     env:
       - name: KUBECONFIG
@@ -85,7 +85,7 @@ spec:
       - name: OIDC_SCOPES
         value: "openid profile email offline_access"
       - name: OIDC_CALLBACK_URL
-        value: "https://headlamp.${CLUSTER_NAME:=talos-1}.gwebs.ca/oidc-callback"
+        value: "https://headlamp.${CLUSTER_DOMAIN:=talos-1}.gwebs.ca/oidc-callback"
 
     # Kubernetes Gateway API HTTPRoute attached to Traefik
     httpRoute:
@@ -94,7 +94,7 @@ spec:
         - name: traefik-gateway
           namespace: traefik
       hostnames:
-        - "headlamp.${CLUSTER_NAME:=talos-1}.gwebs.ca"
+        - "headlamp.${CLUSTER_DOMAIN:=talos-1}.gwebs.ca"
 
     resources:
       requests:

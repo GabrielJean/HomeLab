@@ -11,7 +11,7 @@ spec:
     - name: traefik-gateway
       namespace: traefik
   hostnames:
-    - "homepage.${CLUSTER_NAME:=talos-1}.gwebs.ca"
+    - "homepage.${CLUSTER_DOMAIN:=talos-1}.gwebs.ca"
   rules:
     - matches:
         - path:

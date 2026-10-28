@@ -16,5 +16,6 @@ spec:
     name: flux-system
   postBuild:
     substitute:
-      CLUSTER_NAME: talos-2
+      CLUSTER_NAME: k8s-talos-2
+      CLUSTER_DOMAIN: talos-2
 

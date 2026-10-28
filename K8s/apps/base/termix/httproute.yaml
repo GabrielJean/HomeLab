@@ -10,7 +10,7 @@ spec:
     - name: traefik-gateway
       namespace: traefik
   hostnames:
-    - "termix.${CLUSTER_NAME:=talos-1}.gwebs.ca"
+    - "termix.${CLUSTER_DOMAIN:=talos-1}.gwebs.ca"
   rules:
     - matches:
         - path:

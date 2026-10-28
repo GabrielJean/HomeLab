@@ -14,7 +14,8 @@ spec:
     name: flux-system
   postBuild:
     substitute:
-      CLUSTER_NAME: talos-1
+      CLUSTER_NAME: k8s-talos-1
+      CLUSTER_DOMAIN: talos-1
     substituteFrom:
       - kind: Secret
         name: cluster-secrets
