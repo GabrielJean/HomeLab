@@ -35,7 +35,7 @@ data:
           cpu: true
           memory: true
           showLabel: true
-          label: "${CLUSTER_NAME:=talos-1}"
+          label: "k8s-${CLUSTER_NAME:=talos-1}"
         nodes:
           show: false
 
