@@ -6,3 +6,4 @@ resources:
   - configmap.yaml
   - external-secret.yaml
   - cronjob.yaml
+

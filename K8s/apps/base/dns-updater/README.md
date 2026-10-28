@@ -44,3 +44,4 @@ To immediately trigger a manual run without waiting for the 15-minute cron sched
 kubectl create job --from=cronjob/dns-updater manual-sync-1 -n dns-updater
 kubectl logs -n dns-updater job/manual-sync-1 -f
 ```
+

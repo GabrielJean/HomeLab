@@ -46,3 +46,4 @@ spec:
               configMap:
                 name: dns-updater-script
                 defaultMode: 0755
+
