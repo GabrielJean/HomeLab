@@ -19,6 +19,8 @@ kind: ConfigMap
 metadata:
   name: dns-updater-script
   namespace: dns-updater
+  annotations:
+    kustomize.toolkit.fluxcd.io/substitute: disabled
   labels:
     app.kubernetes.io/name: dns-updater
     app.kubernetes.io/part-of: homelab-apps
@@ -157,3 +159,4 @@ data:
     else
       sync_dns
     fi
+
