@@ -5,3 +5,4 @@ kind: Kustomization
 resources:
   - termix
   - ../base/homepage
+  - ../base/dns-updater
