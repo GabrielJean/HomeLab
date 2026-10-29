@@ -1,6 +1,6 @@
 services:
   stockbot:
-    image: ghcr.io/gabrieljean/stockbot:v0.2.4
+    image: ghcr.io/gabrieljean/stockbot:latest
     container_name: stockbot
     ports:
       - "5052:8000"
