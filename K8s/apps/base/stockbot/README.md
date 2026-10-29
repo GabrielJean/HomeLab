@@ -24,3 +24,4 @@ StockBot is a self-hosted Canadian retail stock monitor and alerting tool built 
 ├── kustomization.yaml  # Kustomize resource list
 └── README.md           # Documentation
 ```
+

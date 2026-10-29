@@ -19,3 +19,4 @@ spec:
       backendRefs:
         - name: stockbot
           port: 8000
+

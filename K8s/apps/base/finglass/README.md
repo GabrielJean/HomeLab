@@ -24,3 +24,4 @@ FinGlass is a personal wealth intelligence and financial portfolio tracking web 
 ├── kustomization.yaml  # Kustomize resource list
 └── README.md           # Documentation
 ```
+
