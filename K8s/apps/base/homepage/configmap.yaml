@@ -168,8 +168,8 @@ data:
             description: Personal wealth intelligence
         - StockBot:
             href: https://stockbot.talos-1.gwebs.ca
-            icon: mdi-chart-line
-            description: Canadian retail stock monitor
+            icon: mdi-storefront
+            description: Retail store inventory monitor
 
     - Monitoring:
         - Grafana:
