@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stockbot
+  namespace: stockbot
+  labels:
+    app.kubernetes.io/name: stockbot
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: stockbot
+  template:
+    metadata:
+      labels:
+        app: stockbot
+    spec:
+      containers:
+        - name: stockbot
+          image: ghcr.io/gabrieljean/stockbot:v0.2.4
+          env:
+            - name: DATABASE_PATH
+              value: "/data/db.sqlite3"
+            - name: DJANGO_DEBUG
+              value: "false"
+            - name: ALLOWED_HOSTS
+              value: "*"
+            - name: COOKIE_SECURE
+              value: "true"
+            - name: SCHEDULER_ENABLED
+              value: "true"
+            - name: CSRF_TRUSTED_ORIGINS
+              value: "https://stockbot.${CLUSTER_DOMAIN:=talos-1}.gwebs.ca"
+          ports:
+            - containerPort: 8000
+              name: http
+          startupProbe:
+            httpGet:
+              path: /healthz/
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /healthz/
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: stockbot-data

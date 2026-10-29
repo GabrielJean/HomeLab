@@ -103,7 +103,7 @@ flowchart LR
 
 ### Phase 4: Lower-Risk Application Migration (In Progress)
 - [ ] **Stirling-PDF**: Deploy PDF manipulation suite with Local Path PVC and TLS Gateway route.
-- [ ] **FinGlass / StockBot**: Financial tracking and alerting tools.
+- [x] **FinGlass / StockBot**: Financial tracking and alerting tools.
 - [ ] **Joke de Jean**: Fun web tools.
 - [x] **Termix**: Web-based SSH terminal with VolSync cross-cluster replication (Active on `k8s-talos-1`, Warm Standby on `k8s-talos-2`).
 - [x] **Homepage**: Single unified multi-home dashboard running statelessly on `k8s-talos-1` and `k8s-talos-2`.
@@ -649,15 +649,17 @@ K8s/
 │   │   ├── stirling-pdf/
 │   │   ├── dns-updater/
 │   │   ├── homepage/
+│   │   ├── finglass/
+│   │   ├── stockbot/
 │   │   └── termix/
 │   ├── k8s-talos-1/                    # Home 1 specific workloads
 │   │   ├── gitea/
 │   │   ├── plexapps/                   # Sonarr, Radarr, Overseerr, Jackett
-│   │   ├── stockbot/
-│   │   ├── finglass/
-│   │   └── joke-de-jean/
+│   │   ├── joke-de-jean/
+│   │   └── termix/
 │   └── k8s-talos-2/                    # Home 2 specific workloads
-│       └── homeassistant/
+│       ├── homeassistant/
+│       └── termix/
 │
 ├── Omni/                               # Omni declarative templates
 │   ├── clusters/

@@ -193,6 +193,14 @@ data:
             href: https://pdf.docker-1.gwebs.ca
             icon: stirling-pdf.png
             description: PDF conversion and editing tools
+        - FinGlass:
+            href: https://finglass.talos-1.gwebs.ca
+            icon: mdi-bank
+            description: Personal wealth intelligence
+        - StockBot:
+            href: https://stockbot.talos-1.gwebs.ca
+            icon: mdi-chart-line
+            description: Canadian retail stock monitor
 
     - Home 2:
         - Proxmox (PVE 2):

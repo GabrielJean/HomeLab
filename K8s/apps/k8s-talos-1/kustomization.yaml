@@ -6,3 +6,5 @@ resources:
   - termix
   - ../base/homepage
   - ../base/dns-updater
+  - ../base/finglass
+  - ../base/stockbot

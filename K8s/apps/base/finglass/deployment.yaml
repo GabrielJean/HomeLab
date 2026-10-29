@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: finglass
+  namespace: finglass
+  labels:
+    app.kubernetes.io/name: finglass
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: finglass
+  template:
+    metadata:
+      labels:
+        app: finglass
+    spec:
+      containers:
+        - name: finglass
+          image: ghcr.io/gabrieljean/finglass:1.0.0
+          env:
+            - name: APP_ENV
+              value: "production"
+            - name: DJANGO_DEBUG
+              value: "0"
+            - name: CSRF_TRUSTED_ORIGINS
+              value: "https://finglass.${CLUSTER_DOMAIN:=talos-1}.gwebs.ca"
+          ports:
+            - containerPort: 8000
+              name: http
+          startupProbe:
+            httpGet:
+              path: /__django__/health/
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /__django__/health/
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /__django__/health/
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: finglass-data

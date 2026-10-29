@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: stockbot
+  labels:
+    app.kubernetes.io/name: stockbot
+    app.kubernetes.io/part-of: homelab-apps
