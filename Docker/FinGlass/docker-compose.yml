@@ -1,6 +1,6 @@
 services:
   finglass:
-    image: gitea.docker-1.gwebs.ca/gabriel/finglass:latest
+    image: ghcr.io/gabrieljean/finglass:1.0.0
     container_name: finglass
     volumes:
       - /Apps/FinGlass:/app/data
