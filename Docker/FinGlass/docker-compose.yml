@@ -1,6 +1,6 @@
 services:
   finglass:
-    image: ghcr.io/gabrieljean/finglass:1.4.7
+    image: ghcr.io/gabrieljean/finglass:1.5.0
     container_name: finglass
     volumes:
       - /Apps/FinGlass:/app/data
