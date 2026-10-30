@@ -20,7 +20,6 @@
           Docker-2:
             - { name: traefik, online: true }
             # - { name: heimdall, online: false }
-            - { name: homepage-2, restart: true, online: true }
             - { name: pdf, online: true }
             - { name: homeassistant, online: true }
             - { name: portainer, online: true }
