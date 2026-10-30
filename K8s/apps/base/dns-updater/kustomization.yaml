@@ -1,9 +1,32 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+namespace: dns-updater
+
 resources:
   - namespace.yaml
-  - configmap.yaml
   - external-secret.yaml
   - cronjob.yaml
 
+configMapGenerator:
+  - name: dns-updater-config
+    literals:
+      - AZURE_APP_ID=e1d55ddd-3453-4a91-9842-aa7d7dc620a3
+      - AZURE_TENANT_ID=10b7061b-f2d0-4778-8cae-2666faf4af25
+      - RESOURCE_GROUP=GJ-DNS-RG
+      - DNS_ZONE_NAME=gwebs.ca
+      - MAIN_RECORD_NAME=gaming
+      - CNAME_NAMES=satisfactory,astroneer,zomboid
+    options:
+      labels:
+        app.kubernetes.io/name: dns-updater
+        app.kubernetes.io/part-of: homelab-apps
+  - name: dns-updater-script
+    files:
+      - scripts/update_dns.sh
+    options:
+      annotations:
+        kustomize.toolkit.fluxcd.io/substitute: disabled
+      labels:
+        app.kubernetes.io/name: dns-updater
+        app.kubernetes.io/part-of: homelab-apps

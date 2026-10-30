@@ -1,0 +1,126 @@
+- Infrastructure:
+    - Proxmox (PVE 1):
+        href: https://pve-1.gwebs.ca:8006
+        icon: proxmox.png
+        description: Virtualization host management
+    - Proxmox Backup Server:
+        href: https://pbs-2.gwebs.ca:8007
+        icon: proxmox.png
+        description: Backup server management
+    - Headlamp:
+        href: https://headlamp.talos-1.gwebs.ca
+        icon: headlamp.png
+        description: Kubernetes cluster dashboard
+    - Termix:
+        href: https://termix.talos-1.gwebs.ca
+        icon: termix.png
+        description: Browser-based terminal access
+
+- Media:
+    - Plex:
+        href: https://app.plex.tv
+        icon: plex.png
+        description: Personal media streaming server
+    - Overseerr:
+        href: https://overseerr.docker-1.gwebs.ca
+        icon: overseerr.png
+        description: Media request management
+    - Sonarr:
+        href: https://sonarr.docker-1.gwebs.ca
+        icon: sonarr.png
+        description: TV series library automation
+    - Radarr:
+        href: https://radarr.docker-1.gwebs.ca
+        icon: radarr.png
+        description: Movie library automation
+    - Jackett:
+        href: https://jackett.docker-1.gwebs.ca
+        icon: jackett.png
+        description: Torrent indexer aggregation
+    - Transmission:
+        href: https://transmission.docker-1.gwebs.ca/transmission/web/
+        icon: transmission.png
+        description: BitTorrent download client
+    - qBittorrent:
+        href: https://qbittorrent.docker-1.gwebs.ca
+        icon: qbittorrent.png
+        description: BitTorrent download client
+
+- Personal Apps:
+    - FinGlass:
+        href: https://finglass.talos-1.gwebs.ca
+        icon: mdi-bank
+        description: Personal wealth intelligence
+    - StockBot:
+        href: https://stockbot.talos-1.gwebs.ca
+        icon: mdi-storefront
+        description: Retail store inventory monitor
+
+- Monitoring:
+    - Grafana:
+        href: https://grafana.docker-1.gwebs.ca
+        icon: grafana.png
+        description: Metrics dashboards and visualization
+    - Prometheus:
+        href: https://prometheus.docker-1.gwebs.ca
+        icon: prometheus.png
+        description: Metrics collection and alerting
+    - Healthchecks:
+        href: https://healthchecks.io/
+        icon: healthchecks.png
+        description: Cron and job monitoring
+    - Upsnap:
+        href: http://192.168.10.11:8090
+        icon: upsnap.png
+        description: Wake-on-LAN device control
+
+- Network & Automation:
+    - AdGuard Home:
+        href: http://192.168.10.5:3080
+        icon: adguard-home.png
+        description: Network-wide DNS filtering
+    - HomeAssistant:
+        href: http://192.168.10.11:8123
+        icon: home-assistant.png
+        description: Smart home automation hub
+
+- Tools:
+    - Gitea:
+        href: https://gitea.docker-1.gwebs.ca
+        icon: gitea.png
+        description: Self-hosted Git service
+    - Stirling-PDF:
+        href: https://pdf.docker-1.gwebs.ca
+        icon: stirling-pdf.png
+        description: PDF conversion and editing tools
+
+- Home 2:
+    - Proxmox (PVE 2):
+        href: https://pve-2.gwebs.ca:8006
+        icon: proxmox.png
+        description: Virtualization host management
+    - Headlamp:
+        href: https://headlamp.talos-2.gwebs.ca
+        icon: headlamp.png
+        description: Kubernetes cluster dashboard
+    - Termix:
+        href: https://termix.talos-2.gwebs.ca
+        icon: termix.png
+        description: Browser-based terminal access
+    - AdGuard Home:
+        href: http://192.168.15.5:3080
+        icon: adguard-home.png
+        description: Network-wide DNS filtering
+    - HomeAssistant:
+        href: http://192.168.15.11:8123
+        icon: home-assistant.png
+        description: Smart home automation hub
+    - Upsnap:
+        href: http://192.168.15.11:8090
+        icon: upsnap.png
+        description: Wake-on-LAN device control
+    - Stirling-PDF:
+        href: https://pdf.docker-2.gwebs.ca
+        icon: stirling-pdf.png
+        description: PDF conversion and editing tools
+

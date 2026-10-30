@@ -1,0 +1,72 @@
+title: My Homelab Dashboard
+theme: dark
+headerStyle: underlined
+
+background:
+  image: https://images.pexels.com/photos/1485894/pexels-photo-1485894.jpeg?cs=srgb&dl=pexels-maoriginalphotography-1485894.jpg&fm=jpg&w=6000&h=4002
+  blur: sm
+  saturate: 50
+  brightness: 50
+
+favicon: https://gethomepage.dev/assets/favicon.ico
+
+update_check: true
+
+allowed_hosts:
+  - homepage.talos-1.gwebs.ca
+  - homepage.talos-2.gwebs.ca
+  - homepage.docker-1.gwebs.ca
+  - homepage.docker-2.gwebs.ca
+  - localhost
+  - 127.0.0.1
+
+useEqualHeights: true
+hideVersion: true
+hideFooter: true
+showStats: true
+hideQuickLaunch: true
+
+layout:
+  Infrastructure:
+    icon: mdi-server
+    style: row
+    columns: 4
+
+  Infrastructure Bookmarks:
+    style: row
+    columns: 4
+
+  Media:
+    icon: mdi-play-circle-outline
+    style: row
+    columns: 4
+
+  Personal Apps:
+    icon: mdi-code-tags
+    style: row
+    columns: 4
+
+  Monitoring:
+    icon: mdi-chart-areaspline
+    style: row
+    columns: 4
+
+  Network & Automation:
+    icon: mdi-shield-home-outline
+    style: row
+    columns: 4
+
+  Tools:
+    icon: mdi-tools
+    style: row
+    columns: 4
+
+  Home 2:
+    icon: mdi-home-outline
+    style: row
+    columns: 4
+    initiallyCollapsed: true
+
+customCss: []
+customJs: []
+

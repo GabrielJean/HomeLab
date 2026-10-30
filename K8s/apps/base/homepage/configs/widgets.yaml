@@ -1,0 +1,16 @@
+- resources:
+    label: System
+    cpu: true
+    memory: true
+    uptime: true
+
+- kubernetes:
+    cluster:
+      show: true
+      cpu: true
+      memory: true
+      showLabel: true
+      label: "${CLUSTER_NAME:=k8s-talos-1}"
+    nodes:
+      show: false
+
