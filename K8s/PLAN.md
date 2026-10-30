@@ -9,6 +9,7 @@
   - [Cluster Topology: Independent Single-Node Clusters](#cluster-topology-independent-single-node-clusters)
   - [Management Layer: Sidero Omni SaaS & omnictl](#management-layer-sidero-omni-saas--omnictl)
   - [Dashboard & Workload Visibility: Headlamp](#dashboard--workload-visibility-headlamp)
+  - [Observability Architecture: Azure Managed Prometheus & Self-Hosted Grafana](#observability-architecture-azure-managed-prometheus--self-hosted-grafana)
   - [GitOps Engine: Flux CD](#gitops-engine-flux-cd)
   - [Operational Tooling Separation](#operational-tooling-separation)
 - [Networking And Ingress](#networking-and-ingress)
@@ -113,7 +114,7 @@ flowchart LR
 ### Phase 5: Stateful & Media Workloads (Pending)
 - [ ] **SMB CSI Driver**: Install and validate SMB CSI driver mounting `//192.168.10.12/Medias`.
 - [ ] **Developer Stack**: Migrate Gitea with PostgreSQL and Local Path PVC backups.
-- [ ] **Observability Stack**: Deploy Prometheus, Grafana, and Alertmanager.
+- [ ] **Observability Stack**: Deploy lightweight collector (`vmagent`) with Azure Managed Prometheus remote-write, Entra ID OAuth2 authentication, metric ingestion optimizations (<$0.50/mo), and self-hosted Grafana on `k8s-talos-1`.
 - [ ] **Media Companion Stack**: Migrate Radarr, Sonarr, Overseerr, Jackett, and FlareSolverr.
 
 ### Phase 6: Edge & Hardware-Bound Workloads (Pending)
@@ -237,6 +238,58 @@ Sidero Omni is the cloud-hosted management platform purpose-built for Talos Linu
 
 ---
 
+### Observability Architecture: Azure Managed Prometheus & Self-Hosted Grafana
+
+Long-term metrics storage, alerting, and cross-cluster historical visualization are handled via a hybrid cloud model: **Azure Managed Prometheus** for cloud time-series storage combined with **Self-Hosted Grafana** on `k8s-talos-1`.
+
+```mermaid
+flowchart LR
+    subgraph Home_1["Home 1 (k8s-talos-1)"]
+        EX_1["node-exporter & KSM"] --> AGENT_1["vmagent / Prometheus Agent<br/>(~30 MB RAM)"]
+        GRAFANA["Self-Hosted Grafana<br/>(talos-1 In-Cluster)"]
+    end
+
+    subgraph Home_2["Home 2 (k8s-talos-2)"]
+        EX_2["node-exporter & KSM"] --> AGENT_2["vmagent / Prometheus Agent<br/>(~30 MB RAM)"]
+    end
+
+    subgraph Azure_Cloud["Microsoft Azure"]
+        ENTRA["Microsoft Entra ID<br/>(OAuth2 Auth)"]
+        AZ_PROM["Azure Monitor Workspace<br/>(Azure Managed Prometheus TSDB)"]
+    end
+
+    AGENT_1 -- "Outbound HTTPS (Port 443)<br/>Remote Write + Bearer Token" --> AZ_PROM
+    AGENT_2 -- "Outbound HTTPS (Port 443)<br/>Remote Write + Bearer Token" --> AZ_PROM
+    AGENT_1 -. "Fetch Token" .-> ENTRA
+    AGENT_2 -. "Fetch Token" .-> ENTRA
+    GRAFANA -- "PromQL Query (HTTPS 443)" --> AZ_PROM
+```
+
+#### Core Architectural Principles:
+1. **Zero Azure Arc Overhead**:
+   - Azure Arc is **not** used. This avoids the ~500 MB – 1 GB RAM footprint of Arc agents (`clusterconnect`, `guard`, `config-agent`) on the single-node Talos VMs.
+   - The cluster uses standard **Prometheus Remote Write API** over outbound HTTPS (Port 443).
+2. **100% Outbound Communication**:
+   - Collectors initiate all traffic outbound to Azure; no inbound ports, public IPs, port forwarding, or cross-site VPNs are required.
+   - Works seamlessly behind standard residential NAT and stateful firewalls.
+3. **Multi-Cluster Federation via `external_labels`**:
+   - Both `talos-1` and `talos-2` push to the exact same Azure Monitor Workspace.
+   - Metrics are tagged with `external_labels: { cluster: "home-1" }` and `{ cluster: "home-2" }`, allowing Grafana dashboards to switch clusters seamlessly via a `$cluster` dropdown.
+4. **Credential Security**:
+   - The collector authenticates against Entra ID using an App Registration (Service Principal) with `Monitoring Metrics Publisher` permissions.
+   - Grafana queries using `Monitoring Data Reader` permissions.
+   - Secrets (`client_id`, `client_secret`, `tenant_id`) are stored in Azure Key Vault and synchronized automatically into Kubernetes secrets via the **External Secrets Operator**.
+5. **Cost Engineering (<$0.50 / Month)**:
+   - Azure Managed Prometheus charges ~$0.16 per 10 million samples after 1 million free monthly samples.
+   - **60s Scrape Interval**: Cuts sample volume by 75% compared to standard 15s scraping.
+   - **High-Cardinality Pruning**: Drops all Prometheus histogram buckets (`*_bucket`) and internal runtime metrics (`^go_.*`, `^process_.*`), keeping only actionable counters and gauges.
+   - **Target Ingestion**: ~15M–25M samples/month total across both clusters, resulting in a predictable monthly bill of **~$0.30 to $0.40/month**.
+6. **Self-Hosted Grafana vs. Azure Managed Grafana**:
+   - Microsoft charges ~$42/month for an Azure Managed Grafana instance.
+   - By running a lightweight Grafana container on `k8s-talos-1`, the visualization tier is **$0/month**, while preserving the resilience and long retention (18 months) of cloud-stored metrics.
+
+---
+
 ### GitOps Engine: Flux CD
 
 Flux CD runs inside each cluster, continuously reconciling desired state from the Git repository:
@@ -287,11 +340,17 @@ flowchart TD
         FLUX_INFRA["Infrastructure: Ingress, cert-manager, ESO"]
         FLUX_APPS["Applications: HelmReleases & Manifests"]
         FLUX_STORE["Storage: Local Path & SMB CSI"]
+        FLUX_MON["Monitoring: vmagent & Grafana"]
     end
 
-    subgraph Admin_Tools["Operator Access"]
+    subgraph Admin_Tools["Operator Access & Dashboards"]
         KUBECTL["kubectl / K9s (Direct API Control)"]
-        HEADLAMP["Headlamp Dashboard (Web UI & Logs)"]
+        HEADLAMP["Headlamp UI (Live Pods & Logs)"]
+        GRAFANA["Grafana (Historical Trends & Metrics)"]
+    end
+
+    subgraph Cloud_Metrics["Azure Cloud (Outbound Port 443)"]
+        AZ_PROM["Azure Managed Prometheus (TSDB)"]
     end
 
     subgraph Host_Infra["Ansible (Proxmox Host Layer)"]
@@ -303,7 +362,20 @@ flowchart TD
     OMNI_AUTH --> KUBECTL
     OMNI_K8S --> GitOps_Flux
     GitOps_Flux --> HEADLAMP
+    GitOps_Flux --> FLUX_MON
+    FLUX_MON -- "Remote Write" --> AZ_PROM
+    GRAFANA -- "PromQL Query" --> AZ_PROM
 ```
+
+| Tool / Layer | Scope & Responsibility | Access / Interface |
+| --- | --- | --- |
+| **Sidero Omni** | Talos OS machine provisioning, maintenance, OS/k8s upgrades, and etcd snapshot health. | Omni SaaS UI & `omnictl` |
+| **Flux CD** | Declarative GitOps reconciliation of infrastructure and workloads from Git monorepo. | Git commits & PRs |
+| **Headlamp** | In-cluster, real-time workload inspection, container live logs, event viewing, and pod restarts. | `headlamp.<cluster>.gwebs.ca` (Entra ID OIDC) |
+| **vmagent (Collector)** | In-cluster lightweight metric scraper (~30MB RAM) pushing outbound samples via HTTPS Remote Write. | Internal K8s service |
+| **Azure Managed Prometheus** | Cloud time-series database storing 18 months of historical metrics across all clusters. | Azure Monitor Workspace (Private/HTTPS) |
+| **Self-Hosted Grafana** | Cross-cluster dashboards, node performance trends, application metrics, and alerting rules. | `grafana.talos-1.gwebs.ca` (Entra ID OIDC) |
+| **Ansible** | Underlying Proxmox host VMs, PBS backup scheduling, and physical networking. | SSH / Local Playbooks |
 
 ---
 
@@ -642,7 +714,8 @@ K8s/
 │   ├── external-secrets/               # External Secrets Operator & Azure Key Vault Store
 │   ├── storage/                        # Local Path Provisioner, VolSync Operator & SMB CSI
 │   ├── headlamp/                       # Headlamp web dashboard
-│   └── monitoring/                     # Prometheus & Grafana stack
+│   ├── metrics-server/                 # In-cluster metrics API (HPA & Headlamp live graphs)
+│   └── monitoring/                     # vmagent (Azure remote-write) & self-hosted Grafana
 │
 ├── apps/                               # Application definitions (base & overlays)
 │   ├── base/                           # Shared application templates
@@ -750,7 +823,14 @@ Migrate stateless and low-risk web services from Docker Compose to Kubernetes:
 ### Phase 5: Stateful & Media Workloads
 
 Migrate stateful applications and media companion services on `k8s-talos-1`:
-- **Monitoring & Developer Tools**: Prometheus/Grafana stack and Gitea.
+- **Observability Stack (Azure Managed Prometheus & Self-Hosted Grafana)**:
+  - Create Azure Monitor Workspace and Entra ID App Registration with `Monitoring Metrics Publisher` and `Monitoring Data Reader` roles.
+  - Store Service Principal credentials in Azure Key Vault and synchronize via External Secrets Operator to `monitoring/azure-prom-auth`.
+  - Deploy lightweight `vmagent` (or Prometheus in agent mode) across both `k8s-talos-1` and `k8s-talos-2` via Flux HelmRelease.
+  - Configure outbound HTTPS Remote Write to Azure Monitor Workspace with `external_labels` (`cluster: home-1` / `cluster: home-2`).
+  - Apply cost-saving ingestion filters (60s scrape intervals, drop `*_bucket` histograms and `go_*` runtime series) to guarantee <$0.50/month total cost.
+  - Deploy self-hosted Grafana on `k8s-talos-1` with Azure Monitor datasource, Entra ID SSO, and multi-cluster dashboards.
+- **Developer Stack**: Gitea with PostgreSQL.
   - Test database export/import, verify Local Path PVC backups, and configure VolSync volume protection and replication.
 - **Media Companion Stack**: Overseerr, Radarr, Sonarr, Jackett, FlareSolverr.
   - Mount NAS SMB share via SMB CSI (`//192.168.10.12/Medias`).
@@ -797,6 +877,9 @@ The migration of each phase will be deemed complete once all of the following cr
 6. **Operations & Observability**:
    - Headlamp web UI is reachable via HTTPS and secured by Entra ID OIDC.
    - PBS successfully backs up both Kubernetes VMs nightly.
+   - In-cluster metric collectors (`vmagent`) successfully push outbound metrics via HTTPS Remote Write to Azure Monitor Workspace using Entra ID OAuth2 authentication.
+   - Self-hosted Grafana successfully queries Azure Managed Prometheus and visualizes both clusters via the `$cluster` variable selector.
+   - Metric ingestion rates remain within the tuned target (<25M samples/month, <$0.50/month).
 
 ---
 
@@ -813,6 +896,7 @@ The migration of each phase will be deemed complete once all of the following cr
 - **Disaster Recovery & Replication**: VolSync with Restic (`copyMethod: Direct`) replicating and backing up `local-path` PVCs to Azure Blob Storage (`gjtalossa`) for cross-cluster failover and disaster recovery, combined with Flux GitOps as the authoritative source of truth for cluster state.
 - **Secrets**: Azure Key Vault + External Secrets Operator + SOPS.
 - **Storage**: Local Path Provisioner (local PVCs) + SMB CSI Driver (NAS shares).
+- **Observability & Metrics**: Azure Managed Prometheus (Azure Monitor Workspace) via outbound HTTPS Prometheus Remote Write (zero Azure Arc overhead) paired with Self-Hosted Grafana on `k8s-talos-1` (avoiding the ~$42/mo Azure Managed Grafana cost). Monthly ingestion costs capped (<$0.50/month) via 60-second scrape intervals and dropping high-cardinality Go/histogram metrics.
 - **DNS & Ingress Isolation**: Strict separation of hostnames per cluster (`<app>.talos-1.gwebs.ca` vs `<app>.talos-2.gwebs.ca`) using Flux `postBuild.substitute` (`CLUSTER_NAME`) to prevent cross-cluster routing confusion and duplicate TLS certificate requests.
 
 ### Remaining Implementation Choices to Confirm:
