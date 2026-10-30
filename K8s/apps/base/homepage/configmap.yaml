@@ -21,6 +21,10 @@ data:
             - icon: backblaze.png
               href: https://secure.backblaze.com/
               description: Cloud backup and storage
+        - Talos Omni:
+            - icon: talos.png
+              href: https://gwebs.na-west-2.omni.siderolabs.io
+              description: Talos Linux cluster management
 
   widgets.yaml: |
     - resources:
