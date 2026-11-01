@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: finglass
-          image: ghcr.io/gabrieljean/finglass:1.5.0
+          image: ghcr.io/gabrieljean/finglass:1.5.1
           env:
             - name: APP_ENV
               value: "production"
