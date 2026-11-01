@@ -3,82 +3,100 @@
         href: https://pve-1.gwebs.ca:8006
         icon: proxmox.png
         description: Virtualization host management
+        siteMonitor: https://pve-1.gwebs.ca:8006
     - Proxmox Backup Server:
         href: https://pbs-2.gwebs.ca:8007
         icon: proxmox.png
         description: Backup server management
+        siteMonitor: https://pbs-2.gwebs.ca:8007
     - Headlamp:
         href: https://headlamp.talos-1.gwebs.ca
         icon: headlamp.png
         description: Kubernetes cluster dashboard
+        siteMonitor: https://headlamp.talos-1.gwebs.ca
     - Termix:
         href: https://termix.talos-1.gwebs.ca
         icon: termix.png
         description: Browser-based terminal access
+        siteMonitor: https://termix.talos-1.gwebs.ca
 
 - Media:
     - Plex:
         href: https://app.plex.tv
         icon: plex.png
         description: Personal media streaming server
+        siteMonitor: http://192.168.10.13:32400
     - Overseerr:
         href: https://overseerr.docker-1.gwebs.ca
         icon: overseerr.png
         description: Media request management
+        siteMonitor: https://overseerr.docker-1.gwebs.ca
     - Sonarr:
         href: https://sonarr.docker-1.gwebs.ca
         icon: sonarr.png
         description: TV series library automation
+        siteMonitor: https://sonarr.docker-1.gwebs.ca
     - Radarr:
         href: https://radarr.docker-1.gwebs.ca
         icon: radarr.png
         description: Movie library automation
+        siteMonitor: https://radarr.docker-1.gwebs.ca
     - Jackett:
         href: https://jackett.docker-1.gwebs.ca
         icon: jackett.png
         description: Torrent indexer aggregation
+        siteMonitor: https://jackett.docker-1.gwebs.ca
     - Transmission:
         href: https://transmission.docker-1.gwebs.ca/transmission/web/
         icon: transmission.png
         description: BitTorrent download client
+        siteMonitor: https://transmission.docker-1.gwebs.ca/transmission/web/
     - qBittorrent:
         href: https://qbittorrent.docker-1.gwebs.ca
         icon: qbittorrent.png
         description: BitTorrent download client
+        siteMonitor: https://qbittorrent.docker-1.gwebs.ca
 
 - Personal Apps:
     - FinGlass:
         href: https://finglass.talos-1.gwebs.ca
         icon: mdi-bank
         description: Personal wealth intelligence
+        siteMonitor: https://finglass.talos-1.gwebs.ca
     - StockBot:
         href: https://stockbot.talos-1.gwebs.ca
         icon: mdi-storefront
         description: Retail store inventory monitor
+        siteMonitor: https://stockbot.talos-1.gwebs.ca
 
 - Monitoring:
     - Grafana:
         href: https://grafana.docker-1.gwebs.ca
         icon: grafana.png
         description: Metrics dashboards and visualization
+        siteMonitor: https://grafana.docker-1.gwebs.ca
     - Prometheus:
         href: https://prometheus.docker-1.gwebs.ca
         icon: prometheus.png
         description: Metrics collection and alerting
+        siteMonitor: https://prometheus.docker-1.gwebs.ca
     - Healthchecks:
         href: https://healthchecks.io/
         icon: healthchecks.png
         description: Cron and job monitoring
+        siteMonitor: https://healthchecks.io/
 
 - Network & Automation:
     - AdGuard Home:
         href: http://192.168.10.5:3080
         icon: adguard-home.png
         description: Network-wide DNS filtering
+        siteMonitor: http://192.168.10.5:3080
     - HomeAssistant:
         href: http://192.168.10.11:8123
         icon: home-assistant.png
         description: Smart home automation hub
+        siteMonitor: http://192.168.10.11:8123
     - Upsnap:
         href: https://upsnap.talos-1.gwebs.ca
         icon: upsnap.png
@@ -90,32 +108,39 @@
         href: https://gitea.docker-1.gwebs.ca
         icon: gitea.png
         description: Self-hosted Git service
+        siteMonitor: https://gitea.docker-1.gwebs.ca
     - Stirling-PDF:
         href: https://pdf.docker-1.gwebs.ca
         icon: stirling-pdf.png
         description: PDF conversion and editing tools
+        siteMonitor: https://pdf.docker-1.gwebs.ca
 
 - Home 2:
     - Proxmox (PVE 2):
         href: https://pve-2.gwebs.ca:8006
         icon: proxmox.png
         description: Virtualization host management
+        siteMonitor: https://pve-2.gwebs.ca:8006
     - Headlamp:
         href: https://headlamp.talos-2.gwebs.ca
         icon: headlamp.png
         description: Kubernetes cluster dashboard
+        siteMonitor: https://headlamp.talos-2.gwebs.ca
     - Termix:
         href: https://termix.talos-2.gwebs.ca
         icon: termix.png
         description: Browser-based terminal access
+        siteMonitor: https://termix.talos-2.gwebs.ca
     - AdGuard Home:
         href: http://192.168.15.5:3080
         icon: adguard-home.png
         description: Network-wide DNS filtering
+        siteMonitor: http://192.168.15.5:3080
     - HomeAssistant:
         href: http://192.168.15.11:8123
         icon: home-assistant.png
         description: Smart home automation hub
+        siteMonitor: http://192.168.15.11:8123
     - Upsnap:
         href: https://upsnap.talos-2.gwebs.ca
         icon: upsnap.png
@@ -125,4 +150,4 @@
         href: https://pdf.docker-2.gwebs.ca
         icon: stirling-pdf.png
         description: PDF conversion and editing tools
-
+        siteMonitor: https://pdf.docker-2.gwebs.ca
