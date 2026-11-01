@@ -21,7 +21,6 @@
             - { name: traefik, online: true }
             - { name: plexapps, online: true, restart: true, build: true }
             - { name: homepage-1, restart: true, online: true }
-            - { name: gitea, online: true }
             - { name: monitoring, restart: true, online: true }
             - { name: portainer, online: true }
             - { name: homeassistant, online: false }

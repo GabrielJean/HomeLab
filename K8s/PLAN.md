@@ -32,6 +32,7 @@
   - [Phase 4: Lower-Risk Application Migration](#phase-4-lower-risk-application-migration)
   - [Phase 5: Stateful & Media Workloads](#phase-5-stateful--media-workloads)
   - [Phase 6: Edge & Hardware-Bound Workloads](#phase-6-edge--hardware-bound-workloads)
+- [Stateful Application Data Migration Runbook (LAN Direct Streaming)](#stateful-application-data-migration-runbook-lan-direct-streaming)
 - [Workloads Remaining Outside Kubernetes Initially](#workloads-remaining-outside-kubernetes-initially)
 - [Validation And Exit Criteria](#validation-and-exit-criteria)
 - [Confirmed Decisions & Remaining Implementation Choices](#confirmed-decisions--remaining-implementation-choices)
@@ -114,7 +115,7 @@ flowchart LR
 
 ### Phase 5: Stateful & Media Workloads (Pending)
 - [ ] **SMB CSI Driver**: Install and validate SMB CSI driver mounting `//192.168.10.12/Medias`.
-- [ ] **Developer Stack**: Migrate Gitea with PostgreSQL and Local Path PVC backups.
+- [x] **Developer Stack**: Migrate Gitea with SQLite3 and Local Path persistent storage on `k8s-talos-1`.
 - [ ] **Observability Stack**: Deploy lightweight collector (`vmagent`) with Azure Managed Prometheus remote-write, Entra ID OAuth2 authentication, metric ingestion optimizations (<$0.50/mo), and self-hosted Grafana on `k8s-talos-1`.
 - [ ] **Media Companion Stack**: Migrate Radarr, Sonarr, Overseerr, Jackett, and FlareSolverr.
 
@@ -831,8 +832,10 @@ Migrate stateful applications and media companion services on `k8s-talos-1`:
   - Configure outbound HTTPS Remote Write to Azure Monitor Workspace with `external_labels` (`cluster: home-1` / `cluster: home-2`).
   - Apply cost-saving ingestion filters (60s scrape intervals, drop `*_bucket` histograms and `go_*` runtime series) to guarantee <$0.50/month total cost.
   - Deploy self-hosted Grafana on `k8s-talos-1` with Azure Monitor datasource, Entra ID SSO, and multi-cluster dashboards.
-- **Developer Stack**: Gitea with PostgreSQL.
-  - Test database export/import, verify Local Path PVC backups, and configure VolSync volume protection and replication.
+- **Developer Stack**: Gitea with SQLite3.
+  - Deploy single-replica Gitea with SQLite3 database on `local-path` persistent storage (15Gi) on `k8s-talos-1`.
+  - Expose HTTP service via Gateway API HTTPRoute on `gitea.talos-1.gwebs.ca` with cluster wildcard TLS.
+  - Expose SSH service directly via `hostPort: 222` on Talos Linux control-plane node (`192.168.10.15`).
 - **Media Companion Stack**: Overseerr, Radarr, Sonarr, Jackett, FlareSolverr.
   - Mount NAS SMB share via SMB CSI (`//192.168.10.12/Medias`).
   - Verify UID/GID permissions, directory write access, hardlink/rename support, and API integrations.
@@ -843,6 +846,130 @@ Evaluate and migrate remaining complex workloads:
 - **Plex**: Requires NVIDIA GPU passthrough configuration in the Talos machine config and SMB media mounts.
 - **Home Assistant** (Home 2): Requires USB Zigbee stick passthrough (or network-attached Zigbee coordinator) and host networking configuration.
 - **VPN / Torrent Clients**: (Gluetun + qBittorrent) Requires TUN device creation, `NET_ADMIN` capabilities, and kill-switch verification.
+
+---
+
+## Stateful Application Data Migration Runbook (LAN Direct Streaming)
+
+When migrating stateful workloads (Gitea, Home Assistant, Sonarr, Radarr, etc.) from Docker Compose VMs (`Docker-1`, `Docker-2`) to Kubernetes `local-path` PersistentVolumeClaims, avoid slow API/export tools or streaming through `kubectl exec` over cloud control-plane proxies. Instead, use **direct LAN HTTP streaming**.
+
+### Why LAN Direct Streaming?
+
+1. **1:1 File Integrity**: Directly copying the database (SQLite, etc.), configuration files, application state, and blobs guarantees 100% preservation of all primary keys, commit histories, user accounts, sessions, timestamps, and permissions with zero date/author rewriting.
+2. **Control-Plane Proxy Bypass**: Running `kubectl cp` or piped `kubectl exec` streams through remote Kubernetes API proxies (e.g. Sidero Omni SaaS proxy `54.148.x.x`), which drop websockets with `unexpected EOF / connection reset` on large multi-gigabyte files.
+3. **Gigabit Transfer Speeds**: Docker VMs (`192.168.10.11`, `192.168.15.11`) and Talos cluster nodes (`192.168.10.15`, `192.168.15.15`) share the physical 1 Gbps local LAN. A 2.5 GB database/blob directory transfers and extracts in ~25 seconds with standard HTTP content-length validation.
+
+---
+
+### End-to-End Migration Procedure
+
+#### Step 1: Quiesce Source Container
+Stop the Docker container on the source VM to flush all memory buffers and lock the database files:
+```bash
+# On Docker VM (e.g., Docker-1 / 192.168.10.11)
+sudo docker stop <app_name>
+sudo docker update --restart=no <app_name>
+```
+
+#### Step 2: Archive & Expose Over LAN
+Create an uncompressed tar archive (`-c` without compression avoids unnecessary CPU bottlenecks on gigabit LAN) and serve it using Python's built-in HTTP server:
+```bash
+# On Docker VM
+sudo rm -f /tmp/<app_name>_backup.tar
+sudo tar -C /Apps/<App_Folder> -cf /tmp/<app_name>_backup.tar .
+sudo chmod 644 /tmp/<app_name>_backup.tar
+nohup python3 -m http.server 9999 --directory /tmp > /tmp/http.log 2>&1 &
+
+# Verify it is listening
+ss -tulpn | grep 9999
+```
+
+#### Step 3: Deploy Application PVC & Scale Workload to 0
+Ensure the application namespace and `PersistentVolumeClaim` (backed by `local-path`) are applied to the cluster, then scale the deployment to `0` so no active pod locks the volume:
+```bash
+kubectl apply -k K8s/apps/base/<app_name>
+kubectl scale deploy/<app_name> --replicas=0 -n <app_name>
+```
+
+#### Step 4: Launch Ephemeral Transfer Pod
+Deploy a lightweight helper pod mounting the application's PVC at `/data`. Using the workload's existing container image is recommended as it is already cached on the node:
+```bash
+cat << 'EOF' | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: <app_name>-transfer
+  namespace: <app_name>
+spec:
+  securityContext:
+    fsGroup: 1000
+  containers:
+    - name: transfer
+      image: <app_image>  # e.g. gitea/gitea:28.3.0 or alpine:latest
+      command: ["sh", "-c", "sleep 3600"]
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: <app_name>-data
+EOF
+
+# Wait for pod readiness
+kubectl wait --for=condition=Ready pod/<app_name>-transfer -n <app_name> --timeout=30s
+```
+
+#### Step 5: Stream & Extract Over Local LAN
+Stream the tarball directly from the Docker VM into the target PVC mount path:
+```bash
+# Clear any default skeleton files generated during initial PVC binding
+kubectl exec -n <app_name> <app_name>-transfer -- sh -c "find /data -mindepth 1 -delete"
+
+# Stream and unpack over 1Gbps LAN
+kubectl exec -n <app_name> <app_name>-transfer -- sh -c \
+  "curl -s http://<DOCKER_VM_IP>:9999/<app_name>_backup.tar | tar -C /data -xpf -"
+
+# Verify extracted volume size
+kubectl exec -n <app_name> <app_name>-transfer -- du -sh /data
+```
+
+#### Step 6: Fix Permissions & Configuration Hostnames
+Inside the transfer pod, update any configuration files containing old Docker VM hostnames or URLs, and ensure filesystem ownership matches the runtime user:
+```bash
+# Example: replace old docker hostnames with talos cluster hostnames
+kubectl exec -n <app_name> <app_name>-transfer -- \
+  sed -i 's/<app>\.docker-1\.gwebs\.ca/<app>.talos-1.gwebs.ca/g' /data/config/config.ini
+
+# Ensure proper UID:GID ownership (e.g. UID 1000 for git/app user)
+kubectl exec -n <app_name> <app_name>-transfer -- \
+  chown -R 1000:1000 /data
+```
+
+#### Step 7: Clean Up Transfer Infrastructure & Start Workload
+Delete the temporary transfer pod and terminate the HTTP server on the Docker VM:
+```bash
+# Delete ephemeral pod
+kubectl delete pod <app_name>-transfer -n <app_name> --now
+
+# On Docker VM: terminate python server and remove backup tarball
+ssh gabriel@<DOCKER_VM_IP> 'sudo pkill -f "python3 -m http.server 9999" || true; sudo rm -f /tmp/<app_name>_backup.tar'
+
+# Scale deployment back up to 1 replica
+kubectl scale deploy/<app_name> --replicas=1 -n <app_name>
+
+# Verify startup logs and health checks
+kubectl logs -n <app_name> deploy/<app_name> -f
+curl -k -I https://<app_name>.talos-1.gwebs.ca
+```
+
+#### Step 8: GitOps Decommissioning
+1. Move the legacy docker compose folder to the archive:
+   ```bash
+   git mv Docker/<app_name> Archives/Docker/<app_name>
+   ```
+2. Remove `<app_name>` from `Ansible/playbooks/pve-X-docker-apps.yml`.
+3. Update bookmarks in `K8s/apps/base/homepage/configs/services.yaml`.
 
 ---
 

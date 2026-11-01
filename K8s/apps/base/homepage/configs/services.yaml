@@ -105,10 +105,10 @@
 
 - Tools:
     - Gitea:
-        href: https://gitea.docker-1.gwebs.ca
+        href: https://gitea.talos-1.gwebs.ca
         icon: gitea.png
         description: Self-hosted Git service
-        siteMonitor: https://gitea.docker-1.gwebs.ca
+        siteMonitor: https://gitea.talos-1.gwebs.ca
     - Stirling-PDF:
         href: https://pdf.talos-1.gwebs.ca
         icon: stirling-pdf.png

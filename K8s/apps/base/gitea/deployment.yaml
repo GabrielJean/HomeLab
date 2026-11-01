@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitea
+  namespace: gitea
+  labels:
+    app.kubernetes.io/name: gitea
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: gitea
+  template:
+    metadata:
+      labels:
+        app: gitea
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: gitea
+          image: gitea/gitea:28.3.0
+          env:
+            - name: USER_UID
+              value: "1000"
+            - name: USER_GID
+              value: "1000"
+            - name: GITEA__database__DB_TYPE
+              value: "sqlite3"
+            - name: GITEA__database__PATH
+              value: "/data/gitea/gitea.db"
+            - name: GITEA__server__DOMAIN
+              value: "gitea.${CLUSTER_DOMAIN:=talos-1}.gwebs.ca"
+            - name: GITEA__server__SSH_DOMAIN
+              value: "gitea.${CLUSTER_DOMAIN:=talos-1}.gwebs.ca"
+            - name: GITEA__server__ROOT_URL
+              value: "https://gitea.${CLUSTER_DOMAIN:=talos-1}.gwebs.ca/"
+            - name: GITEA__server__SSH_PORT
+              value: "222"
+            - name: GITEA__server__SSH_LISTEN_PORT
+              value: "22"
+          ports:
+            - containerPort: 3000
+              name: http
+              protocol: TCP
+            - containerPort: 22
+              hostPort: 222
+              name: ssh
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: gitea-data

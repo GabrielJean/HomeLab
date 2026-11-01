@@ -10,3 +10,4 @@ resources:
   - ../base/stockbot
   - ../base/upsnap
   - ../base/stirling-pdf
+  - ../base/gitea
