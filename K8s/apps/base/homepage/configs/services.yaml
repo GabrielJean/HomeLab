@@ -70,7 +70,7 @@
         icon: healthchecks.png
         description: Cron and job monitoring
     - Upsnap:
-        href: http://192.168.10.11:8090
+        href: https://upsnap.talos-1.gwebs.ca
         icon: upsnap.png
         description: Wake-on-LAN device control
 
@@ -116,7 +116,7 @@
         icon: home-assistant.png
         description: Smart home automation hub
     - Upsnap:
-        href: http://192.168.15.11:8090
+        href: https://upsnap.talos-2.gwebs.ca
         icon: upsnap.png
         description: Wake-on-LAN device control
     - Stirling-PDF:

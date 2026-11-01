@@ -108,6 +108,7 @@ flowchart LR
 - [ ] **Joke de Jean**: Fun web tools.
 - [x] **Termix**: Web-based SSH terminal with VolSync cross-cluster replication (Active on `k8s-talos-1`, Warm Standby on `k8s-talos-2`).
 - [x] **Homepage**: Single unified multi-home dashboard running statelessly on `k8s-talos-1` and `k8s-talos-2`.
+- [x] **UpSnap**: Independent multi-cluster Wake-on-LAN instances running with host networking and `NET_RAW` capability on both `k8s-talos-1` and `k8s-talos-2`.
 - [x] **Azure DNS DDNS Updater**: Lightweight CronJob running exclusively on `k8s-talos-1` (every 15m) using `mcr.microsoft.com/azure-cli` to synchronize residential WAN IP to `gaming.gwebs.ca` and CNAME aliases via `k8s-app` Service Principal in Azure Key Vault.
 - [ ] **DNS Cutover**: Switch local DNS records in AdGuard Home to cluster IPs.
 
@@ -812,7 +813,7 @@ K8s/
 ### Phase 4: Lower-Risk Application Migration
 
 Migrate stateless and low-risk web services from Docker Compose to Kubernetes:
-- **Applications**: Stirling-PDF, FinGlass, StockBot, Joke de Jean, Termix, Homepage, Azure DNS DDNS Updater.
+- **Applications**: Stirling-PDF, FinGlass, StockBot, Joke de Jean, Termix, Homepage, UpSnap, Azure DNS DDNS Updater.
 - **Procedure**:
   1. Create Kubernetes manifests / HelmReleases under `apps/`.
   2. Configure `HTTPRoute` with Traefik Gateway API (automatically inheriting wildcard TLS).

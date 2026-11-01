@@ -8,3 +8,4 @@ resources:
   - ../base/dns-updater
   - ../base/finglass
   - ../base/stockbot
+  - ../base/upsnap

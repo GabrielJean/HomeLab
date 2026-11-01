@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: upsnap
+  namespace: upsnap
+  labels:
+    app.kubernetes.io/name: upsnap
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: upsnap
+  template:
+    metadata:
+      labels:
+        app: upsnap
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: upsnap
+          image: ghcr.io/seriousm4x/upsnap:5.5.0
+          env:
+            - name: TZ
+              value: "America/Toronto"
+            - name: UPSNAP_HTTP_LISTEN
+              value: "0.0.0.0:8090"
+          ports:
+            - containerPort: 8090
+              name: http
+          securityContext:
+            capabilities:
+              add:
+                - NET_RAW
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: data
+              mountPath: /app/pb_data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: upsnap-data
+
