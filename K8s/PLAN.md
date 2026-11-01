@@ -103,7 +103,7 @@ flowchart LR
 - [x] **Data Replication & Standby Verification**: Validate asynchronous cross-cluster volume replication and offsite snapshots (`ReplicationSource` on `k8s-talos-1`, `ReplicationDestination` on `k8s-talos-2` via Termix workload).
 
 ### Phase 4: Lower-Risk Application Migration (In Progress)
-- [ ] **Stirling-PDF**: Deploy PDF manipulation suite with Local Path PVC and TLS Gateway route.
+- [x] **Stirling-PDF**: Deploy PDF manipulation suite with Local Path PVC and TLS Gateway route on `k8s-talos-1`.
 - [x] **FinGlass / StockBot**: Financial tracking and alerting tools.
 - [ ] **Joke de Jean**: Fun web tools.
 - [x] **Termix**: Web-based SSH terminal with VolSync cross-cluster replication (Active on `k8s-talos-1`, Warm Standby on `k8s-talos-2`).

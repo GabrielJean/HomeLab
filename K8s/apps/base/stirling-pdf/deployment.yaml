@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stirling-pdf
+  namespace: stirling-pdf
+  labels:
+    app.kubernetes.io/name: stirling-pdf
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: stirling-pdf
+  template:
+    metadata:
+      labels:
+        app: stirling-pdf
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: stirling-pdf
+          image: frooodle/s-pdf:3.2.2
+          env:
+            - name: DOCKER_ENABLE_SECURITY
+              value: "false"
+            - name: SECURITY_ENABLELOGIN
+              value: "false"
+            - name: SYSTEM_DEFAULTLOCALE
+              value: "fr_FR"
+            - name: UI_APPNAME
+              value: "Stirling-PDF"
+            - name: UI_HOMEDESCRIPTION
+              value: "Stirling-PDF"
+            - name: UI_APPNAMENAVBAR
+              value: "Stirling-PDF"
+            - name: METRICS_ENABLED
+              value: "true"
+          ports:
+            - containerPort: 8080
+              name: http
+          startupProbe:
+            httpGet:
+              path: /api/v1/info/status
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /api/v1/info/status
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/v1/info/status
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+          volumeMounts:
+            - name: data
+              mountPath: /configs
+              subPath: configs
+            - name: data
+              mountPath: /usr/share/tessdata
+              subPath: tessdata
+            - name: data
+              mountPath: /logs
+              subPath: logs
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: stirling-pdf-data
+

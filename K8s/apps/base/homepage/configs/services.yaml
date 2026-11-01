@@ -110,10 +110,10 @@
         description: Self-hosted Git service
         siteMonitor: https://gitea.docker-1.gwebs.ca
     - Stirling-PDF:
-        href: https://pdf.docker-1.gwebs.ca
+        href: https://pdf.talos-1.gwebs.ca
         icon: stirling-pdf.png
         description: PDF conversion and editing tools
-        siteMonitor: https://pdf.docker-1.gwebs.ca
+        siteMonitor: https://pdf.talos-1.gwebs.ca
 
 - Home 2:
     - Proxmox (PVE 2):
@@ -146,8 +146,3 @@
         icon: upsnap.png
         description: Wake-on-LAN device control
         siteMonitor: https://upsnap.talos-2.gwebs.ca
-    - Stirling-PDF:
-        href: https://pdf.docker-2.gwebs.ca
-        icon: stirling-pdf.png
-        description: PDF conversion and editing tools
-        siteMonitor: https://pdf.docker-2.gwebs.ca
