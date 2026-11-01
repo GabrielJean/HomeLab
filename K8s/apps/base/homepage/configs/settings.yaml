@@ -25,6 +25,7 @@ hideVersion: true
 hideFooter: true
 showStats: true
 hideQuickLaunch: true
+statusStyle: dot
 
 layout:
   Infrastructure:
