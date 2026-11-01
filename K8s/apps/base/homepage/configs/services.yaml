@@ -69,10 +69,6 @@
         href: https://healthchecks.io/
         icon: healthchecks.png
         description: Cron and job monitoring
-    - Upsnap:
-        href: https://upsnap.talos-1.gwebs.ca
-        icon: upsnap.png
-        description: Wake-on-LAN device control
 
 - Network & Automation:
     - AdGuard Home:
@@ -83,6 +79,11 @@
         href: http://192.168.10.11:8123
         icon: home-assistant.png
         description: Smart home automation hub
+    - Upsnap:
+        href: https://upsnap.talos-1.gwebs.ca
+        icon: upsnap.png
+        description: Wake-on-LAN device control
+        siteMonitor: https://upsnap.talos-1.gwebs.ca
 
 - Tools:
     - Gitea:
@@ -119,6 +120,7 @@
         href: https://upsnap.talos-2.gwebs.ca
         icon: upsnap.png
         description: Wake-on-LAN device control
+        siteMonitor: https://upsnap.talos-2.gwebs.ca
     - Stirling-PDF:
         href: https://pdf.docker-2.gwebs.ca
         icon: stirling-pdf.png
