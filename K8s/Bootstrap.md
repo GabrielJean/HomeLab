@@ -94,7 +94,7 @@ End-to-end operational guide for provisioning, bootstrapping, and operating the 
 ## Prerequisites & Tools
 
 ### 1. Install CLI Tooling
-Run the automated tool installer to ensure `omnictl`, `kubectl`, and `flux` are installed:
+Run the automated tool installer to ensure `omnictl`, `kubectl`, `helm`, `flux`, and `k9s` are installed:
 
 ```bash
 cd /home/gabriel/HomeLab

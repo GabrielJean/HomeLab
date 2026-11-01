@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# install-tools.sh - Install or update omnictl, kubectl, flux, and k9s
+# install-tools.sh - Install or update omnictl, kubectl, helm, flux, and k9s
 # ==============================================================================
 # Usage:
 #   ./install-tools.sh
 #
 # Description:
-#   Installs omnictl, kubectl, flux, and k9s system-wide to /usr/local/bin.
+#   Installs omnictl, kubectl, helm, flux, and k9s system-wide to /usr/local/bin.
 #   Uses sudo automatically if write permissions are required.
 # ==============================================================================
 
@@ -26,7 +26,7 @@ warn()  { echo -e "${YELLOW}${BOLD}[WARN]${NC} $*"; }
 error() { echo -e "${RED}${BOLD}[ERROR]${NC} $*" >&2; exit 1; }
 
 # Target installation directory
-TARGET_DIR="/usr/local/bin"
+TARGET_DIR="${TARGET_DIR:-/usr/local/bin}"
 
 # Check write permissions; use sudo if target directory is not writable
 SUDO=""
@@ -115,7 +115,44 @@ echo -n "  Version: "
 echo ""
 
 # ------------------------------------------------------------------------------
-# 3. Install flux (Flux CD CLI)
+# 3. Install helm (Kubernetes Package Manager)
+# ------------------------------------------------------------------------------
+info "Installing / Updating ${BOLD}helm${NC}..."
+
+HELM_VERSION="${HELM_VERSION:-latest}"
+if [ "$HELM_VERSION" = "latest" ]; then
+  HELM_VERSION="$(curl -sSL -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/helm/helm/releases/latest | grep '"tag_name":' | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')"
+  if [ -z "$HELM_VERSION" ]; then
+    warn "Could not resolve latest helm release via GitHub API, checking get.helm.sh..."
+    HELM_VERSION="$(curl -sSL -f https://get.helm.sh/helm-latest-version 2>/dev/null || true)"
+  fi
+  if [ -z "$HELM_VERSION" ]; then
+    warn "Could not resolve latest helm release, falling back to v4.3.1"
+    HELM_VERSION="v4.3.1"
+  fi
+fi
+
+if [[ "$HELM_VERSION" != v* ]]; then
+  HELM_VERSION="v${HELM_VERSION}"
+fi
+
+HELM_URL="https://get.helm.sh/helm-${HELM_VERSION}-${OS}-${ARCH}.tar.gz"
+info "Downloading helm ${HELM_VERSION} from ${HELM_URL}..."
+
+curl -sSL -f -o "${TMP_DIR}/helm.tar.gz" "$HELM_URL" || error "Failed to download helm from $HELM_URL"
+tar -xzf "${TMP_DIR}/helm.tar.gz" -C "${TMP_DIR}"
+HELM_BIN="$(find "${TMP_DIR}" -type f -name helm | head -n1)"
+[ -n "$HELM_BIN" ] || error "Could not locate helm binary in extracted archive"
+chmod +x "$HELM_BIN"
+
+$SUDO install -m 755 "$HELM_BIN" "${TARGET_DIR}/helm"
+success "helm installed to ${TARGET_DIR}/helm"
+echo -n "  Version: "
+"${TARGET_DIR}/helm" version --short 2>/dev/null || true
+echo ""
+
+# ------------------------------------------------------------------------------
+# 4. Install flux (Flux CD CLI)
 # ------------------------------------------------------------------------------
 info "Installing / Updating ${BOLD}flux${NC}..."
 
@@ -143,7 +180,7 @@ echo -n "  Version: "
 echo ""
 
 # ------------------------------------------------------------------------------
-# 4. Install k9s (Kubernetes Terminal UI)
+# 5. Install k9s (Kubernetes Terminal UI)
 # ------------------------------------------------------------------------------
 info "Installing / Updating ${BOLD}k9s${NC}..."
 
