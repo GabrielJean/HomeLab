@@ -19,12 +19,8 @@
         _docker_apps_by_host:
           Docker-2:
             - { name: traefik, online: true }
-            # - { name: heimdall, online: false }
-            - { name: pdf, online: true }
             - { name: homeassistant, online: true }
             - { name: portainer, online: true }
-            - { name: upsnap, online: true }
-            - { name: termix, online: true }
           DNS-2:
             - { name: adguardhome, online: true }
 
