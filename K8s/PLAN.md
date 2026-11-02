@@ -726,11 +726,11 @@ K8s/
 │   │   ├── homepage/
 │   │   ├── finglass/
 │   │   ├── stockbot/
-│   │   └── termix/
-│   ├── k8s-talos-1/                    # Home 1 specific workloads
+│   │   ├── termix/
 │   │   ├── gitea/
+│   │   └── discordbots/
+│   ├── k8s-talos-1/                    # Home 1 specific workloads
 │   │   ├── plexapps/                   # Sonarr, Radarr, Overseerr, Jackett
-│   │   ├── joke-de-jean/
 │   │   └── termix/
 │   └── k8s-talos-2/                    # Home 2 specific workloads
 │       ├── homeassistant/

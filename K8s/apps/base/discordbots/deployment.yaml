@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discordbots
+  namespace: discordbots
+  labels:
+    app.kubernetes.io/name: discordbots
+    app.kubernetes.io/part-of: homelab-apps
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: discordbots
+  template:
+    metadata:
+      labels:
+        app: discordbots
+    spec:
+      containers:
+        - name: jokebot
+          image: ghcr.io/gabrieljean/jokebot:1.0.0
+          env:
+            - name: JOKEBOT_DISCORD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: discordbots-secrets
+                  key: JOKEBOT_DISCORD_TOKEN
+            - name: XAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: discordbots-secrets
+                  key: XAI_API_KEY
+            - name: LOAD_REDDIT
+              value: "true"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+              subPath: jokebot
+
+        - name: musicbot
+          image: ghcr.io/gabrieljean/musicbot:1.0.0
+          env:
+            - name: MUSICBOT_DISCORD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: discordbots-secrets
+                  key: MUSICBOT_DISCORD_TOKEN
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+              subPath: musicbot
+
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: discordbots-data
+

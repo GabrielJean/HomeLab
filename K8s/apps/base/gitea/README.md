@@ -11,7 +11,7 @@ Gitea is a painless self-hosted Git service written in Go, acting as a local mir
 - **Database**: Self-contained SQLite3 (`/data/gitea/gitea.db`), providing low-overhead, zero-network-latency database operations with atomic filesystem storage.
 - **Storage**: Persistent local volume via `local-path` storage class (15Gi) mounted at `/data`, housing git repositories, SQLite database, attachments, avatars, and the container package registry.
 - **Security Context**: Runs with `fsGroup: 1000` to ensure user `git` (UID 1000 / GID 1000) maintains full write permissions across the `/data` mount.
-- **SSH Access**: Native SSH service exposed directly via host binding (`hostPort: 222` mapping to container port `22`) on the Talos Linux control-plane node (`192.168.10.15`), supporting seamless `git clone ssh://git@gitea.talos-1.gwebs.ca:222/...`.
+- **SSH Access**: Native SSH service exposed directly via host binding (`hostPort: 222` mapping to container port `22`) on the Talos Linux control-plane node (`192.168.10.15`), supporting seamless `git clone ssh://git@example.com:222/...`.
 - **Ingress & TLS**: Gateway API `HTTPRoute` attached to `traefik-gateway` in the `traefik` namespace, serving HTTPS on `gitea.${CLUSTER_DOMAIN:=talos-1}.gwebs.ca` with cluster wildcard TLS certificates.
 - **Health Probes**: Integrated startup, liveness, and readiness probes checking `/api/healthz` on port 3000.
 
