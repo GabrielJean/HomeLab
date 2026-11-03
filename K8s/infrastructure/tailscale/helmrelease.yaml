@@ -23,7 +23,7 @@ spec:
       retries: 3
   values:
     operatorConfig:
-      hostname: "talos-1-tailscale-operator"
+      hostname: "${CLUSTER_NAME:=k8s-talos-1}-tailscale-operator"
       defaultTags:
         - "tag:k8s-operator"
       logging: "info"
