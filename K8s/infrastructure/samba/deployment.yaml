@@ -25,6 +25,12 @@ spec:
       containers:
         - name: samba
           image: dockurr/samba:latest
+          command:
+            - sh
+            - -c
+            - |
+              getent group medias >/dev/null 2>&1 || groupadd -g 950 medias
+              exec /sbin/tini -- /usr/bin/samba.sh
           securityContext:
             privileged: true
           env:

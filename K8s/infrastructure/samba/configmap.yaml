@@ -27,7 +27,7 @@ data:
        browsable = yes
        guest ok = no
        valid users = gabriel
-       force group = 950
+       force group = medias
        create mask = 0660
        directory mask = 0770
 

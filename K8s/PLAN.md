@@ -921,7 +921,7 @@ Migrate stateful applications, native host storage, and media companion services
     - Migrate SQLite databases and configs from `/Apps/Sonarr` and `/Apps/Radarr` via LAN Direct Streaming into `local-path` PVCs.
     - **Atomic Hardlink Verification**: Confirm that completed torrent downloads import instantly into media libraries without duplicating disk space or copying bytes across the filesystem.
   - **Part 4: In-Cluster Samba Deployment & VM Retirement**:
-    - [x] Deploy declarative Samba container (`infrastructure/storage/samba/`) on `k8s-talos-1` with `hostNetwork: true` (listening on node IP `192.168.10.15:445`).
+    - [x] Deploy declarative Samba container (`infrastructure/samba/`) on `k8s-talos-1` with `hostNetwork: true` (listening on node IP `192.168.10.15:445`).
     - [x] Mount `vault-pv` at `/mnt/Vault` inside the container via `samba-vault-pvc`. Exposes `[Medias]` (`/mnt/Vault/Medias`, `force group = 950`) and `[Lightroom]` (`/mnt/Vault/Lightroom`, `force user = gabriel`).
     - [x] Configure authenticated credentials for user `gabriel` from Azure Key Vault (`gabriel-samba-password`) via External Secrets Operator (`samba-secrets`).
     - [ ] Update LAN DNS in AdGuard Home (`nas.lan` / `nas.gwebs.ca`) pointing to `192.168.10.15`.
