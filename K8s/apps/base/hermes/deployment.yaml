@@ -22,9 +22,28 @@ spec:
       containers:
         - name: hermes
           image: nousresearch/hermes-agent:latest
-          args:
-            - gateway
-            - run
+          command:
+            - /bin/bash
+            - -c
+            - |
+              if [ -n "$AZURE_OPENAI_ENDPOINT" ]; then
+                echo "[Hermes Init] Configuring Azure Foundry endpoint: $AZURE_OPENAI_ENDPOINT"
+                hermes config set model.provider azure-foundry || true
+                hermes config set model.base_url "$AZURE_OPENAI_ENDPOINT" || true
+                hermes config set model.default "${HERMES_MODEL:-gpt-5.6-terra}" || true
+                # Register aliases for easy switching via /model <alias>
+                hermes config set model_aliases.terra.model "gpt-5.6-terra" || true
+                hermes config set model_aliases.terra.provider "azure-foundry" || true
+                hermes config set model_aliases.sol.model "gpt-5.6-sol" || true
+                hermes config set model_aliases.sol.provider "azure-foundry" || true
+                hermes config set model_aliases.luna.model "gpt-5.6-luna" || true
+                hermes config set model_aliases.luna.provider "azure-foundry" || true
+              fi
+              if [ -n "$AZURE_OPENAI_API_KEY" ]; then
+                echo "[Hermes Init] Configuring Azure Foundry API key"
+                hermes config set AZURE_OPENAI_API_KEY "$AZURE_OPENAI_API_KEY" || true
+              fi
+              exec /opt/hermes/docker/entrypoint-dispatch.sh gateway run
           env:
             - name: HERMES_DASHBOARD
               value: "1"
@@ -50,6 +69,20 @@ spec:
               value: "1000"
             - name: HERMES_HOME
               value: "/opt/data"
+            - name: HERMES_MODEL
+              value: "gpt-5.6-terra"
+            - name: AZURE_OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-secrets
+                  key: AZURE_OPENAI_API_KEY
+                  optional: true
+            - name: AZURE_OPENAI_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-secrets
+                  key: AZURE_OPENAI_ENDPOINT
+                  optional: true
           ports:
             - containerPort: 9119
               name: http-dashboard

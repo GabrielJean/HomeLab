@@ -5,3 +5,4 @@ metadata:
   labels:
     app.kubernetes.io/name: hermes
     app.kubernetes.io/part-of: homelab-apps
+

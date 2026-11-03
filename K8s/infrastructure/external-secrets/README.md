@@ -120,6 +120,8 @@ The following secrets must exist in Azure Key Vault (`https://gjtaloskv.vault.az
 | **`k8s-app-secret`** | `headlamp-oidc` / `azure-dns-secret` | `headlamp` / `cert-manager` | **Oct 23, 2028** | Client secret for Entra ID app `e1d55ddd...` used by Headlamp backend (OIDC) and cert-manager (Azure DNS ACME solver). |
 | **`headlamp-admin-email`** | `cluster-secrets` (`OIDC_ADMIN_EMAIL`) | `flux-system` | Never | Admin email address injected dynamically into Kubernetes RBAC (`oidc-admin` ClusterRoleBinding) so personal emails never appear in Git. |
 | **`azure-subscription-id`** | `cluster-secrets` (`AZURE_SUBSCRIPTION_ID`) | `flux-system` | Never | Azure Subscription GUID where Resource Group `GJ-DNS-RG` and DNS Zone `gwebs.ca` reside, dynamically substituted into ClusterIssuers. |
+| **`hermes-azure-foundry-api-key`** | `hermes-secrets` (`AZURE_OPENAI_API_KEY`) | `hermes` | User managed | API key for Azure AI Foundry / Azure OpenAI models used by Hermes Agent. |
+| **`hermes-azure-foundry-url`** | `hermes-secrets` (`AZURE_OPENAI_ENDPOINT`) | `hermes` | User managed | Base URL / endpoint for Azure AI Foundry models used by Hermes Agent. |
 
 ---
 
