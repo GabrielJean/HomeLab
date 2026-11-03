@@ -114,6 +114,11 @@
         icon: stirling-pdf.png
         description: PDF conversion and editing tools
         siteMonitor: https://pdf.talos-1.gwebs.ca
+    - Hermes Agent:
+        href: https://hermes.talos-1.gwebs.ca
+        icon: mdi-robot
+        description: Autonomous agentic AI platform
+        siteMonitor: https://hermes.talos-1.gwebs.ca
 
 - Home 2:
     - Proxmox (PVE 2):

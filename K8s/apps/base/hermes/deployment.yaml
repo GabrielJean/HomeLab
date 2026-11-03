@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hermes
+  namespace: hermes
+  labels:
+    app.kubernetes.io/name: hermes
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: hermes
+  template:
+    metadata:
+      labels:
+        app: hermes
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: hermes
+          image: nousresearch/hermes-agent:latest
+          args:
+            - gateway
+            - run
+          env:
+            - name: HERMES_DASHBOARD
+              value: "1"
+            - name: HERMES_DASHBOARD_HOST
+              value: "0.0.0.0"
+            - name: HERMES_DASHBOARD_PORT
+              value: "9119"
+            - name: HERMES_DASHBOARD_BASIC_AUTH_USERNAME
+              value: "admin"
+            - name: HERMES_DASHBOARD_BASIC_AUTH_PASSWORD
+              value: "admin"
+            - name: HERMES_DASHBOARD_BASIC_AUTH_SECRET
+              value: "hermes-default-session-secret-change-me"
+            - name: API_SERVER_ENABLED
+              value: "true"
+            - name: API_SERVER_HOST
+              value: "0.0.0.0"
+            - name: API_SERVER_PORT
+              value: "8642"
+            - name: HERMES_UID
+              value: "1000"
+            - name: HERMES_GID
+              value: "1000"
+            - name: HERMES_HOME
+              value: "/opt/data"
+          ports:
+            - containerPort: 9119
+              name: http-dashboard
+            - containerPort: 8642
+              name: http-gateway
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http-gateway
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http-gateway
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http-gateway
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+          volumeMounts:
+            - name: data
+              mountPath: /opt/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: hermes-data

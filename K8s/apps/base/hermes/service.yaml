@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: hermes
+  namespace: hermes
+  labels:
+    app.kubernetes.io/name: hermes
+spec:
+  ports:
+    - name: http-dashboard
+      port: 9119
+      targetPort: 9119
+    - name: http-gateway
+      port: 8642
+      targetPort: 8642
+  selector:
+    app: hermes
