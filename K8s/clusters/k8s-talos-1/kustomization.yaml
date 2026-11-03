@@ -5,4 +5,5 @@ resources:
   - flux-system
   - infrastructure.yaml
   - apps.yaml
+  - samba.yaml
 

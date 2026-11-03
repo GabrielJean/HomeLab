@@ -8,7 +8,6 @@ resources:
   - headlamp
   - metrics-server
   - notifications
-  - samba
   - storage
   - system-rbac
   - tailscale
