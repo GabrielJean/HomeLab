@@ -6,6 +6,8 @@ talos:
   version: v1.14.4
 systemExtensions:
   - siderolabs/qemu-guest-agent
+  - siderolabs/nonfree-kmod-nvidia-lts
+  - siderolabs/nvidia-container-toolkit-lts
 features:
   backupConfiguration:
     interval: 1h
@@ -22,6 +24,8 @@ patches:
     file: patches/oidc-azure-ad.yaml
   - name: virtiofs-vault
     file: patches/virtiofs-vault.yaml
+  - name: nvidia
+    file: patches/nvidia.yaml
 ---
 kind: ControlPlane
 machineClass:
