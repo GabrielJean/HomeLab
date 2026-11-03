@@ -20,6 +20,8 @@ patches:
     file: patches/service-account-issuer-talos-1.yaml
   - name: oidc-auth
     file: patches/oidc-azure-ad.yaml
+  - name: virtiofs-vault
+    file: patches/virtiofs-vault.yaml
 ---
 kind: ControlPlane
 machineClass:

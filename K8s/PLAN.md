@@ -114,15 +114,18 @@ flowchart LR
 - [ ] **DNS Cutover**: Switch local DNS records in AdGuard Home to cluster IPs.
 
 ### Phase 5: Stateful & Media Workloads (Pending)
-- [ ] **SMB CSI Driver**: Install and validate SMB CSI driver mounting `//192.168.10.12/Medias`.
+- [ ] **VirtioFS Storage on talos-1**: Attach Proxmox VirtioFS Directory Mapping `Vault` (`/mnt/Vault`) to VM `talos-1` and apply Talos `ExternalVolumeConfig` machine patch for native ZFS pool access (`/var/mnt/vault`) with declarative `ReadWriteMany` PV/PVC.
+- [ ] **In-Cluster Samba Service**: Deploy declarative Samba container on `k8s-talos-1` with `hostPort: 445`, mounting VirtioFS volume at `/mnt/Vault` using existing `etc/samba/smb.conf` and Azure Key Vault credentials via ESO, enabling complete decommissioning of the Ubuntu VM.
 - [x] **Developer Stack**: Migrate Gitea with SQLite3 and Local Path persistent storage on `k8s-talos-1`.
 - [ ] **Observability Stack**: Deploy lightweight collector (`vmagent`) with Azure Managed Prometheus remote-write, Entra ID OAuth2 authentication, metric ingestion optimizations (<$0.50/mo), and self-hosted Grafana on `k8s-talos-1`.
-- [ ] **Media Companion Stack**: Migrate Radarr, Sonarr, Overseerr, Jackett, and FlareSolverr.
+- [ ] **Media Companion Stack (Part 1 - Stateless/Config Only)**: Migrate Overseerr, Prowlarr/Jackett, and FlareSolverr via LAN Direct Streaming into `local-path` PVCs with Gateway API routing.
+- [ ] **VPN & Download Stack**: Deploy Gluetun VPN container with qBittorrent sidecar mounting `medias-pv` (`/medias/downloads`, UID 950:950) with verified kill-switch and direct ZFS write performance.
+- [ ] **Media Companion Stack (Part 2 - Media Managers)**: Migrate Sonarr and Radarr via LAN Direct Streaming into `local-path` PVCs, mount `medias-pv` (`/medias`, UID 950:950), and validate instant atomic hardlinking from downloads to library datasets.
+- [ ] **OneDrive Rclone Sync CronJob**: Deploy scheduled rclone sync CronJob mounting `vault-pv` (`/mnt/Vault/OneDrive`, UID 1000:1000) with credentials managed via External Secrets Operator.
 
 ### Phase 6: Edge & Hardware-Bound Workloads (Pending)
-- [ ] **Plex Media Server**: Add NVIDIA extensions (`siderolabs/nonfree-kmod-nvidia-lts`, `siderolabs/nvidia-container-toolkit-lts`) and configure GPU passthrough on `talos-1`.
+- [ ] **Plex Media Server**: Add NVIDIA extensions (`siderolabs/nonfree-kmod-nvidia-lts`, `siderolabs/nvidia-container-toolkit-lts`), configure GPU passthrough on `talos-1`, and mount `medias-pvc` via VirtioFS for 4K direct stream and NVENC transcode validation.
 - [ ] **Home Assistant**: Deploy on `talos-2` with host networking and Zigbee coordinator integration.
-- [ ] **VPN / Torrent Clients**: Deploy Gluetun VPN container with qBittorrent sidecar and kill-switch verification.
 
 ---
 
@@ -143,11 +146,14 @@ The architecture establishes **one single-node cluster in each home**, providing
 ## Current Environment Summary
 
 - **Physical Sites**:
-  - **Home 1 (`pve-1`)**: Hosts the primary VM infrastructure including `Docker-1` (Traefik, Plex companion apps, Gitea, WebUI, utilities), `DNS-1` (AdGuard Home), `Plex-1` (media server with GPU), `Gaming-1`, and the dedicated NAS host (`pve-nas`).
+  - **Home 1 (`pve-1`)**: Hosts the primary VM infrastructure including `Docker-1` (Traefik, Plex companion apps, WebUI, utilities), `DNS-1` (AdGuard Home), `Plex-1` (media server with GPU), `Gaming-1`, and native Proxmox ZFS storage pool (eliminating dedicated storage VMs).
   - **Home 2 (`pve-2`)**: Hosts secondary VM infrastructure including `Docker-2` (Traefik, Home Assistant, PDF, utilities) and `DNS-2` (AdGuard Home).
 - **Inter-Site Networking**: Tailscale site-to-site routers bridge the subnets between homes.
 - **Application State**: Workloads currently use host-local `/Apps/...` bind mounts.
-- **Shared Storage**: Media is shared from the Home 1 NAS SMB share at `//192.168.10.12/Medias`.
+- **Storage Architecture**:
+  - The primary storage pool runs on **native Proxmox ZFS** on `pve-1`.
+  - Storage is shared directly into the **`talos-1` VM** via **Talos native VirtioFS** (`ExternalVolumeConfig` over hypervisor shared memory), eliminating network bottlenecks and enabling instant atomic hardlinks for the media/torrent stack.
+  - An **in-cluster Samba container** on `k8s-talos-1` mounts the VirtioFS volume and binds to port 445 on node IP `192.168.10.15` to serve SMB shares across the LAN (replacing the dedicated Ubuntu/NAS VM entirely).
 - **Ingress & TLS**: Traefik currently acts as reverse proxy, handling Let's Encrypt DNS-01 challenges via Azure DNS.
 - **Identity & Secrets**: Microsoft Entra ID provides identity, and Azure Key Vault holds sensitive configuration.
 
@@ -183,7 +189,7 @@ Rather than stretching a single Kubernetes cluster across two residential WAN li
     |  - Flux CD           |                   |  - Flux CD           |
     |  - Headlamp          |                   |  - Headlamp          |
     |  - Local Storage     |                   |  - Local Storage     |
-    |  - SMB CSI (NAS)     |                   |  - Local Services    |
+    |  - VirtioFS (ZFS)    |                   |  - Local Services    |
     +----------------------+                   +----------------------+
                ^                                           ^
                |                                           |
@@ -341,7 +347,7 @@ flowchart TD
     subgraph GitOps_Flux["Flux CD (In-Cluster GitOps)"]
         FLUX_INFRA["Infrastructure: Ingress, cert-manager, ESO"]
         FLUX_APPS["Applications: HelmReleases & Manifests"]
-        FLUX_STORE["Storage: Local Path & SMB CSI"]
+        FLUX_STORE["Storage: Local Path & VirtioFS PV/PVC"]
         FLUX_MON["Monitoring: vmagent & Grafana"]
     end
 
@@ -606,16 +612,74 @@ A hybrid approach secures secrets without storing plaintext credentials in Git:
 
 ## Storage And Backup
 
-### Storage Classes
+### Storage Architecture & Volume Providers
 
-Because each home runs a single-node cluster, storage architecture is clean, high-performance, and immune to distributed locking issues:
+Because each home runs a single-node cluster on Proxmox VE, storage architecture is clean, high-performance, and immune to distributed locking issues:
 
 | Storage Type | Purpose | Implementation | Provisioner Behavior |
 | --- | --- | --- | --- |
-| **Node-Local PVCs** | Databases, app configuration, SQLite files, logs | **Local Path Provisioner** (or OpenEBS LocalPV) | Dynamically provisions volumes backed by the VM's high-speed virtual disk. Zero network storage latency. |
+| **Node-Local PVCs** | Databases, app configuration, SQLite files, logs | **Local Path Provisioner** | Dynamically provisions volumes backed by the VM's virtual disk (`/var/mnt/local-path-provisioner`). Zero network storage latency. |
+| **Native Host ZFS (Vault Pool)** | Bulk media (`/Medias`), Lightroom, torrent downloads, Plex libraries | **VirtioFS (`ExternalVolumeConfig`)** | Directly mounts Proxmox host ZFS mapping `Vault` (`/mnt/Vault`) into `talos-1` at `/var/mnt/vault`. Exposed to Kubernetes via declarative `ReadWriteMany` PV/PVC. |
 | **Volume Replication** | Asynchronous cross-cluster & offsite PVC sync | **VolSync Operator** (`volsync.backube`) | Declarative CRDs (`ReplicationSource` / `ReplicationDestination`) replicating PVCs via Restic to Azure Blob. |
-| **Shared SMB Storage** | Bulk media (`//192.168.10.12/Medias`), shared archives | **SMB CSI Driver** | Mounts NAS shares directly into pods. Used primarily in Home 1. |
+| **LAN SMB Shares** | Desktop file access (Windows, Mac, mobile, TVs) | **In-Cluster Samba Container** | Runs on `k8s-talos-1` with `hostPort: 445`, mounting VirtioFS volume and serving SMB shares directly across the physical LAN. |
 | **Offsite Backup** | Encrypted recovery archives | **Azure Blob Storage / PBS** | Scheduled object/VM backups for offsite disaster recovery. |
+
+### Native Proxmox ZFS & VirtioFS Integration on `talos-1`
+
+Migrating the primary storage pool directly onto native Proxmox ZFS on `pve-1` and running Samba as a containerized workload eliminates the need for any dedicated storage VMs:
+
+```text
+       +-------------------------------------------------------------+
+       |               Proxmox VE Host (pve-1)                       |
+       |  Directory Mapping: ID "Vault" -> Path "/mnt/Vault"         |
+       |  Datasets: /mnt/Vault/Medias, /mnt/Vault/Lightroom, etc.    |
+       +------------------------------+------------------------------+
+                                      |
+                                      | Shared Memory (vhost-user-fs, tag: vault)
+                                      v
+       +-------------------------------------------------------------+
+       |                      talos-1 (VM)                           |
+       |               VirtioFS Mount: /var/mnt/vault                |
+       |                                                             |
+       |  +-------------------------------------------------------+  |
+       |  |          Kubernetes ReadWriteMany PV/PVC (vault)      |  |
+       |  +---------------------------+---------------------------+  |
+       |                              |                              |
+       |         +--------------------+--------------------+         |
+       |         v                                         v         |
+       |   +-----------------------+             +-----------------+ |
+       |   | Media Workloads       |             | Samba Server Pod| |
+       |   | - qBittorrent / VPN   |             | (Image: samba)  | |
+       |   | - Sonarr & Radarr     |             | - hostPort: 445 | |
+       |   | - Plex Media Server   |             | - Azure KV Auth | |
+       |   +-----------------------+             +--------+--------+ |
+       +--------------------------------------------------|----------+
+                                                          | TCP :445
+                                                          | (192.168.10.15)
+                                                          v
+                                                 +-------------------+
+                                                 |  LAN SMB Clients  |
+                                                 |  - Windows / Mac  |
+                                                 |  - Laptops/Mobile |
+                                                 |  - Smart TVs      |
+                                                 +-------------------+
+```
+
+#### Why Direct VirtioFS + In-Cluster Samba Outperforms an SMB VM:
+1. **Instant Atomic Hardlinks**:
+   - The media automation workflow (qBittorrent -> Sonarr/Radarr -> Plex) depends heavily on atomic file hardlinks. When a 50 GB 4K download finishes, Sonarr/Radarr links the file into the TV/Movie library instantly without duplicating disk space or copying bytes.
+   - Over SMB/CIFS, cross-share or cross-directory hardlinks frequently fail or require complex CIFS Unix extensions, forcing slow, duplicate 50 GB file copies.
+   - Over VirtioFS, Linux POSIX filesystem semantics are fully preserved directly down to the host ZFS dataset. Hardlinks work atomically in sub-millisecond time.
+2. **Hypervisor Memory-Speed Throughput**:
+   - VirtioFS uses `vhost-user-fs` shared memory regions between the Proxmox host and the guest kernel. Data transfers at memory bus / NVMe speeds without passing through virtual network interfaces, TCP network stacks, or intermediary VMs.
+3. **Zero Dedicated Storage VM Overhead**:
+   - Running Samba in a container on `k8s-talos-1` eliminates the need for an Ubuntu VM entirely. This recovers 2–4 GB of host RAM, vCPU cycles, and virtual disk storage on `pve-1`.
+   - Eliminates Ubuntu OS maintenance, kernel updates, patching, and separate PBS backup jobs for a NAS VM disk.
+4. **GitOps & Secret Management for Samba**:
+   - Samba shares (`[Medias]`, `[Lightroom]`), permissions, and users are managed declaratively in Git via Flux CD.
+   - Passwords and credentials are kept out of Git, stored in Azure Key Vault, and synced automatically via the **External Secrets Operator**.
+5. **Zero Third-Party CSI Driver Overhead**:
+   - Eliminates the requirement to deploy and maintain the `csi-smb-driver` controller and daemonset in Kubernetes. Workloads bind to standard, declarative Kubernetes `PersistentVolume` and `PersistentVolumeClaim` resources.
 
 ### Backup Strategy & Disaster Recovery
 
@@ -714,7 +778,7 @@ K8s/
 │   ├── ingress/                        # Traefik Ingress Controller HelmRelease
 │   ├── cert-manager/                   # ACME cert-manager & Azure DNS solver
 │   ├── external-secrets/               # External Secrets Operator & Azure Key Vault Store
-│   ├── storage/                        # Local Path Provisioner, VolSync Operator & SMB CSI
+│   ├── storage/                        # Local Path Provisioner, VolSync Operator & VirtioFS Medias PV/PVC
 │   ├── headlamp/                       # Headlamp web dashboard
 │   ├── metrics-server/                 # In-cluster metrics API (HPA & Headlamp live graphs)
 │   └── monitoring/                     # vmagent (Azure remote-write) & self-hosted Grafana
@@ -741,7 +805,8 @@ K8s/
 │   │   ├── k8s-talos-1.yaml            # Omni template for Home 1 cluster
 │   │   └── k8s-talos-2.yaml            # Omni template for Home 2 cluster
 │   └── patches/
-│       └── allow-controlplane.yaml     # Machine patch to allow scheduling on CP
+│       ├── allow-controlplane.yaml     # Machine patch to allow scheduling on CP
+│       └── virtiofs-medias.yaml        # Machine patch to mount host ZFS pool via virtiofs
 │
 └── platform/                           # Shared RBAC, namespaces, and security policies
     ├── namespaces/
@@ -779,7 +844,7 @@ K8s/
 5. **Flux CD Bootstrap**: Run `kubectl apply -k K8s/clusters/k8s-talos-1`.
 6. **Deploy Platform Services via Flux**:
    - Traefik Ingress Controller (with `hostPort: 80/443`).
-   - Local Path Provisioner and SMB CSI driver.
+   - Local Path Provisioner (default StorageClass).
    - cert-manager with Azure DNS solver.
    - External Secrets Operator connected to Azure Key Vault.
    - Headlamp dashboard with Entra ID OIDC authentication.
@@ -822,9 +887,14 @@ Migrate stateless and low-risk web services from Docker Compose to Kubernetes:
   4. Perform DNS cutover in AdGuard Home / Azure DNS from the old Docker host to the cluster LAN IP.
   5. Decommission the corresponding Docker Compose container in Ansible playbooks.
 
-### Phase 5: Stateful & Media Workloads
+### Phase 5: Stateful & Media Workloads (VirtioFS & Arr Stack)
 
-Migrate stateful applications and media companion services on `k8s-talos-1`:
+Migrate stateful applications, native host storage, and media companion services on `k8s-talos-1`:
+- **VirtioFS Storage Integration on `talos-1`**:
+  - **Proxmox VM Hardware**: Enable NUMA memory sharing on the `talos-1` VM (`qm set <vmid> -numa 1`) and add VirtioFS directory sharing device selecting Directory Mapping `Vault` (`/mnt/Vault`, tag: `vault`).
+  - **Talos Machine Config**: Create and apply `K8s/Omni/clusters/patches/virtiofs-vault.yaml` using `kind: ExternalVolumeConfig` (`filesystemType: virtiofs`, `tag: vault`). Talos mounts the share at `/var/mnt/vault`.
+  - **Kubernetes PV/PVC**: Deploy declarative `PersistentVolume` (`vault-pv`) and `PersistentVolumeClaim` (`vault-pvc`) with `accessModes: [ReadWriteMany]` under `infrastructure/storage/vault/`.
+  - **Storage Verification**: Launch an ephemeral test pod to verify read/write access to both `/storage/Medias` and `/storage/Lightroom` and confirm created files reflect directly on the Proxmox ZFS host with expected permissions.
 - **Observability Stack (Azure Managed Prometheus & Self-Hosted Grafana)**:
   - Create Azure Monitor Workspace and Entra ID App Registration with `Monitoring Metrics Publisher` and `Monitoring Data Reader` roles.
   - Store Service Principal credentials in Azure Key Vault and synchronize via External Secrets Operator to `monitoring/azure-prom-auth`.
@@ -832,20 +902,40 @@ Migrate stateful applications and media companion services on `k8s-talos-1`:
   - Configure outbound HTTPS Remote Write to Azure Monitor Workspace with `external_labels` (`cluster: home-1` / `cluster: home-2`).
   - Apply cost-saving ingestion filters (60s scrape intervals, drop `*_bucket` histograms and `go_*` runtime series) to guarantee <$0.50/month total cost.
   - Deploy self-hosted Grafana on `k8s-talos-1` with Azure Monitor datasource, Entra ID SSO, and multi-cluster dashboards.
-- **Developer Stack**: Gitea with SQLite3.
-  - Deploy single-replica Gitea with SQLite3 database on `local-path` persistent storage (15Gi) on `k8s-talos-1`.
-  - Expose HTTP service via Gateway API HTTPRoute on `gitea.talos-1.gwebs.ca` with cluster wildcard TLS.
-  - Expose SSH service directly via `hostPort: 222` on Talos Linux control-plane node (`192.168.10.15`).
-- **Media Companion Stack**: Overseerr, Radarr, Sonarr, Jackett, FlareSolverr.
-  - Mount NAS SMB share via SMB CSI (`//192.168.10.12/Medias`).
-  - Verify UID/GID permissions, directory write access, hardlink/rename support, and API integrations.
+- **Developer Stack (Complete)**: Gitea with SQLite3.
+  - Deployed single-replica Gitea with SQLite3 database on `local-path` persistent storage (15Gi) on `k8s-talos-1`.
+  - Exposed HTTP service via Gateway API HTTPRoute on `gitea.talos-1.gwebs.ca` with cluster wildcard TLS.
+  - Exposed SSH service directly via `hostPort: 222` on Talos Linux control-plane node (`192.168.10.15`).
+- **Media Companion Stack Migration Roadmap**:
+  - **Part 1: Non-Media Arr Companions** (Overseerr, Prowlarr/Jackett, FlareSolverr):
+    - Migrate configs from `/Apps/...` on `Docker-1` to `local-path` PVCs using LAN Direct Streaming.
+    - Wire up Traefik Gateway API routes (`overseerr.talos-1.gwebs.ca`, `prowlarr.talos-1.gwebs.ca`).
+    - Verify interconnectivity between Overseerr and indexers before introducing download managers.
+  - **Part 2: VPN & Download Stack** (Gluetun + qBittorrent):
+    - Deploy Gluetun VPN container with qBittorrent sidecar in Kubernetes (`apps/base/qbittorrent/`).
+    - Mount `medias-pv` at `/medias` (mapping downloads to `/medias/downloads`), configured with `securityContext: { runAsUser: 950, runAsGroup: 950, fsGroup: 950 }` to strictly match host directory ownership (`950:950 drwxrws---`).
+    - Migrate `/Apps/qbittorrent` config via LAN Direct Streaming into `local-path` PVC.
+    - Verify VPN kill-switch and test multi-gigabit download write speeds to the native ZFS dataset.
+  - **Part 3: Media Automators & Atomic Hardlinks** (Sonarr & Radarr):
+    - Deploy Sonarr and Radarr mounting `medias-pv` at `/medias` (accessing `/medias/downloads` and library paths `/medias/tv`, `/medias/movies`), running as `950:950`.
+    - Migrate SQLite databases and configs from `/Apps/Sonarr` and `/Apps/Radarr` via LAN Direct Streaming into `local-path` PVCs.
+    - **Atomic Hardlink Verification**: Confirm that completed torrent downloads import instantly into media libraries without duplicating disk space or copying bytes across the filesystem.
+  - **Part 4: In-Cluster Samba Deployment & VM Retirement**:
+    - Deploy declarative Samba container (`apps/base/samba/`) on `k8s-talos-1` with `hostPort: 445` (listening on node IP `192.168.10.15`).
+    - Mount `vault-pv` at `/mnt/Vault` inside the container. Because the mount matches the host path, the existing [`etc/samba/smb.conf`](file:///home/gabriel/HomeLab/etc/samba/smb.conf) paths (`path=/mnt/Vault/Medias` and `path=/mnt/Vault/Lightroom`) work **100% as-is without any modifications**.
+    - Configure credentials and user accounts from Azure Key Vault via External Secrets Operator.
+    - Update LAN DNS in AdGuard Home (`nas.lan` / `nas.gwebs.ca`) pointing to `192.168.10.15`.
+    - Validate SMB read/write from desktop clients (Windows/Mac).
+    - Stop, archive, and delete the legacy Ubuntu VM from Proxmox VE, recovering host RAM, CPU, and disk storage.
+  - **Part 5: OneDrive Rclone Sync CronJob**:
+    - Deploy a scheduled Kubernetes `CronJob` (`apps/base/rclone-onedrive/`) mounting `vault-pv` (subPath: `OneDrive`) with `runAsUser: 1000, runAsGroup: 1000` matching host ownership (`1000:1000 drwxrwx---`).
+    - Synchronize remote OneDrive to `/mnt/Vault/OneDrive` using Microsoft Graph API / OAuth2 credentials synchronized from Azure Key Vault via External Secrets Operator.
 
 ### Phase 6: Edge & Hardware-Bound Workloads
 
 Evaluate and migrate remaining complex workloads:
-- **Plex**: Requires NVIDIA GPU passthrough configuration in the Talos machine config and SMB media mounts.
+- **Plex Media Server**: Add NVIDIA extensions (`siderolabs/nonfree-kmod-nvidia-lts`, `siderolabs/nvidia-container-toolkit-lts`), configure GPU passthrough on `talos-1`, mount `medias-pv` (`/medias`, UID `950:950`) via VirtioFS for library access, and migrate `/Apps/Plex` config to `local-path` storage.
 - **Home Assistant** (Home 2): Requires USB Zigbee stick passthrough (or network-attached Zigbee coordinator) and host networking configuration.
-- **VPN / Torrent Clients**: (Gluetun + qBittorrent) Requires TUN device creation, `NET_ADMIN` capabilities, and kill-switch verification.
 
 ---
 
@@ -1000,7 +1090,8 @@ The migration of each phase will be deemed complete once all of the following cr
 5. **Storage & Disaster Recovery**:
    - Local Path Provisioner dynamically provisions node-local volumes.
    - Pod restart retains all SQLite and configuration data.
-   - SMB CSI successfully mounts `//192.168.10.12/Medias` with expected read/write permissions.
+   - VirtioFS successfully mounts native Proxmox ZFS dataset on `talos-1` (`/var/mnt/vault`), bound to Kubernetes `ReadWriteMany` PV/PVC.
+   - Instant atomic hardlinks verified across download and library directories on ZFS without file duplication.
    - VolSync successfully captures volume snapshots to Azure Blob Storage and replicates state between clusters.
 6. **Operations & Observability**:
    - Headlamp web UI is reachable via HTTPS and secured by Entra ID OIDC.
@@ -1023,11 +1114,12 @@ The migration of each phase will be deemed complete once all of the following cr
 - **TLS Certificates**: cert-manager with Azure DNS DNS-01 ACME challenges and wildcard certificates per cluster (`*.talos-1.gwebs.ca` and `*.talos-2.gwebs.ca`).
 - **Disaster Recovery & Replication**: VolSync with Restic (`copyMethod: Direct`) replicating and backing up `local-path` PVCs to Azure Blob Storage (`gjtalossa`) for cross-cluster failover and disaster recovery, combined with Flux GitOps as the authoritative source of truth for cluster state.
 - **Secrets**: Azure Key Vault + External Secrets Operator + SOPS.
-- **Storage**: Local Path Provisioner (local PVCs) + SMB CSI Driver (NAS shares).
+- **Storage**: Local Path Provisioner (local PVCs for configs/databases) + Native Proxmox ZFS via Talos VirtioFS External Volumes + In-Cluster Samba Container on `k8s-talos-1` (LAN SMB file sharing for desktops/clients, zero dedicated storage VMs).
 - **Observability & Metrics**: Azure Managed Prometheus (Azure Monitor Workspace) via outbound HTTPS Prometheus Remote Write (zero Azure Arc overhead) paired with Self-Hosted Grafana on `k8s-talos-1` (avoiding the ~$42/mo Azure Managed Grafana cost). Monthly ingestion costs capped (<$0.50/month) via 60-second scrape intervals and dropping high-cardinality Go/histogram metrics.
 - **DNS & Ingress Isolation**: Strict separation of hostnames per cluster (`<app>.talos-1.gwebs.ca` vs `<app>.talos-2.gwebs.ca`) using Flux `postBuild.substitute` (`CLUSTER_NAME`) to prevent cross-cluster routing confusion and duplicate TLS certificate requests.
 
 ### Remaining Implementation Choices to Confirm:
-- **Local Storage Provisioner**: Rancher Local Path Provisioner vs. OpenEBS LocalPV hostpath (Local Path Provisioner is recommended for maximum simplicity).
-- **Proxmox VM Sizing**: Allocate initial vCPU, RAM, and disk sizes for the `talos-1` and `talos-2` VMs (Recommended: 4 vCPU, 8-16 GB RAM, 60-100 GB SSD disk per VM).
-- **Static IP Allocations**: Specific IP addresses on Home 1 LAN and Home 2 LAN for the nodes `talos-1` and `talos-2`.
+- **Proxmox VirtioFS Configuration**: Confirm NUMA shared memory setting (`qm set <vmid> -numa 1`) and mount tag (`vault`) on `talos-1` VM in Proxmox VE.
+- **Media Dataset Directory Structure**: Confirm unified dataset layout (e.g., `/medias/downloads`, `/medias/tv`, `/medias/movies`) on Proxmox ZFS so torrent downloads and media libraries reside on the same filesystem for instant atomic hardlinking.
+- **VPN Provider Credentials for Gluetun**: Verify PIA WireGuard credentials in Azure Key Vault for the containerized download stack.
+- **Plex NVIDIA Passthrough on Talos**: Verify PCI ID for GPU passthrough to `talos-1` VM and test `siderolabs/nonfree-kmod-nvidia-lts` system extension.
