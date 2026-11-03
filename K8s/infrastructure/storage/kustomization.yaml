@@ -5,4 +5,5 @@ resources:
   - local-path
   - volsync
   - vault
+  - samba
 

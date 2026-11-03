@@ -16,6 +16,7 @@ spec:
     substitute:
       CLUSTER_NAME: k8s-talos-1
       CLUSTER_DOMAIN: talos-1
+      SAMBA_REPLICAS: "1"
     substituteFrom:
       - kind: Secret
         name: cluster-secrets

@@ -921,12 +921,12 @@ Migrate stateful applications, native host storage, and media companion services
     - Migrate SQLite databases and configs from `/Apps/Sonarr` and `/Apps/Radarr` via LAN Direct Streaming into `local-path` PVCs.
     - **Atomic Hardlink Verification**: Confirm that completed torrent downloads import instantly into media libraries without duplicating disk space or copying bytes across the filesystem.
   - **Part 4: In-Cluster Samba Deployment & VM Retirement**:
-    - Deploy declarative Samba container (`apps/base/samba/`) on `k8s-talos-1` with `hostPort: 445` (listening on node IP `192.168.10.15`).
-    - Mount `vault-pv` at `/mnt/Vault` inside the container. Because the mount matches the host path, the existing [`etc/samba/smb.conf`](file:///home/gabriel/HomeLab/etc/samba/smb.conf) paths (`path=/mnt/Vault/Medias` and `path=/mnt/Vault/Lightroom`) work **100% as-is without any modifications**.
-    - Configure credentials and user accounts from Azure Key Vault via External Secrets Operator.
-    - Update LAN DNS in AdGuard Home (`nas.lan` / `nas.gwebs.ca`) pointing to `192.168.10.15`.
-    - Validate SMB read/write from desktop clients (Windows/Mac).
-    - Stop, archive, and delete the legacy Ubuntu VM from Proxmox VE, recovering host RAM, CPU, and disk storage.
+    - [x] Deploy declarative Samba container (`infrastructure/storage/samba/`) on `k8s-talos-1` with `hostNetwork: true` (listening on node IP `192.168.10.15:445`).
+    - [x] Mount `vault-pv` at `/mnt/Vault` inside the container via `samba-vault-pvc`. Exposes `[Medias]` (`/mnt/Vault/Medias`, `force group = 950`) and `[Lightroom]` (`/mnt/Vault/Lightroom`, `force user = gabriel`).
+    - [x] Configure authenticated credentials for user `gabriel` from Azure Key Vault (`gabriel-samba-password`) via External Secrets Operator (`samba-secrets`).
+    - [ ] Update LAN DNS in AdGuard Home (`nas.lan` / `nas.gwebs.ca`) pointing to `192.168.10.15`.
+    - [ ] Validate SMB read/write from desktop clients (Windows/Mac).
+    - [ ] Stop, archive, and delete the legacy Ubuntu VM from Proxmox VE, recovering host RAM, CPU, and disk storage.
   - **Part 5: OneDrive Rclone Sync CronJob**:
     - Deploy a scheduled Kubernetes `CronJob` (`apps/base/rclone-onedrive/`) mounting `vault-pv` (subPath: `OneDrive`) with `runAsUser: 1000, runAsGroup: 1000` matching host ownership (`1000:1000 drwxrwx---`).
     - Synchronize remote OneDrive to `/mnt/Vault/OneDrive` using Microsoft Graph API / OAuth2 credentials synchronized from Azure Key Vault via External Secrets Operator.

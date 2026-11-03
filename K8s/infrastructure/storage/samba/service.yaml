@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: samba
+  namespace: samba
+  labels:
+    app.kubernetes.io/name: samba
+    app.kubernetes.io/part-of: homelab-storage
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: samba
+  ports:
+    - name: smb
+      port: 445
+      targetPort: 445
+      protocol: TCP

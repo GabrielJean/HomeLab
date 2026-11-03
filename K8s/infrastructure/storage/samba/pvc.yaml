@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: samba-vault-pvc
+  namespace: samba
+  labels:
+    app.kubernetes.io/name: samba
+    app.kubernetes.io/part-of: homelab-storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: vault-storage
+  volumeName: vault-pv
+  resources:
+    requests:
+      storage: 10Ti

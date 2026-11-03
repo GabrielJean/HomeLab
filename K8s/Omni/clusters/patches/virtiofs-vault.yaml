@@ -1,5 +1,5 @@
 # Mounts native Proxmox ZFS pool into talos-1 via virtiofs.
-# Hypervisor device must be configured on VM with tag: vault
+# Hypervisor device is configured on VM with tag: Vault
 # Filesystem is automatically mounted by Talos at /var/mnt/vault
 apiVersion: v1alpha1
 kind: ExternalVolumeConfig
@@ -7,5 +7,4 @@ name: vault
 filesystemType: virtiofs
 mount:
   virtiofs:
-    tag: vault
-
+    tag: Vault
