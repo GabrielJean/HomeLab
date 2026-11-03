@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tailscale
+  labels:
+    app.kubernetes.io/name: tailscale
+    app.kubernetes.io/part-of: homelab-infrastructure
+
