@@ -7,6 +7,14 @@ resources:
   - namespace.yaml
   - external-secret.yaml
   - pvc.yaml
-  - configmap.yaml
   - service.yaml
   - deployment.yaml
+
+configMapGenerator:
+  - name: samba-config
+    files:
+      - configs/smb.conf
+    options:
+      labels:
+        app.kubernetes.io/name: samba
+        app.kubernetes.io/part-of: homelab-storage
