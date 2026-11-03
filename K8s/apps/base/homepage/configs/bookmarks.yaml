@@ -12,4 +12,8 @@
         - icon: talos.png
           href: https://gwebs.na-west-2.omni.siderolabs.io
           description: Talos Linux cluster management
+    - Tailscale:
+        - icon: tailscale.png
+          href: https://console.tailscale.com/admin/machines
+          description: Mesh VPN & Tailnet Machines
 
