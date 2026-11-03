@@ -105,8 +105,8 @@ flowchart LR
 
 ### Phase 4: Lower-Risk Application Migration (In Progress)
 - [x] **Stirling-PDF**: Deploy PDF manipulation suite with Local Path PVC and TLS Gateway route on `k8s-talos-1`.
-- [x] **FinGlass / StockBot**: Financial tracking and alerting tools.
-- [ ] **Joke de Jean**: Fun web tools.
+- [x] **FinGlass / StockBot**: Financial tracking and alerting tools migrated to `local-path` persistent storage.
+- [x] **Discord Bots (JokeBot & MusicBot)**: Multi-container deployment replacing legacy `joke-de-jean`.
 - [x] **Termix**: Web-based SSH terminal with VolSync cross-cluster replication (Active on `k8s-talos-1`, Warm Standby on `k8s-talos-2`).
 - [x] **Homepage**: Single unified multi-home dashboard running statelessly on `k8s-talos-1` and `k8s-talos-2`.
 - [x] **UpSnap**: Independent multi-cluster Wake-on-LAN instances running with host networking and `NET_RAW` capability on both `k8s-talos-1` and `k8s-talos-2`.
