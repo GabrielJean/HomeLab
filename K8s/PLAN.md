@@ -32,6 +32,7 @@
   - [Phase 4: Lower-Risk Application Migration](#phase-4-lower-risk-application-migration)
   - [Phase 5: Stateful & Media Workloads](#phase-5-stateful--media-workloads)
   - [Phase 6: Edge & Hardware-Bound Workloads](#phase-6-edge--hardware-bound-workloads)
+  - [Phase 7: Observability Stack](#phase-7-observability-stack)
 - [Stateful Application Data Migration Runbook (LAN Direct Streaming)](#stateful-application-data-migration-runbook-lan-direct-streaming)
 - [Workloads Remaining Outside Kubernetes Initially](#workloads-remaining-outside-kubernetes-initially)
 - [Validation And Exit Criteria](#validation-and-exit-criteria)
@@ -43,7 +44,7 @@
 
 > [!NOTE]
 > **Active Branch**: `main`
-> **Overall Progress**: **Phase 0, 1, 2, 3 & 4 Complete (100%)** | **Phase 5 & 6 In Progress**
+> **Overall Progress**: **Phase 0, 1, 2, 3 & 4 Complete (100%)** | **Phase 5 In Progress** | **Phase 6 & 7 Pending**
 
 ```mermaid
 flowchart LR
@@ -52,12 +53,14 @@ flowchart LR
     P2 --> P3["Phase 3: TLS & Backups<br/>(Complete)"]
     P3 --> P4["Phase 4: Web Apps<br/>(Complete)"]
     P4 --> P5["Phase 5: Media & Storage<br/>(In Progress)"]
-    P5 --> P6["Phase 6: GPU & Edge<br/>(In Progress)"]
+    P5 --> P6["Phase 6: Edge & Hardware<br/>(Pending)"]
+    P6 --> P7["Phase 7: Observability<br/>(Pending)"]
     classDef done fill:#2e7d32,stroke:#1b5e20,color:#ffffff;
     classDef inprog fill:#f57f17,stroke:#e65100,color:#ffffff;
     classDef todo fill:#424242,stroke:#212121,color:#ffffff;
     class P0,P1,P2,P3,P4 done;
-    class P5,P6 inprog;
+    class P5 inprog;
+    class P6,P7 todo;
 ```
 
 ### Phase 0: Prerequisites & Automation
@@ -115,15 +118,17 @@ flowchart LR
 - [x] **VirtioFS Storage on talos-1**: Attach Proxmox VirtioFS Directory Mapping `Vault` (`/mnt/Vault`) to VM `talos-1` and apply Talos `ExternalVolumeConfig` machine patch for native ZFS pool access (`/var/mnt/vault`) with declarative `ReadWriteMany` PV/PVC.
 - [x] **In-Cluster Samba Service**: Deploy declarative Samba container on `k8s-talos-1` with `hostPort: 445`, mounting VirtioFS volume at `/mnt/Vault` using existing `etc/samba/smb.conf` and Azure Key Vault credentials via ESO, enabling complete decommissioning of the Ubuntu VM.
 - [x] **Developer Stack**: Migrate Gitea with SQLite3 and Hermes AI agent gateway with Local Path persistent storage on `k8s-talos-1`.
-- [ ] **Observability Stack**: Deploy lightweight collector (`vmagent`) with Azure Managed Prometheus remote-write, Entra ID OAuth2 authentication, metric ingestion optimizations (<$0.50/mo), and self-hosted Grafana on `k8s-talos-1`.
 - [x] **Media Companion Stack (Part 1 - Stateless/Config Only)**: Migrate Overseerr, Prowlarr/Jackett, and FlareSolverr via LAN Direct Streaming into `local-path` PVCs with Gateway API routing.
 - [x] **VPN & Download Stack**: Deploy Gluetun VPN container with qBittorrent sidecar mounting `medias-pv` (`/medias/downloads`, UID 950:950) with verified kill-switch and direct ZFS write performance.
 - [x] **Media Companion Stack (Part 2 - Media Managers)**: Migrate Sonarr and Radarr via LAN Direct Streaming into `local-path` PVCs, mount `medias-pv` (`/medias`, UID 950:950), and validate instant atomic hardlinking from downloads to library datasets.
+- [x] **Plex Media Server**: Add NVIDIA extensions (`siderolabs/nonfree-kmod-nvidia-lts`, `siderolabs/nvidia-container-toolkit-lts`), configure GPU passthrough on `talos-1`, and mount `medias-pvc` via VirtioFS for 4K direct stream and NVENC transcode validation.
 - [ ] **OneDrive Rclone Sync CronJob**: Deploy scheduled rclone sync CronJob mounting `vault-pv` (`/mnt/Vault/OneDrive`, UID 1000:1000) with credentials managed via External Secrets Operator.
 
-### Phase 6: Edge & Hardware-Bound Workloads (In Progress)
-- [x] **Plex Media Server**: Add NVIDIA extensions (`siderolabs/nonfree-kmod-nvidia-lts`, `siderolabs/nvidia-container-toolkit-lts`), configure GPU passthrough on `talos-1`, and mount `medias-pvc` via VirtioFS for 4K direct stream and NVENC transcode validation.
+### Phase 6: Edge & Hardware-Bound Workloads (Pending)
 - [ ] **Home Assistant**: Deploy on `talos-2` with host networking and Zigbee coordinator integration.
+
+### Phase 7: Observability Stack (Pending)
+- [ ] **Observability Stack**: Deploy lightweight collector (`vmagent`) with Azure Managed Prometheus remote-write, Entra ID OAuth2 authentication, metric ingestion optimizations (<$0.50/mo), and self-hosted Grafana on `k8s-talos-1`.
 
 ---
 
@@ -907,13 +912,6 @@ Migrate stateful applications, native host storage, and media companion services
   - **Talos Machine Config**: Create and apply `K8s/Omni/clusters/patches/virtiofs-vault.yaml` using `kind: ExternalVolumeConfig` (`filesystemType: virtiofs`, `tag: vault`). Talos mounts the share at `/var/mnt/vault`.
   - **Kubernetes PV/PVC**: Deploy declarative `PersistentVolume` (`vault-pv`) and `PersistentVolumeClaim` (`vault-pvc`) with `accessModes: [ReadWriteMany]` under `infrastructure/storage/vault/`.
   - **Storage Verification**: Launch an ephemeral test pod to verify read/write access to both `/storage/Medias` and `/storage/Lightroom` and confirm created files reflect directly on the Proxmox ZFS host with expected permissions.
-- **Observability Stack (Azure Managed Prometheus & Self-Hosted Grafana)**:
-  - Create Azure Monitor Workspace and Entra ID App Registration with `Monitoring Metrics Publisher` and `Monitoring Data Reader` roles.
-  - Store Service Principal credentials in Azure Key Vault and synchronize via External Secrets Operator to `monitoring/azure-prom-auth`.
-  - Deploy lightweight `vmagent` (or Prometheus in agent mode) across both `k8s-talos-1` and `k8s-talos-2` via Flux HelmRelease.
-  - Configure outbound HTTPS Remote Write to Azure Monitor Workspace with `external_labels` (`cluster: home-1` / `cluster: home-2`).
-  - Apply cost-saving ingestion filters (60s scrape intervals, drop `*_bucket` histograms and `go_*` runtime series) to guarantee <$0.50/month total cost.
-  - Deploy self-hosted Grafana on `k8s-talos-1` with Azure Monitor datasource, Entra ID SSO, and multi-cluster dashboards.
 - **Developer Stack (Complete)**: Gitea with SQLite3 & Hermes AI Gateway.
   - Deployed single-replica Gitea with SQLite3 database on `local-path` persistent storage (15Gi) on `k8s-talos-1`.
   - Deployed Hermes AI assistant gateway with `local-path` persistent storage (10Gi) on `k8s-talos-1`.
@@ -932,22 +930,35 @@ Migrate stateful applications, native host storage, and media companion services
     - Deployed Sonarr and Radarr mounting `medias-pv` at `/medias` (accessing `/medias/downloads` and library paths `/medias/tv`, `/medias/movies`), running as `950:950`.
     - Migrated SQLite databases and configs from `/Apps/Sonarr` and `/Apps/Radarr` via LAN Direct Streaming into `local-path` PVCs.
     - **Atomic Hardlink Verification**: Confirmed that completed torrent downloads import instantly into media libraries without duplicating disk space or copying bytes across the filesystem.
-  - **Part 4: In-Cluster Samba Deployment & VM Retirement (Active)**:
+  - **Part 4: Plex Media Server (Complete)**:
+    - Added NVIDIA extensions (`siderolabs/nonfree-kmod-nvidia-lts`, `siderolabs/nvidia-container-toolkit-lts`), configured GPU passthrough on `talos-1` with `runtimeClassName: nvidia`, mounted `plex-medias-pv` (`/medias`, UID `950:950`) via VirtioFS for library access, and migrated `/Apps/Plex` config to `local-path` storage.
+    - Exposed Plex directly on node IP `192.168.10.15:32400` with hardware-accelerated NVENC transcoding verified.
+  - **Part 5: In-Cluster Samba Deployment & VM Retirement (Active)**:
     - [x] Deploy declarative Samba container (`infrastructure/overlays/k8s-talos-1/samba/`) on `k8s-talos-1` with `hostNetwork: true` (listening on node IP `192.168.10.15:445`).
     - [x] Mount `vault-pv` at `/mnt/Vault` inside the container via `samba-vault-pvc`. Exposes `[Medias]` (`/mnt/Vault/Medias`, `force group = 950`) and `[Lightroom]` (`/mnt/Vault/Lightroom`, `force user = gabriel`).
     - [x] Configure authenticated credentials for user `gabriel` from Azure Key Vault (`gabriel-samba-password`) via External Secrets Operator (`samba-secrets`).
     - [ ] Update LAN DNS in AdGuard Home (`nas.lan` / `nas.gwebs.ca`) pointing to `192.168.10.15`.
     - [ ] Validate SMB read/write from desktop clients (Windows/Mac).
     - [ ] Stop, archive, and delete the legacy Ubuntu VM from Proxmox VE, recovering host RAM, CPU, and disk storage.
-  - **Part 5: OneDrive Rclone Sync CronJob (Pending)**:
+  - **Part 6: OneDrive Rclone Sync CronJob (Pending)**:
     - Deploy a scheduled Kubernetes `CronJob` mounting `vault-pv` (subPath: `OneDrive`) with `runAsUser: 1000, runAsGroup: 1000` matching host ownership (`1000:1000 drwxrwx---`).
     - Synchronize remote OneDrive to `/mnt/Vault/OneDrive` using Microsoft Graph API / OAuth2 credentials synchronized from Azure Key Vault via External Secrets Operator.
 
 ### Phase 6: Edge & Hardware-Bound Workloads
 
 Evaluate and migrate remaining complex workloads:
-- **Plex Media Server (Complete)**: Added NVIDIA extensions (`siderolabs/nonfree-kmod-nvidia-lts`, `siderolabs/nvidia-container-toolkit-lts`), configured GPU passthrough on `talos-1` with `runtimeClassName: nvidia`, mounted `plex-medias-pv` (`/medias`, UID `950:950`) via VirtioFS for library access, and migrated `/Apps/Plex` config to `local-path` storage.
 - **Home Assistant (Pending)** (Home 2): Requires USB Zigbee stick passthrough (or network-attached Zigbee coordinator) and host networking configuration.
+
+### Phase 7: Observability Stack
+
+Deploy lightweight collector and monitoring infrastructure across clusters:
+- **Observability Stack (Azure Managed Prometheus & Self-Hosted Grafana) (Pending)**:
+  - Create Azure Monitor Workspace and Entra ID App Registration with `Monitoring Metrics Publisher` and `Monitoring Data Reader` roles.
+  - Store Service Principal credentials in Azure Key Vault and synchronize via External Secrets Operator to `monitoring/azure-prom-auth`.
+  - Deploy lightweight `vmagent` (or Prometheus in agent mode) across both `k8s-talos-1` and `k8s-talos-2` via Flux HelmRelease.
+  - Configure outbound HTTPS Remote Write to Azure Monitor Workspace with `external_labels` (`cluster: home-1` / `cluster: home-2`).
+  - Apply cost-saving ingestion filters (60s scrape intervals, drop `*_bucket` histograms and `go_*` runtime series) to guarantee <$0.50/month total cost.
+  - Deploy self-hosted Grafana on `k8s-talos-1` with Azure Monitor datasource, Entra ID SSO, and multi-cluster dashboards.
 
 ---
 
