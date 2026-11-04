@@ -111,18 +111,18 @@ flowchart LR
 - [x] **UpSnap**: Independent multi-cluster Wake-on-LAN instances running with host networking and `NET_RAW` capability on both `k8s-talos-1` and `k8s-talos-2`.
 - [x] **Azure DNS DDNS Updater**: Lightweight CronJob running exclusively on `k8s-talos-1` (every 15m) using `mcr.microsoft.com/azure-cli` to synchronize residential WAN IP to `gaming.gwebs.ca` and CNAME aliases via `k8s-app` Service Principal in Azure Key Vault.
 
-### Phase 5: Stateful & Media Workloads (Pending)
-- [ ] **VirtioFS Storage on talos-1**: Attach Proxmox VirtioFS Directory Mapping `Vault` (`/mnt/Vault`) to VM `talos-1` and apply Talos `ExternalVolumeConfig` machine patch for native ZFS pool access (`/var/mnt/vault`) with declarative `ReadWriteMany` PV/PVC.
-- [ ] **In-Cluster Samba Service**: Deploy declarative Samba container on `k8s-talos-1` with `hostPort: 445`, mounting VirtioFS volume at `/mnt/Vault` using existing `etc/samba/smb.conf` and Azure Key Vault credentials via ESO, enabling complete decommissioning of the Ubuntu VM.
-- [x] **Developer Stack**: Migrate Gitea with SQLite3 and Local Path persistent storage on `k8s-talos-1`.
+### Phase 5: Stateful & Media Workloads (In Progress)
+- [x] **VirtioFS Storage on talos-1**: Attach Proxmox VirtioFS Directory Mapping `Vault` (`/mnt/Vault`) to VM `talos-1` and apply Talos `ExternalVolumeConfig` machine patch for native ZFS pool access (`/var/mnt/vault`) with declarative `ReadWriteMany` PV/PVC.
+- [x] **In-Cluster Samba Service**: Deploy declarative Samba container on `k8s-talos-1` with `hostPort: 445`, mounting VirtioFS volume at `/mnt/Vault` using existing `etc/samba/smb.conf` and Azure Key Vault credentials via ESO, enabling complete decommissioning of the Ubuntu VM.
+- [x] **Developer Stack**: Migrate Gitea with SQLite3 and Hermes AI agent gateway with Local Path persistent storage on `k8s-talos-1`.
 - [ ] **Observability Stack**: Deploy lightweight collector (`vmagent`) with Azure Managed Prometheus remote-write, Entra ID OAuth2 authentication, metric ingestion optimizations (<$0.50/mo), and self-hosted Grafana on `k8s-talos-1`.
-- [ ] **Media Companion Stack (Part 1 - Stateless/Config Only)**: Migrate Overseerr, Prowlarr/Jackett, and FlareSolverr via LAN Direct Streaming into `local-path` PVCs with Gateway API routing.
-- [ ] **VPN & Download Stack**: Deploy Gluetun VPN container with qBittorrent sidecar mounting `medias-pv` (`/medias/downloads`, UID 950:950) with verified kill-switch and direct ZFS write performance.
-- [ ] **Media Companion Stack (Part 2 - Media Managers)**: Migrate Sonarr and Radarr via LAN Direct Streaming into `local-path` PVCs, mount `medias-pv` (`/medias`, UID 950:950), and validate instant atomic hardlinking from downloads to library datasets.
+- [x] **Media Companion Stack (Part 1 - Stateless/Config Only)**: Migrate Overseerr, Prowlarr/Jackett, and FlareSolverr via LAN Direct Streaming into `local-path` PVCs with Gateway API routing.
+- [x] **VPN & Download Stack**: Deploy Gluetun VPN container with qBittorrent sidecar mounting `medias-pv` (`/medias/downloads`, UID 950:950) with verified kill-switch and direct ZFS write performance.
+- [x] **Media Companion Stack (Part 2 - Media Managers)**: Migrate Sonarr and Radarr via LAN Direct Streaming into `local-path` PVCs, mount `medias-pv` (`/medias`, UID 950:950), and validate instant atomic hardlinking from downloads to library datasets.
 - [ ] **OneDrive Rclone Sync CronJob**: Deploy scheduled rclone sync CronJob mounting `vault-pv` (`/mnt/Vault/OneDrive`, UID 1000:1000) with credentials managed via External Secrets Operator.
 
-### Phase 6: Edge & Hardware-Bound Workloads (Pending)
-- [ ] **Plex Media Server**: Add NVIDIA extensions (`siderolabs/nonfree-kmod-nvidia-lts`, `siderolabs/nvidia-container-toolkit-lts`), configure GPU passthrough on `talos-1`, and mount `medias-pvc` via VirtioFS for 4K direct stream and NVENC transcode validation.
+### Phase 6: Edge & Hardware-Bound Workloads (In Progress)
+- [x] **Plex Media Server**: Add NVIDIA extensions (`siderolabs/nonfree-kmod-nvidia-lts`, `siderolabs/nvidia-container-toolkit-lts`), configure GPU passthrough on `talos-1`, and mount `medias-pvc` via VirtioFS for 4K direct stream and NVENC transcode validation.
 - [ ] **Home Assistant**: Deploy on `talos-2` with host networking and Zigbee coordinator integration.
 
 ---
@@ -902,7 +902,7 @@ Migrate stateless and low-risk web services from Docker Compose to Kubernetes:
 ### Phase 5: Stateful & Media Workloads (VirtioFS & Arr Stack)
 
 Migrate stateful applications, native host storage, and media companion services on `k8s-talos-1`:
-- **VirtioFS Storage Integration on `talos-1`**:
+- **VirtioFS Storage Integration on `talos-1` (Complete)**:
   - **Proxmox VM Hardware**: Enable NUMA memory sharing on the `talos-1` VM (`qm set <vmid> -numa 1`) and add VirtioFS directory sharing device selecting Directory Mapping `Vault` (`/mnt/Vault`, tag: `vault`).
   - **Talos Machine Config**: Create and apply `K8s/Omni/clusters/patches/virtiofs-vault.yaml` using `kind: ExternalVolumeConfig` (`filesystemType: virtiofs`, `tag: vault`). Talos mounts the share at `/var/mnt/vault`.
   - **Kubernetes PV/PVC**: Deploy declarative `PersistentVolume` (`vault-pv`) and `PersistentVolumeClaim` (`vault-pvc`) with `accessModes: [ReadWriteMany]` under `infrastructure/storage/vault/`.
@@ -914,8 +914,9 @@ Migrate stateful applications, native host storage, and media companion services
   - Configure outbound HTTPS Remote Write to Azure Monitor Workspace with `external_labels` (`cluster: home-1` / `cluster: home-2`).
   - Apply cost-saving ingestion filters (60s scrape intervals, drop `*_bucket` histograms and `go_*` runtime series) to guarantee <$0.50/month total cost.
   - Deploy self-hosted Grafana on `k8s-talos-1` with Azure Monitor datasource, Entra ID SSO, and multi-cluster dashboards.
-- **Developer Stack (Complete)**: Gitea with SQLite3.
+- **Developer Stack (Complete)**: Gitea with SQLite3 & Hermes AI Gateway.
   - Deployed single-replica Gitea with SQLite3 database on `local-path` persistent storage (15Gi) on `k8s-talos-1`.
+  - Deployed Hermes AI assistant gateway with `local-path` persistent storage (10Gi) on `k8s-talos-1`.
   - Exposed HTTP service via Gateway API HTTPRoute on `gitea.talos-1.gwebs.ca` with cluster wildcard TLS.
   - Exposed SSH service directly via `hostPort: 222` on Talos Linux control-plane node (`192.168.10.15`).
 - **Media Companion Stack Migration Roadmap**:
