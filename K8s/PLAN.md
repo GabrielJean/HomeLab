@@ -102,7 +102,7 @@ flowchart LR
 - [x] **Cloud Storage Secret Configuration**: Configure Azure Blob Storage (`gjtalossa`) repository secret and Restic credentials (`volsync-restic-password`) via External Secrets Operator.
 - [x] **Data Replication & Standby Verification**: Validate asynchronous cross-cluster volume replication and offsite snapshots (`ReplicationSource` on `k8s-talos-1`, `ReplicationDestination` on `k8s-talos-2` via Termix workload).
 
-### Phase 4: Lower-Risk Application Migration (In Progress)
+### Phase 4: Lower-Risk Application Migration — COMPLETE
 - [x] **Stirling-PDF**: Deploy PDF manipulation suite with Local Path PVC and TLS Gateway route on `k8s-talos-1`.
 - [x] **FinGlass / StockBot**: Financial tracking and alerting tools migrated to `local-path` persistent storage.
 - [x] **Discord Bots (JokeBot & MusicBot)**: Multi-container deployment replacing legacy `joke-de-jean`.
@@ -110,7 +110,6 @@ flowchart LR
 - [x] **Homepage**: Single unified multi-home dashboard running statelessly on `k8s-talos-1` and `k8s-talos-2`.
 - [x] **UpSnap**: Independent multi-cluster Wake-on-LAN instances running with host networking and `NET_RAW` capability on both `k8s-talos-1` and `k8s-talos-2`.
 - [x] **Azure DNS DDNS Updater**: Lightweight CronJob running exclusively on `k8s-talos-1` (every 15m) using `mcr.microsoft.com/azure-cli` to synchronize residential WAN IP to `gaming.gwebs.ca` and CNAME aliases via `k8s-app` Service Principal in Azure Key Vault.
-- [ ] **DNS Cutover**: Switch local DNS records in AdGuard Home to cluster IPs.
 
 ### Phase 5: Stateful & Media Workloads (Pending)
 - [ ] **VirtioFS Storage on talos-1**: Attach Proxmox VirtioFS Directory Mapping `Vault` (`/mnt/Vault`) to VM `talos-1` and apply Talos `ExternalVolumeConfig` machine patch for native ZFS pool access (`/var/mnt/vault`) with declarative `ReadWriteMany` PV/PVC.
