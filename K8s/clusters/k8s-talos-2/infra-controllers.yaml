@@ -9,8 +9,6 @@ spec:
   prune: true
   wait: true
   timeout: 5m
-  serverSideApply: true
   sourceRef:
     kind: GitRepository
     name: flux-system
-
