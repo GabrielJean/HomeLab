@@ -1,0 +1,60 @@
+name: Kubernetes GitOps Validation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'K8s/**'
+      - '!K8s/Omni/**'
+      - '!K8s/*.md'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'K8s/**'
+      - '!K8s/Omni/**'
+      - '!K8s/*.md'
+  workflow_dispatch:
+
+jobs:
+  kustomize:
+    name: Validate Kustomize Manifests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Validate Flux Clusters
+        run: |
+          echo "Validating k8s-talos-1 cluster entrypoint..."
+          kubectl kustomize K8s/clusters/k8s-talos-1 > /dev/null
+
+          echo "Validating k8s-talos-2 cluster entrypoint..."
+          kubectl kustomize K8s/clusters/k8s-talos-2 > /dev/null
+
+      - name: Validate Infrastructure Layers
+        run: |
+          echo "Validating infrastructure controllers..."
+          kubectl kustomize K8s/infrastructure/controllers > /dev/null
+
+          echo "Validating infrastructure configs..."
+          kubectl kustomize K8s/infrastructure/configs > /dev/null
+
+          echo "Validating infrastructure overlay talos-1..."
+          kubectl kustomize K8s/infrastructure/overlays/k8s-talos-1 > /dev/null
+
+          echo "Validating infrastructure overlay talos-2..."
+          kubectl kustomize K8s/infrastructure/overlays/k8s-talos-2 > /dev/null
+
+      - name: Validate Application Overlays
+        run: |
+          echo "Validating apps talos-1..."
+          kubectl kustomize K8s/apps/k8s-talos-1 > /dev/null
+
+          echo "Validating apps talos-2..."
+          kubectl kustomize K8s/apps/k8s-talos-2 > /dev/null
+

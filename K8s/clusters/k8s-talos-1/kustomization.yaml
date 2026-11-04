@@ -3,7 +3,6 @@ kind: Kustomization
 
 resources:
   - flux-system
-  - infrastructure.yaml
+  - infra-controllers.yaml
+  - infra-configs.yaml
   - apps.yaml
-  - samba.yaml
-

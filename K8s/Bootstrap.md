@@ -11,15 +11,14 @@ End-to-end operational guide for provisioning, bootstrapping, and operating the 
   - [1. Install CLI Tooling](#1-install-cli-tooling)
   - [2. Authenticate Omni CLI](#2-authenticate-omni-cli)
   - [3. Azure Infrastructure Setup](#3-azure-infrastructure-setup)
-- [Step-by-Step Bootstrap Walkthrough](#step-by-step-bootstrap-walkthrough-8-steps)
+- [Step-by-Step Bootstrap Walkthrough](#step-by-step-bootstrap-walkthrough-7-steps)
   - [Step 1: Register Media Presets & Download ISO](#step-1-register-media-presets--download-iso)
   - [Step 2: Create & Boot the Proxmox VM](#step-2-create--boot-the-proxmox-vm)
   - [Step 3: Label Machine & Sync Omni Cluster Template](#step-3-label-machine--sync-omni-cluster-template)
   - [Step 4: Fetch Admin Kubeconfig](#step-4-fetch-admin-kubeconfig)
   - [Step 5: Establish Azure Workload Identity Federation (Path 2)](#step-5-establish-azure-workload-identity-federation-path-2)
   - [Step 6: Populate Secrets in Azure Key Vault](#step-6-populate-secrets-in-azure-key-vault)
-  - [Step 7: Pre-Install CRD Bundles (Server-Side Apply)](#step-7-pre-install-crd-bundles-server-side-apply)
-  - [Step 8: Bootstrap Flux GitOps & Platform Stack](#step-8-bootstrap-flux-gitops--platform-stack)
+  - [Step 7: Bootstrap Flux GitOps & Platform Stack](#step-7-bootstrap-flux-gitops--platform-stack)
 - [Verification & Day-to-Day Operations](#verification--day-to-day-operations)
   - [1. Verify Flux Reconciliation](#1-verify-flux-reconciliation)
   - [2. Verify External Secrets & Key Vault Sync](#2-verify-external-secrets--key-vault-sync)
@@ -269,19 +268,9 @@ In Azure Key Vault (`https://gjtaloskv.vault.azure.net/`) ➔ **Objects** ➔ **
 
 ---
 
-### Step 7: Pre-Install CRD Bundles (Server-Side Apply)
+### Step 7: Bootstrap Flux GitOps & Platform Stack
 
-Before deploying the GitOps tree, apply the External Secrets Operator CRDs to avoid OpenAPI size limits:
-
-```bash
-kubectl --context admin@<cluster> apply --server-side -f https://raw.githubusercontent.com/external-secrets/external-secrets/main/deploy/crds/bundle.yaml
-```
-
----
-
-### Step 8: Bootstrap Flux GitOps & Platform Stack
-
-Because the repository is public, **no SSH keys or GitHub tokens are required**.
+Because the repository is public, **no SSH keys or GitHub tokens are required**. Platform controllers (`infra-controllers`) and configurations (`infra-configs`) use staged reconciliation with native server-side apply, eliminating manual CRD pre-installation.
 
 > [!IMPORTANT]
 > Ensure your working directory is the repository root:
@@ -307,18 +296,11 @@ kubectl --context admin@k8s-talos-2 apply -f K8s/clusters/k8s-talos-2/flux-syste
 kubectl --context admin@k8s-talos-2 apply -k K8s/clusters/k8s-talos-2
 ```
 
-**What happens automatically:**
-1. Flux starts up in the `flux-system` namespace.
-2. Flux pulls `https://github.com/GabrielJean/HomeLab.git` anonymously over HTTPS.
-3. Flux reconciles [`K8s/infrastructure/`](infrastructure/):
-   - **Local Path Provisioner**: host storage for volumes.
-   - **Traefik Controller**: Gateway API implementation binding ports 80 and 443.
-   - **Metrics Server**: API metrics for `kubectl top`.
-   - **External Secrets Operator**: Authenticates to Azure Key Vault via secretless Workload Identity.
-   - **ClusterSecrets**: ESO pulls `headlamp-admin-email` and writes Secret `flux-system/cluster-secrets`.
-   - **Headlamp**: ESO pulls `k8s-app-secret` and starts the Headlamp dashboard.
-   - **Dynamic RBAC**: Flux substitutes `${OIDC_ADMIN_EMAIL}` into `oidc-rbac.yaml`, binding `cluster-admin` to your email.
-4. Flux reconciles cluster-specific applications under [`K8s/apps/`](apps/).
+**What happens automatically in staged order:**
+1. **Flux Root (`flux-system`)**: Starts up and pulls `https://github.com/GabrielJean/HomeLab.git` anonymously over HTTPS.
+2. **Stage 1 (`infra-controllers`)**: Reconciles CRD bundles and core operators with `serverSideApply: true` (Gateway API, cert-manager, External Secrets Operator, Traefik, Local Path Storage, Metrics Server, Tailscale, VolSync).
+3. **Stage 2 (`infra-configs`)**: Once controllers are ready, reconciles `ClusterSecretStore`, `cluster-secrets` via Workload Identity, Let's Encrypt `ClusterIssuer`, wildcard TLS `Certificate`, dynamic RBAC, and Headlamp dashboard.
+4. **Stage 3 (`apps`)**: Reconciles cluster workloads under `K8s/apps/` with dependencies guaranteed.
 
 ---
 
@@ -328,7 +310,7 @@ kubectl --context admin@k8s-talos-2 apply -k K8s/clusters/k8s-talos-2
 ```bash
 kubectl --context admin@<cluster> -n flux-system get kustomizations
 ```
-All entries (`flux-system`, `infrastructure`, `apps`) should report **`READY: True`**.
+All entries (`flux-system`, `infra-controllers`, `infra-configs`, `apps`) should report **`READY: True`**.
 
 ### 2. Verify External Secrets & Key Vault Sync
 ```bash
@@ -385,7 +367,6 @@ If authentication suddenly fails:
 | :--- | :--- | :--- |
 | **Sync Omni Template** | `omnictl cluster template sync -f K8s/Omni/clusters/k8s-talos-1.yaml` | `omnictl cluster template sync -f K8s/Omni/clusters/k8s-talos-2.yaml` |
 | **Fetch Kubeconfig** | `omnictl kubeconfig -c k8s-talos-1 --service-account --user admin --force-context-name admin@k8s-talos-1 --force` | `omnictl kubeconfig -c k8s-talos-2 --service-account --user admin --force-context-name admin@k8s-talos-2 --force` |
-| **Pre-Apply CRDs** | `kubectl apply --server-side -f https://raw.githubusercontent.com/external-secrets/external-secrets/main/deploy/crds/bundle.yaml` | *(Same command on context)* |
 | **Bootstrap GitOps** | `kubectl apply -f K8s/clusters/k8s-talos-1/flux-system/gotk-components.yaml && kubectl apply -k K8s/clusters/k8s-talos-1` | `kubectl apply -f K8s/clusters/k8s-talos-2/flux-system/gotk-components.yaml && kubectl apply -k K8s/clusters/k8s-talos-2` |
 | **Check Secrets Sync** | `kubectl get externalsecrets -A` | `kubectl get externalsecrets -A` |
 | **Get Breakglass Token** | `kubectl -n headlamp get secret headlamp-breakglass-token -o jsonpath='{.data.token}' \| base64 -d` | *(Same command on context)* |

@@ -10,6 +10,7 @@ Because the repository is **public**, zero SSH keys or GitHub tokens are require
 
 - [Topology](#topology)
 - [Directory Structure](#directory-structure)
+- [Staged Reconciliation Architecture](#staged-reconciliation-architecture)
 - [How to Bootstrap (One Single Command Per Cluster)](#how-to-bootstrap-one-single-command-per-cluster)
   - [For Cluster 1 (`k8s-talos-1`)](#for-cluster-1-k8s-talos-1)
   - [For Cluster 2 (`k8s-talos-2`)](#for-cluster-2-k8s-talos-2)
@@ -42,8 +43,9 @@ Because the repository is **public**, zero SSH keys or GitHub tokens are require
       +-------------------+                             +-------------------+
                |                                                 |
                +---> Reconciles:                                 +---> Reconciles:
-                     - K8s/infrastructure (Headlamp, etc.)             - K8s/infrastructure (Headlamp, etc.)
-                     - K8s/apps/k8s-talos-1 (Local apps)               - K8s/apps/k8s-talos-2 (Local apps)
+                     1. infra-controllers (CRDs & Helm releases)       1. infra-controllers (CRDs & Helm releases)
+                     2. infra-configs (Home 1 configs + Samba/Vault)   2. infra-configs (Home 2 configs)
+                     3. apps (Local Home 1 workloads)                  3. apps (Local Home 2 workloads)
 ```
 
 Each cluster runs its own **independent, pull-based Flux instance**. A WAN outage at one home has zero impact on the other.
@@ -57,21 +59,39 @@ clusters/
 ├── README.md                      # Operational guide
 ├── k8s-talos-1/                   # Cluster 1 (Home 1 / pve-1 / talos-1)
 │   ├── kustomization.yaml         # Cluster entrypoint
-│   ├── infrastructure.yaml        # Reconciles K8s/infrastructure
-│   ├── apps.yaml                  # Reconciles K8s/apps/k8s-talos-1 (dependsOn: infrastructure)
+│   ├── infra-controllers.yaml     # Reconciles K8s/infrastructure/controllers (serverSideApply: true)
+│   ├── infra-configs.yaml         # Reconciles K8s/infrastructure/overlays/k8s-talos-1 (dependsOn: infra-controllers)
+│   ├── apps.yaml                  # Reconciles K8s/apps/k8s-talos-1 (dependsOn: infra-configs)
 │   └── flux-system/
 │       ├── gotk-components.yaml   # Flux controller manifests (v2.9.6)
 │       ├── gotk-sync.yaml         # Public HTTPS GitRepository & root sync
 │       └── kustomization.yaml
 └── k8s-talos-2/                   # Cluster 2 (Home 2 / pve-2 / talos-2)
     ├── kustomization.yaml         # Cluster entrypoint
-    ├── infrastructure.yaml        # Reconciles K8s/infrastructure
-    ├── apps.yaml                  # Reconciles K8s/apps/k8s-talos-2 (dependsOn: infrastructure)
+    ├── infra-controllers.yaml     # Reconciles K8s/infrastructure/controllers (serverSideApply: true)
+    ├── infra-configs.yaml         # Reconciles K8s/infrastructure/overlays/k8s-talos-2 (dependsOn: infra-controllers)
+    ├── apps.yaml                  # Reconciles K8s/apps/k8s-talos-2 (dependsOn: infra-configs)
     └── flux-system/
         ├── gotk-components.yaml   # Flux controller manifests (v2.9.6)
         ├── gotk-sync.yaml         # Public HTTPS GitRepository & root sync
         └── kustomization.yaml
 ```
+
+---
+
+## Staged Reconciliation Architecture
+
+To avoid race conditions and eliminate manual CRD pre-installation steps, infrastructure and applications reconcile in three deterministic stages:
+
+1. **Stage 1 (`infra-controllers`)**:
+   - Deploys core operators, Helm releases, and CRDs (Gateway API, cert-manager, External Secrets Operator, Traefik, Local Path Provisioner, Metrics Server, Tailscale, VolSync).
+   - Uses `serverSideApply: true` to prevent OpenAPI schema annotation size limits.
+2. **Stage 2 (`infra-configs`)**:
+   - `dependsOn: [infra-controllers]` ensures all CRDs and controllers are fully ready.
+   - Deploys cluster resources that instantiate CRDs: `ClusterIssuer`, `ClusterSecretStore`, Traefik Gateway, wildcard certificates, and Headlamp.
+   - Includes cluster-specific overlays (e.g. Samba and VirtioFS PVs on `k8s-talos-1` only).
+3. **Stage 3 (`apps`)**:
+   - `dependsOn: [infra-configs]` ensures storage classes, wildcard certificates, and secrets stores are live before workload pods start.
 
 ---
 
@@ -91,21 +111,22 @@ omnictl kubeconfig -c k8s-talos-2 > ~/.kube/config
 kubectl apply -k K8s/clusters/k8s-talos-2
 ```
 
-That's it. Flux installs itself, clones the public repository over HTTPS, starts reconciling, and deploys platform infrastructure (Headlamp, Traefik, External Secrets Operator) automatically.
+Flux installs itself, clones the public repository over HTTPS, and reconciles controllers, configurations, and applications autonomously in sequence without manual CRD pre-installation.
 
 ---
 
 ## Secretless GitOps & Dynamic Variable Substitution
 
-To keep the repository completely public and free of secrets or personal identity information (e.g. administrator emails):
+To keep the repository completely public and free of secrets or personal identity information:
 
 1. **External Secrets Operator** connects to **Azure Key Vault** using passwordless **Workload Identity Federation**.
 2. ESO writes sensitive configuration (such as `headlamp-admin-email`) into Secret `cluster-secrets` in the `flux-system` namespace.
-3. The cluster `infrastructure.yaml` Kustomization uses `postBuild.substituteFrom` to dynamically substitute variables into manifests at deployment time:
+3. The cluster `infra-configs.yaml` Kustomization uses `postBuild.substituteFrom` to dynamically substitute variables into manifests at deployment time:
    ```yaml
    postBuild:
      substitute:
-       CLUSTER_NAME: talos-1
+       CLUSTER_NAME: k8s-talos-1
+       CLUSTER_DOMAIN: talos-1
      substituteFrom:
        - kind: Secret
          name: cluster-secrets

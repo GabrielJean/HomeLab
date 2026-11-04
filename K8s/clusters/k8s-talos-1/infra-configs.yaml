@@ -1,21 +1,23 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: infrastructure
+  name: infra-configs
   namespace: flux-system
 spec:
   interval: 1h
-  path: ./K8s/infrastructure
+  path: ./K8s/infrastructure/overlays/k8s-talos-1
   prune: true
   wait: true
   timeout: 5m
+  dependsOn:
+    - name: infra-controllers
   sourceRef:
     kind: GitRepository
     name: flux-system
   postBuild:
     substitute:
-      CLUSTER_NAME: k8s-talos-2
-      CLUSTER_DOMAIN: talos-2
+      CLUSTER_NAME: k8s-talos-1
+      CLUSTER_DOMAIN: talos-1
     substituteFrom:
       - kind: Secret
         name: cluster-secrets

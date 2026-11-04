@@ -5,8 +5,3 @@ resources:
   - namespace.yaml
   - helmrepository.yaml
   - helmrelease.yaml
-  - external-secret.yaml
-  - cluster-issuer-staging.yaml
-  - cluster-issuer-prod.yaml
-  - certificate.yaml
-

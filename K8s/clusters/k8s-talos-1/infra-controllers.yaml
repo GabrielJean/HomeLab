@@ -1,21 +1,16 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: samba
+  name: infra-controllers
   namespace: flux-system
 spec:
   interval: 1h
-  path: ./K8s/infrastructure/samba
+  path: ./K8s/infrastructure/controllers
   prune: true
   wait: true
   timeout: 5m
-  dependsOn:
-    - name: infrastructure
+  serverSideApply: true
   sourceRef:
     kind: GitRepository
     name: flux-system
-  postBuild:
-    substitute:
-      CLUSTER_NAME: k8s-talos-1
-      CLUSTER_DOMAIN: talos-1
 

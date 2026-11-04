@@ -3,13 +3,11 @@ kind: Kustomization
 
 resources:
   - priority-classes
-  - cert-manager
-  - external-secrets
-  - gateway-api
-  - headlamp
-  - metrics-server
-  - notifications
-  - storage
   - system-rbac
-  - tailscale
+  - external-secrets
+  - cert-manager
   - traefik
+  - tailscale
+  - headlamp
+  - notifications
+

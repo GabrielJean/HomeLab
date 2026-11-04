@@ -767,52 +767,65 @@ K8s/
 ├── clusters/
 │   ├── k8s-talos-1/                    # Home 1 Cluster Definition (pve-1)
 │   │   ├── flux-system/                # Flux operator manifests
-│   │   ├── infrastructure.yaml         # Points to infrastructure/
-│   │   └── apps.yaml                   # Points to k8s-talos-1 apps
+│   │   ├── infra-controllers.yaml      # Reconciles infrastructure/controllers (serverSideApply: true)
+│   │   ├── infra-configs.yaml          # Reconciles infrastructure/overlays/k8s-talos-1 (dependsOn: infra-controllers)
+│   │   ├── apps.yaml                   # Reconciles apps/k8s-talos-1 (dependsOn: infra-configs)
+│   │   └── kustomization.yaml
 │   └── k8s-talos-2/                    # Home 2 Cluster Definition (pve-2)
 │       ├── flux-system/                # Flux operator manifests
-│       ├── infrastructure.yaml         # Points to infrastructure/
-│       └── apps.yaml                   # Points to k8s-talos-2 apps
+│       ├── infra-controllers.yaml      # Reconciles infrastructure/controllers (serverSideApply: true)
+│       ├── infra-configs.yaml          # Reconciles infrastructure/overlays/k8s-talos-2 (dependsOn: infra-controllers)
+│       ├── apps.yaml                   # Reconciles apps/k8s-talos-2 (dependsOn: infra-configs)
+│       └── kustomization.yaml
 │
-├── infrastructure/                     # Cluster-wide platform components
-│   ├── ingress/                        # Traefik Ingress Controller HelmRelease
-│   ├── cert-manager/                   # ACME cert-manager & Azure DNS solver
-│   ├── external-secrets/               # External Secrets Operator & Azure Key Vault Store
-│   ├── storage/                        # Local Path Provisioner, VolSync Operator & VirtioFS Medias PV/PVC
-│   ├── headlamp/                       # Headlamp web dashboard
-│   ├── metrics-server/                 # In-cluster metrics API (HPA & Headlamp live graphs)
-│   └── monitoring/                     # vmagent (Azure remote-write) & self-hosted Grafana
+├── infrastructure/
+│   ├── controllers/                    # Core operators & CRD bundles (Stage 1)
+│   │   ├── cert-manager/               # cert-manager controller & HelmRelease
+│   │   ├── external-secrets/           # External Secrets Operator HelmRelease
+│   │   ├── gateway-api/                # Gateway API CRDs
+│   │   ├── local-path/                 # Local Path Provisioner HelmRelease
+│   │   ├── metrics-server/             # Metrics Server HelmRelease
+│   │   ├── tailscale/                  # Tailscale Operator HelmRelease
+│   │   ├── traefik/                    # Traefik Ingress & Gateway HelmRelease
+│   │   └── volsync/                    # VolSync Operator HelmRelease
+│   ├── configs/                        # Shared configurations & CRD instances (Stage 2)
+│   │   ├── cert-manager/               # ClusterIssuer & wildcard TLS Certificate
+│   │   ├── external-secrets/           # ClusterSecretStore (Azure Key Vault) & cluster-secrets
+│   │   ├── headlamp/                   # Headlamp web dashboard & Entra ID OIDC RBAC
+│   │   ├── notifications/              # Flux Pushover Provider & Alert
+│   │   ├── priority-classes/           # Cluster priority classes
+│   │   ├── system-rbac/                # Control plane & kubelet RBAC bindings
+│   │   ├── tailscale/                  # Tailscale OAuth external secret
+│   │   └── traefik/                    # Traefik default certificate
+│   └── overlays/                       # Cluster-specific platform extensions
+│       ├── k8s-talos-1/                # Inherits configs + Samba & VirtioFS ZFS storage-vault
+│       └── k8s-talos-2/                # Inherits configs (clean, zero host-1 storage leakage)
 │
 ├── apps/                               # Application definitions (base & overlays)
-│   ├── base/                           # Shared application templates
-│   │   ├── stirling-pdf/
-│   │   ├── dns-updater/
-│   │   ├── homepage/
-│   │   ├── finglass/
-│   │   ├── stockbot/
-│   │   ├── termix/
-│   │   ├── gitea/
-│   │   └── discordbots/
-│   ├── k8s-talos-1/                    # Home 1 specific workloads
-│   │   ├── plexapps/                   # Sonarr, Radarr, Overseerr, Jackett
-│   │   └── termix/
-│   └── k8s-talos-2/                    # Home 2 specific workloads
-│       ├── homeassistant/
-│       └── termix/
+│   ├── base/                           # Shared multi-cluster application templates
+│   │   ├── homepage/                   # Multi-cluster status dashboard
+│   │   ├── termix/                     # Shared SSH terminal template
+│   │   └── upsnap/                     # Multi-cluster Wake-on-LAN
+│   ├── k8s-talos-1/                    # Home 1 specific workloads & overlays
+│   │   ├── discordbots/                # Music & joke bots
+│   │   ├── dns-updater/                # Home 1 residential WAN dynamic DNS
+│   │   ├── finglass/                   # Financial dashboard
+│   │   ├── gitea/                      # Git server with local storage
+│   │   ├── hermes/                     # Messaging & AI bridge
+│   │   ├── plex/                       # Plex media server with GPU passthrough
+│   │   ├── plexapps/                   # Sonarr, Radarr, Overseerr, Jackett, torrents
+│   │   ├── stirling-pdf/               # PDF manipulation tool suite
+│   │   ├── stockbot/                   # Stock alerting engine
+│   │   └── termix/                     # Active terminal with VolSync ReplicationSource
+│   └── k8s-talos-2/                    # Home 2 specific workloads & overlays
+│       └── termix/                     # Warm standby terminal with ReplicationDestination
+│       └── termix/                     # Warm standby terminal with ReplicationDestination
 │
-├── Omni/                               # Omni declarative templates
-│   ├── clusters/
-│   │   ├── k8s-talos-1.yaml            # Omni template for Home 1 cluster
-│   │   └── k8s-talos-2.yaml            # Omni template for Home 2 cluster
-│   └── patches/
-│       ├── allow-controlplane.yaml     # Machine patch to allow scheduling on CP
-│       └── virtiofs-medias.yaml        # Machine patch to mount host ZFS pool via virtiofs
-│
-└── platform/                           # Shared RBAC, namespaces, and security policies
-    ├── namespaces/
-    ├── rbac/
-    ├── policies/                       # Outbound firewall & NetworkPolicy rules
-    └── sops/                           # Encrypted bootstrap secrets
+└── Omni/                               # Sidero Omni declarative templates
+    ├── classes/                        # Machine classes (pve-1, pve-2)
+    ├── clusters/                       # Omni templates for k8s-talos-1 and k8s-talos-2
+    ├── media/                          # Custom Talos Linux boot media presets
+    └── patches/                        # Talos machine configuration patches
 ```
 
 ---
