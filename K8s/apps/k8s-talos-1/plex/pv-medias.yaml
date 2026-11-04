@@ -1,0 +1,23 @@
+# Dedicated PersistentVolume binding the VirtioFS Medias dataset on talos-1 to the plex namespace
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: plex-medias-pv
+spec:
+  capacity:
+    storage: 10Ti
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: vault-storage
+  hostPath:
+    path: /var/mnt/vault/Medias
+    type: Directory
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - talos-1

@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: radarr
+  namespace: plexapps
+  labels:
+    app.kubernetes.io/name: radarr
+    app.kubernetes.io/part-of: homelab-media
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: radarr
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: radarr
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: talos-1
+      containers:
+        - name: radarr
+          image: linuxserver/radarr:6.4.4
+          env:
+            - name: PUID
+              value: "950"
+            - name: PGID
+              value: "950"
+            - name: TZ
+              value: America/Toronto
+          ports:
+            - name: http
+              containerPort: 7878
+              protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: medias
+              mountPath: /medias
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: radarr-config
+        - name: medias
+          persistentVolumeClaim:
+            claimName: medias-pvc

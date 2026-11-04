@@ -1,0 +1,147 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: torrents
+  namespace: plexapps
+  labels:
+    app.kubernetes.io/name: torrents
+    app.kubernetes.io/part-of: homelab-media
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: torrents
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: torrents
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: talos-1
+      initContainers:
+        - name: generate-pia-wg
+          image: alpine:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              apk add --no-cache bash curl jq wireguard-tools coreutils >/dev/null
+              mkdir -p /gluetun/wireguard
+              cd /gluetun/wireguard
+              bash /scripts/gen_config.sh -r "$PIA_REGION"
+          env:
+            - name: PIA_REGION
+              value: "ca_toronto"
+          envFrom:
+            - secretRef:
+                name: pia-credentials
+          volumeMounts:
+            - name: wireguard-config
+              mountPath: /gluetun/wireguard
+            - name: pia-script
+              mountPath: /scripts
+      containers:
+        - name: gluetun
+          image: qmcgaw/gluetun:v3.41.1
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+          env:
+            - name: VPN_SERVICE_PROVIDER
+              value: custom
+            - name: VPN_TYPE
+              value: wireguard
+            - name: FIREWALL_INPUT_PORTS
+              value: "8087,9091"
+            - name: FIREWALL_OUTBOUND_SUBNETS
+              value: "192.168.10.0/24,10.244.0.0/16,10.96.0.0/12"
+            - name: TZ
+              value: America/Toronto
+          ports:
+            - name: qbittorrent
+              containerPort: 8087
+              protocol: TCP
+            - name: transmission
+              containerPort: 9091
+              protocol: TCP
+          volumeMounts:
+            - name: wireguard-config
+              mountPath: /gluetun/wireguard
+            - name: dev-tun
+              mountPath: /dev/net/tun
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+
+        - name: transmission
+          image: lscr.io/linuxserver/transmission:4.1.3
+          env:
+            - name: PUID
+              value: "950"
+            - name: PGID
+              value: "950"
+            - name: TZ
+              value: America/Toronto
+          volumeMounts:
+            - name: transmission-config
+              mountPath: /config
+            - name: medias
+              mountPath: /medias
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+
+        - name: qbittorrent
+          image: lscr.io/linuxserver/qbittorrent:5.2.4
+          env:
+            - name: PUID
+              value: "950"
+            - name: PGID
+              value: "950"
+            - name: TZ
+              value: America/Toronto
+            - name: WEBUI_PORT
+              value: "8087"
+          volumeMounts:
+            - name: qbittorrent-config
+              mountPath: /config
+            - name: medias
+              mountPath: /medias
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 2000m
+              memory: 2Gi
+
+      volumes:
+        - name: wireguard-config
+          emptyDir: {}
+        - name: pia-script
+          configMap:
+            name: pia-gen-script
+            defaultMode: 0755
+        - name: dev-tun
+          hostPath:
+            path: /dev/net/tun
+        - name: transmission-config
+          persistentVolumeClaim:
+            claimName: transmission-config
+        - name: qbittorrent-config
+          persistentVolumeClaim:
+            claimName: qbittorrent-config
+        - name: medias
+          persistentVolumeClaim:
+            claimName: medias-pvc

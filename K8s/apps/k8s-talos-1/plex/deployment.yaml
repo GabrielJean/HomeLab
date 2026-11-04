@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plex
+  namespace: plex
+  labels:
+    app.kubernetes.io/name: plex
+    app.kubernetes.io/part-of: homelab-media
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: plex
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: plex
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: talos-1
+      runtimeClassName: nvidia
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: plex
+          image: linuxserver/plex:1.43.5
+          env:
+            - name: PUID
+              value: "950"
+            - name: PGID
+              value: "950"
+            - name: VERSION
+              value: "docker"
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "all"
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: "compute,video,utility"
+          ports:
+            - name: http
+              containerPort: 32400
+              protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: medias
+              mountPath: /Plex
+            - name: transcode
+              mountPath: /transcode
+          resources:
+            requests:
+              cpu: 200m
+              memory: 1Gi
+            limits:
+              cpu: 8000m
+              memory: 8Gi
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: plex-config
+        - name: medias
+          persistentVolumeClaim:
+            claimName: plex-medias-pvc
+        - name: transcode
+          emptyDir:
+            medium: Memory

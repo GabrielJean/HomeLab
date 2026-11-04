@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: medias-pvc
+  namespace: plexapps
+  labels:
+    app.kubernetes.io/name: plexapps
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: vault-storage
+  volumeName: plexapps-medias-pv
+  resources:
+    requests:
+      storage: 10Ti

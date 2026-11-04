@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: plex-config
+  namespace: plex
+  labels:
+    app.kubernetes.io/name: plex
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: plex-medias-pvc
+  namespace: plex
+  labels:
+    app.kubernetes.io/name: plex
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: vault-storage
+  volumeName: plex-medias-pv
+  resources:
+    requests:
+      storage: 10Ti

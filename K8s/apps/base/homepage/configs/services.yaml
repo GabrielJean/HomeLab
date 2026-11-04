@@ -22,40 +22,45 @@
 
 - Media:
     - Plex:
-        href: https://app.plex.tv
+        href: https://plex.talos-1.gwebs.ca
         icon: plex.png
         description: Personal media streaming server
-        siteMonitor: http://192.168.10.13:32400
+        siteMonitor: https://plex.talos-1.gwebs.ca
     - Overseerr:
-        href: https://overseerr.docker-1.gwebs.ca
+        href: https://overseerr.talos-1.gwebs.ca
         icon: overseerr.png
         description: Media request management
-        siteMonitor: https://overseerr.docker-1.gwebs.ca
+        siteMonitor: https://overseerr.talos-1.gwebs.ca
     - Sonarr:
-        href: https://sonarr.docker-1.gwebs.ca
+        href: https://sonarr.talos-1.gwebs.ca
         icon: sonarr.png
         description: TV series library automation
-        siteMonitor: https://sonarr.docker-1.gwebs.ca
+        siteMonitor: https://sonarr.talos-1.gwebs.ca
     - Radarr:
-        href: https://radarr.docker-1.gwebs.ca
+        href: https://radarr.talos-1.gwebs.ca
         icon: radarr.png
         description: Movie library automation
-        siteMonitor: https://radarr.docker-1.gwebs.ca
+        siteMonitor: https://radarr.talos-1.gwebs.ca
+    - Prowlarr:
+        href: https://prowlarr.talos-1.gwebs.ca
+        icon: prowlarr.png
+        description: Torrent indexer proxy
+        siteMonitor: https://prowlarr.talos-1.gwebs.ca
     - Jackett:
-        href: https://jackett.docker-1.gwebs.ca
+        href: https://jackett.talos-1.gwebs.ca
         icon: jackett.png
         description: Torrent indexer aggregation
-        siteMonitor: https://jackett.docker-1.gwebs.ca
+        siteMonitor: https://jackett.talos-1.gwebs.ca
     - Transmission:
-        href: https://transmission.docker-1.gwebs.ca/transmission/web/
+        href: https://transmission.talos-1.gwebs.ca/transmission/web/
         icon: transmission.png
         description: BitTorrent download client
-        siteMonitor: https://transmission.docker-1.gwebs.ca/transmission/web/
+        siteMonitor: https://transmission.talos-1.gwebs.ca/transmission/web/
     - qBittorrent:
-        href: https://qbittorrent.docker-1.gwebs.ca
+        href: https://qbittorrent.talos-1.gwebs.ca
         icon: qbittorrent.png
         description: BitTorrent download client
-        siteMonitor: https://qbittorrent.docker-1.gwebs.ca
+        siteMonitor: https://qbittorrent.talos-1.gwebs.ca
 
 - Personal Apps:
     - FinGlass:

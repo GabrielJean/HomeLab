@@ -4,6 +4,8 @@ kind: Kustomization
 # Workloads specific to Home 1 cluster
 resources:
   - termix
+  - plex
+  - plexapps
   - ../base/homepage
   - ../base/dns-updater
   - ../base/finglass
