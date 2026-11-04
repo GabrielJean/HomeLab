@@ -22,7 +22,7 @@ spec:
         kubernetes.io/hostname: talos-1
       containers:
         - name: sonarr
-          image: linuxserver/sonarr:4.0.19
+          image: linuxserver/sonarr:4.0.20
           env:
             - name: PUID
               value: "950"
