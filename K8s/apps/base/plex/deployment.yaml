@@ -50,10 +50,10 @@ spec:
               mountPath: /transcode
           resources:
             requests:
-              cpu: 200m
-              memory: 1Gi
+              cpu: 1000m
+              memory: 2Gi
             limits:
-              cpu: 8000m
+              cpu: 6000m
               memory: 8Gi
       volumes:
         - name: config
@@ -65,3 +65,4 @@ spec:
         - name: transcode
           emptyDir:
             medium: Memory
+            sizeLimit: 4Gi
