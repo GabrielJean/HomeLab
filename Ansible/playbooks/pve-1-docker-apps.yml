@@ -17,8 +17,6 @@
     - name: Define docker apps by host (without cadvisor)
       set_fact:
         _docker_apps_by_host:
-          Docker-1:
-            - { name: traefik, online: true }
           DNS-1:
             - { name: adguardhome, online: true }
           Gaming-1:
