@@ -6,7 +6,9 @@
   ],
   "timezone": "America/Toronto",
   "ignorePaths": [
-    "**/Archives/**"
+    "**/Archives/**",
+    "Docker/homeassistant/**",
+    "Docker/traefik/**"
   ],
   "minimumReleaseAge": "3 days",
   "prHourlyLimit": 0,
@@ -14,39 +16,40 @@
     "dependencies"
   ],
   "flux": {
-    "fileMatch": [
-      "(^|/)K8s/.+\\.ya?ml$"
+    "managerFilePatterns": [
+      "/(^|/)K8s/.+\\.ya?ml$/"
     ]
   },
   "kubernetes": {
-    "fileMatch": [
-      "(^|/)K8s/.+\\.ya?ml$"
+    "managerFilePatterns": [
+      "/(^|/)K8s/.+\\.ya?ml$/"
     ]
   },
   "kustomize": {
-    "fileMatch": [
-      "(^|/)K8s/.+kustomization\\.ya?ml$"
+    "managerFilePatterns": [
+      "/(^|/)K8s/.+kustomization\\.ya?ml$/"
     ]
   },
   "customManagers": [
     {
       "customType": "regex",
       "description": "Update Talos Linux versions in Omni manifests",
-      "fileMatch": [
-        "(^|/)K8s/Omni/.+\\.ya?ml$"
+      "managerFilePatterns": [
+        "/(^|/)K8s/Omni/.+\\.ya?ml$/"
       ],
       "matchStrings": [
-        "talos:\\s+version:\\s+[\"']?(?<currentValue>v[0-9.]+)[\"']?",
-        "talosVersion:\\s+[\"']?(?<currentValue>v[0-9.]+)[\"']?"
+        "talos:\\s+version:\\s+[\"']?v(?<currentValue>[0-9.]+)[\"']?",
+        "talos[vV]ersion:\\s+[\"']?(?<currentValue>[0-9.]+)[\"']?"
       ],
+      "extractVersionTemplate": "^v?(?<version>.*)$",
       "depNameTemplate": "siderolabs/talos",
       "datasourceTemplate": "github-releases"
     },
     {
       "customType": "regex",
       "description": "Update Kubernetes versions in Omni manifests",
-      "fileMatch": [
-        "(^|/)K8s/Omni/clusters/.+\\.ya?ml$"
+      "managerFilePatterns": [
+        "/(^|/)K8s/Omni/clusters/.+\\.ya?ml$/"
       ],
       "matchStrings": [
         "kubernetes:\\s+version:\\s+[\"']?(?<currentValue>v[0-9.]+)[\"']?"
@@ -57,8 +60,35 @@
   ],
   "packageRules": [
     {
-      "description": "Label Docker Compose updates",
-      "matchPaths": [
+      "description": "Disable Kubernetes API version deprecation checks across YAML manifests",
+      "matchDatasources": [
+        "kubernetes-api"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Disable updates for local custom builds and private registry images",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "azure-dns-updater",
+        "homelab/*",
+        "gitea.docker-1.gwebs.ca/**"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Disable updates for phased-out Docker services",
+      "matchFileNames": [
+        "Docker/homeassistant/**",
+        "Docker/traefik/**"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Label Docker updates",
+      "matchFileNames": [
         "Docker/**"
       ],
       "labels": [
@@ -68,7 +98,7 @@
     },
     {
       "description": "Label Kubernetes manifest and container updates",
-      "matchPaths": [
+      "matchFileNames": [
         "K8s/**"
       ],
       "labels": [
@@ -88,21 +118,9 @@
       ]
     },
     {
-      "description": "Disable updates for local custom builds and private registry images",
-      "matchDatasources": [
-        "docker"
-      ],
-      "matchPackageNames": [
-        "azure-dns-updater",
-        "homelab/*",
-        "gitea.docker-1.gwebs.ca/**"
-      ],
-      "enabled": false
-    },
-    {
-      "description": "Group and auto-merge all non-major Docker Compose updates on Saturdays",
-      "matchPaths": [
-        "Docker/**"
+      "description": "Group AdGuard Home non-major updates on Saturdays",
+      "matchFileNames": [
+        "Docker/adguardhome/**"
       ],
       "matchDatasources": [
         "docker"
@@ -113,17 +131,17 @@
         "pin",
         "digest"
       ],
-      "groupName": "all non-major docker images",
-      "groupSlug": "docker-non-major",
+      "groupName": "AdGuard Home",
+      "groupSlug": "adguard-home-non-major",
       "automerge": true,
       "schedule": [
         "before 6am on saturday"
       ]
     },
     {
-      "description": "Hold back major Docker Compose updates for manual PR review on Saturdays",
-      "matchPaths": [
-        "Docker/**"
+      "description": "Hold back AdGuard Home major updates for manual PR review on Saturdays",
+      "matchFileNames": [
+        "Docker/adguardhome/**"
       ],
       "matchDatasources": [
         "docker"
@@ -131,38 +149,74 @@
       "matchUpdateTypes": [
         "major"
       ],
+      "groupName": "AdGuard Home (major)",
+      "groupSlug": "adguard-home-major",
       "automerge": false,
       "schedule": [
         "before 6am on saturday"
       ]
     },
     {
-      "description": "Never auto-merge critical infrastructure, stateful services, databases, or game servers in Docker",
-      "matchPaths": [
-        "Docker/**"
+      "description": "Group Docker game server updates and hold for manual review",
+      "matchFileNames": [
+        "Docker/satisfactory/**",
+        "Docker/zomboid/**"
       ],
       "matchDatasources": [
         "docker"
       ],
-      "matchPackageNames": [
-        "/traefik/",
-        "/adguard/",
-        "/home-assistant/",
-        "/plex/",
-        "gitea/gitea",
-        "portainer/portainer-ce",
-        "qmcgaw/gluetun",
-        "wolveix/satisfactory-server",
-        "indifferentbroccoli/projectzomboid-server-docker",
-        "/postgres/",
-        "/mariadb/",
-        "/mysql/",
-        "/redis/",
-        "/nginx/",
-        "/authentik/",
-        "/authelia/"
+      "groupName": "Game servers (Docker)",
+      "groupSlug": "docker-game-servers",
+      "automerge": false,
+      "schedule": [
+        "before 6am on saturday"
+      ]
+    },
+    {
+      "description": "Group and auto-merge non-major Kubernetes app container updates on Saturdays",
+      "matchFileNames": [
+        "K8s/apps/**"
       ],
-      "groupName": null,
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "groupName": "all non-major k8s app images",
+      "groupSlug": "k8s-apps-non-major",
+      "automerge": true,
+      "schedule": [
+        "before 6am on saturday"
+      ]
+    },
+    {
+      "description": "Group major Kubernetes app container updates for manual review on Saturdays",
+      "matchFileNames": [
+        "K8s/apps/**"
+      ],
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "groupName": "all major k8s app images",
+      "groupSlug": "k8s-apps-major",
+      "automerge": false,
+      "schedule": [
+        "before 6am on saturday"
+      ]
+    },
+    {
+      "description": "Never auto-merge Kubernetes platform infrastructure and controllers",
+      "matchFileNames": [
+        "K8s/infrastructure/**",
+        "K8s/clusters/**"
+      ],
       "automerge": false,
       "schedule": [
         "before 6am on saturday"
@@ -182,9 +236,6 @@
     },
     {
       "description": "Group non-major Helm chart updates on Saturdays",
-      "matchManagers": [
-        "flux"
-      ],
       "matchDatasources": [
         "helm"
       ],
@@ -201,35 +252,14 @@
     },
     {
       "description": "Hold back major Helm chart updates for manual PR review on Saturdays",
-      "matchManagers": [
-        "flux"
-      ],
       "matchDatasources": [
         "helm"
       ],
       "matchUpdateTypes": [
         "major"
       ],
-      "automerge": false,
-      "schedule": [
-        "before 6am on saturday"
-      ]
-    },
-    {
-      "description": "Never auto-merge Kubernetes critical platform infrastructure",
-      "matchManagers": [
-        "flux"
-      ],
-      "matchPackageNames": [
-        "traefik",
-        "cert-manager",
-        "external-secrets",
-        "headlamp",
-        "metrics-server",
-        "volsync",
-        "local-path-provisioner"
-      ],
-      "groupName": null,
+      "groupName": "all major helm charts",
+      "groupSlug": "helm-major",
       "automerge": false,
       "schedule": [
         "before 6am on saturday"
