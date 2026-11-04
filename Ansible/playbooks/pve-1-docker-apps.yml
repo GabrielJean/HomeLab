@@ -19,13 +19,8 @@
         _docker_apps_by_host:
           Docker-1:
             - { name: traefik, online: true }
-            - { name: plexapps, online: true, restart: true, build: true }
-            - { name: monitoring, restart: true, online: true }
-            - { name: portainer, online: true }
           DNS-1:
             - { name: adguardhome, online: true }
-          Plex-1:
-            - { name: plex, online: true }
           Gaming-1:
             - { name: satisfactory, online: false }
             - { name: zomboid, restart: true, online: false }
