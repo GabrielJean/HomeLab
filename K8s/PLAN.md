@@ -801,24 +801,25 @@ K8s/
 │       ├── k8s-talos-1/                # Inherits configs + Samba & VirtioFS ZFS storage-vault
 │       └── k8s-talos-2/                # Inherits configs (clean, zero host-1 storage leakage)
 │
-├── apps/                               # Application definitions (base & overlays)
-│   ├── base/                           # Shared multi-cluster application templates
-│   │   ├── homepage/                   # Multi-cluster status dashboard
-│   │   ├── termix/                     # Shared SSH terminal template
-│   │   └── upsnap/                     # Multi-cluster Wake-on-LAN
-│   ├── k8s-talos-1/                    # Home 1 specific workloads & overlays
+├── apps/                               # Application definitions (base catalog & cluster manifests)
+│   ├── base/                           # Application Catalog (ALL core manifests live here)
 │   │   ├── discordbots/                # Music & joke bots
 │   │   ├── dns-updater/                # Home 1 residential WAN dynamic DNS
 │   │   ├── finglass/                   # Financial dashboard
 │   │   ├── gitea/                      # Git server with local storage
 │   │   ├── hermes/                     # Messaging & AI bridge
+│   │   ├── homepage/                   # Multi-cluster status dashboard
 │   │   ├── plex/                       # Plex media server with GPU passthrough
 │   │   ├── plexapps/                   # Sonarr, Radarr, Overseerr, Jackett, torrents
 │   │   ├── stirling-pdf/               # PDF manipulation tool suite
 │   │   ├── stockbot/                   # Stock alerting engine
+│   │   ├── termix/                     # Shared SSH terminal template
+│   │   └── upsnap/                     # Multi-cluster Wake-on-LAN
+│   ├── k8s-talos-1/                    # Home 1 activation manifest & overlays
+│   │   ├── kustomization.yaml          # Activates workloads for Home 1
 │   │   └── termix/                     # Active terminal with VolSync ReplicationSource
-│   └── k8s-talos-2/                    # Home 2 specific workloads & overlays
-│       └── termix/                     # Warm standby terminal with ReplicationDestination
+│   └── k8s-talos-2/                    # Home 2 activation manifest & overlays
+│       ├── kustomization.yaml          # Activates workloads for Home 2
 │       └── termix/                     # Warm standby terminal with ReplicationDestination
 │
 └── Omni/                               # Sidero Omni declarative templates

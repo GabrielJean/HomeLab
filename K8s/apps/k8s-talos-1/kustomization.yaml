@@ -1,20 +1,20 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Workloads deployed on Home 1 cluster (k8s-talos-1)
+# Workloads activated on Home 1 (k8s-talos-1)
 resources:
   # Multi-cluster shared apps
   - termix
   - ../base/homepage
   - ../base/upsnap
 
-  # Dedicated Home 1 workloads
-  - discordbots
-  - dns-updater
-  - finglass
-  - gitea
-  - hermes
-  - plex
-  - plexapps
-  - stirling-pdf
-  - stockbot
+  # Workloads activated on Home 1
+  - ../base/discordbots
+  - ../base/dns-updater
+  - ../base/finglass
+  - ../base/gitea
+  - ../base/hermes
+  - ../base/plex
+  - ../base/plexapps
+  - ../base/stirling-pdf
+  - ../base/stockbot
