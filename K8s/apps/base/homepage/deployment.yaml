@@ -18,6 +18,7 @@ spec:
       labels:
         app: homepage
     spec:
+      priorityClassName: app-critical
       serviceAccountName: homepage
       containers:
         - name: homepage
@@ -69,9 +70,9 @@ spec:
           resources:
             requests:
               cpu: 50m
-              memory: 128Mi
+              memory: 192Mi
             limits:
-              cpu: 500m
+              cpu: 1000m
               memory: 512Mi
           volumeMounts:
             - name: config
