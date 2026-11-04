@@ -18,6 +18,7 @@ spec:
       labels:
         app.kubernetes.io/name: plex
     spec:
+      priorityClassName: media-priority
       nodeSelector:
         kubernetes.io/hostname: talos-1
       runtimeClassName: nvidia

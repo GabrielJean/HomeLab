@@ -17,6 +17,7 @@ spec:
       labels:
         app: gitea
     spec:
+      priorityClassName: app-critical
       securityContext:
         fsGroup: 1000
       containers:

@@ -17,6 +17,7 @@ spec:
       labels:
         app: termix
     spec:
+      priorityClassName: app-critical
       containers:
         - name: termix
           image: ghcr.io/lukegus/termix:2.7.1

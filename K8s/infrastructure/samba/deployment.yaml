@@ -18,6 +18,7 @@ spec:
       labels:
         app.kubernetes.io/name: samba
     spec:
+      priorityClassName: infra-critical
       nodeSelector:
         kubernetes.io/hostname: talos-1
       hostNetwork: true

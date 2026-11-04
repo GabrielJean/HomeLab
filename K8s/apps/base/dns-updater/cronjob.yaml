@@ -19,6 +19,7 @@ spec:
           labels:
             app.kubernetes.io/name: dns-updater
         spec:
+          priorityClassName: app-critical
           restartPolicy: OnFailure
           containers:
             - name: dns-updater

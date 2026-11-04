@@ -1,0 +1,44 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: infra-critical
+value: 1000000000
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "Mission-critical cluster infrastructure (Traefik, Storage, Cert-Manager, Secrets, Tailscale, Samba)."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: app-critical
+value: 100000000
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "Core homelab services and backups (Gitea, Termix, VolSync, DNS-Updater)."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: media-priority
+value: 50000000
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "Primary user-facing media service (Plex), protected from background downloaders and scrapers."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: app-standard
+value: 10000000
+preemptionPolicy: PreemptLowerPriority
+globalDefault: true
+description: "Standard homelab user-facing applications and dashboards (Homepage, Overseerr, Sonarr, Radarr)."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: app-low
+value: 1000000
+preemptionPolicy: PreemptLowerPriority
+globalDefault: false
+description: "Background downloaders, scrapers, and batch tasks (Torrents, FlareSolverr, Jackett)."

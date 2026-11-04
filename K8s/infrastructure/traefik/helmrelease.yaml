@@ -22,6 +22,7 @@ spec:
     remediation:
       retries: 3
   values:
+    priorityClassName: infra-critical
     deployment:
       replicas: 1
 

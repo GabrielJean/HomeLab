@@ -59,6 +59,7 @@ spec:
           labels:
             app.kubernetes.io/name: torrents-vpn-refresh
         spec:
+          priorityClassName: app-low
           serviceAccountName: torrents-restarter
           restartPolicy: OnFailure
           securityContext:
