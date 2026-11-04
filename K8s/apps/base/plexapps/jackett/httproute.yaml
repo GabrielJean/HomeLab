@@ -1,21 +1,22 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: plex
-  namespace: plex
+  name: jackett
+  namespace: plexapps
   labels:
-    app.kubernetes.io/name: plex
+    app.kubernetes.io/name: jackett
+    app.kubernetes.io/part-of: homelab-media
 spec:
   parentRefs:
     - name: traefik-gateway
       namespace: traefik
   hostnames:
-    - "plex.talos-1.gwebs.ca"
+    - "jackett.${CLUSTER_DOMAIN:=talos-1}.gwebs.ca"
   rules:
     - matches:
         - path:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: plex
-          port: 32400
+        - name: jackett
+          port: 9117

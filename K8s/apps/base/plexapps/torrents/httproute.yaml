@@ -11,7 +11,7 @@ spec:
     - name: traefik-gateway
       namespace: traefik
   hostnames:
-    - "qbittorrent.talos-1.gwebs.ca"
+    - "qbittorrent.${CLUSTER_DOMAIN:=talos-1}.gwebs.ca"
   rules:
     - matches:
         - path:
@@ -34,7 +34,7 @@ spec:
     - name: traefik-gateway
       namespace: traefik
   hostnames:
-    - "transmission.talos-1.gwebs.ca"
+    - "transmission.${CLUSTER_DOMAIN:=talos-1}.gwebs.ca"
   rules:
     - matches:
         - path:

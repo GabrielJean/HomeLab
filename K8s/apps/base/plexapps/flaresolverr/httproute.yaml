@@ -1,22 +1,22 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: prowlarr
+  name: flaresolverr
   namespace: plexapps
   labels:
-    app.kubernetes.io/name: prowlarr
+    app.kubernetes.io/name: flaresolverr
     app.kubernetes.io/part-of: homelab-media
 spec:
   parentRefs:
     - name: traefik-gateway
       namespace: traefik
   hostnames:
-    - "prowlarr.talos-1.gwebs.ca"
+    - "flaresolverr.${CLUSTER_DOMAIN:=talos-1}.gwebs.ca"
   rules:
     - matches:
         - path:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: prowlarr
-          port: 9696
+        - name: flaresolverr
+          port: 8191
