@@ -7,7 +7,18 @@ on:
     paths:
       - 'Ansible/playbooks/pve-ubuntu-base.yml'
       - 'Ansible/inventories/home/inventory.ini'
+      - 'Ansible/roles/common/**'
+      - 'Ansible/vars/secrets.yml'
   workflow_dispatch:
+    inputs:
+      target_host:
+        description: 'Specific host or pattern to target (e.g. DNS-1, Gaming-1; leave empty for all linux_vms)'
+        required: false
+        default: ''
+      check_mode:
+        description: 'Run in check mode (dry-run without applying changes)?'
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy-pve-ubuntu-base-${{ github.ref }}
@@ -15,6 +26,7 @@ concurrency:
 
 jobs:
   run-playbook:
+    name: Provision Base Ubuntu Config
     runs-on: ubuntu-latest
 
     steps:
@@ -22,25 +34,34 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Grace period for cancel
+        if: github.event_name == 'push'
         run: sleep 10
 
-      - name: Tailscale
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Ansible dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible passlib
+
+      - name: Connect to Tailscale
         uses: tailscale/github-action@v4
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:ci
 
-      - name: Install Ansible
+      - name: Create Ansible vault password file
         run: |
-          python -m pip install --upgrade pip
-          pip install ansible passlib
-
-      - name: Create ansible_vault_password_file
-        run: echo "${{ secrets.ANSIBLE_VAULT_DOCKER }}" > .vault_pass.txt
+          echo "${{ secrets.ANSIBLE_VAULT_DOCKER }}" > .vault_pass.txt
+          chmod 600 .vault_pass.txt
         working-directory: Ansible
 
-      - name: Decrypt inventory.ini
+      - name: Decrypt inventory
         run: ansible-vault decrypt --vault-password-file .vault_pass.txt inventories/home/inventory.ini
         working-directory: Ansible
 
@@ -53,23 +74,57 @@ jobs:
         env:
           ANSIBLE_HOST_KEY_CHECKING: 'false'
           ANSIBLE_FAIL_ON_UNREACHABLE: 'false'
+          TARGET_HOST: ${{ inputs.target_host }}
+          CHECK_MODE: ${{ inputs.check_mode }}
         run: |
           set -o pipefail
-          ansible-playbook playbooks/pve-ubuntu-base.yml \
-            -i inventories/home/inventory.ini --extra-vars "ansible_user=ci" --vault-password-file .vault_pass.txt | tee ansible_output.log
+
+          cmd=(ansible-playbook playbooks/pve-ubuntu-base.yml -i inventories/home/inventory.ini --extra-vars "ansible_user=ci" --vault-password-file .vault_pass.txt)
+
+          if [[ -n "$TARGET_HOST" ]]; then
+            echo "::notice::Limiting execution to host: $TARGET_HOST"
+            cmd+=(--limit "$TARGET_HOST")
+          fi
+
+          if [[ "$CHECK_MODE" == "true" ]]; then
+            echo "::notice::Running in check mode (dry-run)"
+            cmd+=(--check --diff)
+          fi
+
+          "${cmd[@]}" | tee ansible_output.log
           rc=${PIPESTATUS[0]}
+
+          # Generate GitHub Step Summary from PLAY RECAP
+          echo "### 🚀 Ansible Deployment Summary" >> "$GITHUB_STEP_SUMMARY"
+          if grep -q "PLAY RECAP" ansible_output.log; then
+            echo '```text' >> "$GITHUB_STEP_SUMMARY"
+            sed -n '/PLAY RECAP/,$p' ansible_output.log >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
           case "$rc" in
             0)
               echo "Ansible succeeded." ; exit 0 ;;
             2)
-              echo "Ansible reported changes or unreachable (treated as ok)." ; exit 0 ;;
+              echo "Ansible reported changes or unreachable (treated as ok per policy)." ; exit 0 ;;
             3)
-              echo "Ansible reported mixed/unreachable (treated as ok)." ; exit 0 ;;
+              echo "Ansible reported mixed/unreachable (treated as ok per policy)." ; exit 0 ;;
             4)
-              echo "Unreachable hosts detected; ignoring per policy." ; exit 0 ;;
+              echo "Unreachable hosts detected (treated as ok per policy)." ; exit 0 ;;
             5)
-              echo "Unreachable+failed mix reported; treating as ok per policy." ; exit 0 ;;
+              echo "Unreachable+failed mix reported (treated as ok per policy)." ; exit 0 ;;
             *)
-              echo "Ansible failed with exit code $rc." ; exit $rc ;;
+              echo "Ansible failed with exit code $rc." ; exit "$rc" ;;
           esac
+        working-directory: Ansible
+
+      - name: Cleanup sensitive credentials
+        if: always()
+        run: rm -f .vault_pass.txt
+        working-directory: Ansible
+
+
+      - name: Cleanup sensitive credentials
+        if: always()
+        run: rm -f .vault_pass.txt
         working-directory: Ansible

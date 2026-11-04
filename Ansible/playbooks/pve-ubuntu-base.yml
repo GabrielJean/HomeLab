@@ -29,14 +29,32 @@
         update_cache: yes
       changed_when: false
 
-    - name: "Install qemu-guest-agent and prometheus-node-exporter"
+    - name: "Install qemu-guest-agent, prometheus-node-exporter, and unattended-upgrades"
       ansible.builtin.apt:
         pkg:
           - qemu-guest-agent
           - prometheus-node-exporter
+          - unattended-upgrades
           - curl
           - git
         state: present
+
+    - name: "Configure unattended-upgrades for automatic security updates"
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Download-Upgradeable-Packages "1";
+          APT::Periodic::Unattended-Upgrade "1";
+
+    - name: "Ensure unattended-upgrades service is enabled and started"
+      ansible.builtin.systemd:
+        name: unattended-upgrades
+        enabled: yes
+        state: started
 
     - name: "Ensure group 'docker' exists"
       ansible.builtin.group:
