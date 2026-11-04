@@ -41,11 +41,11 @@ spec:
               mountPath: /medias
           resources:
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 256Mi
             limits:
-              cpu: 2000m
-              memory: 2Gi
+              cpu: 1000m
+              memory: 1536Mi
       volumes:
         - name: config
           persistentVolumeClaim:

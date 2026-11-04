@@ -61,10 +61,10 @@ spec:
           resources:
             requests:
               cpu: 50m
-              memory: 64Mi
+              memory: 128Mi
             limits:
-              cpu: 1000m
-              memory: 512Mi
+              cpu: 2000m
+              memory: 1Gi
       volumes:
         - name: vault-storage
           persistentVolumeClaim:

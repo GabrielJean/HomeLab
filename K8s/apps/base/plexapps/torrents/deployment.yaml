@@ -97,11 +97,11 @@ spec:
               mountPath: /medias
           resources:
             requests:
-              cpu: 100m
-              memory: 256Mi
+              cpu: 50m
+              memory: 192Mi
             limits:
-              cpu: 2000m
-              memory: 2Gi
+              cpu: 1000m
+              memory: 1536Mi
 
         - name: qbittorrent
           image: lscr.io/linuxserver/qbittorrent:5.2.4
@@ -121,11 +121,11 @@ spec:
               mountPath: /medias
           resources:
             requests:
-              cpu: 100m
-              memory: 256Mi
+              cpu: 50m
+              memory: 192Mi
             limits:
-              cpu: 2000m
-              memory: 2Gi
+              cpu: 1000m
+              memory: 1536Mi
 
       volumes:
         - name: wireguard-config
