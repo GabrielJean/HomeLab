@@ -42,23 +42,22 @@
 ## Current Status & Implementation Checklist
 
 > [!NOTE]
-> **Active Branch**: `main`  
-> **Overall Progress**: **Phase 0, 1, 2 & 3 Complete (100%)** | **Phase 4 In Progress**
+> **Active Branch**: `main`
+> **Overall Progress**: **Phase 0, 1, 2, 3 & 4 Complete (100%)** | **Phase 5 & 6 In Progress**
 
 ```mermaid
 flowchart LR
     P0["Phase 0: Omni & GitOps<br/>(Complete)"] --> P1["Phase 1: talos-1 Core<br/>(Complete)"]
     P1 --> P2["Phase 2: talos-2 Core<br/>(Complete)"]
     P2 --> P3["Phase 3: TLS & Backups<br/>(Complete)"]
-    P3 --> P4["Phase 4: Web Apps<br/>(In Progress)"]
-    P4 --> P5["Phase 5: Media & NAS<br/>(Pending)"]
-    P5 --> P6["Phase 6: GPU & Edge<br/>(Pending)"]
+    P3 --> P4["Phase 4: Web Apps<br/>(Complete)"]
+    P4 --> P5["Phase 5: Media & Storage<br/>(In Progress)"]
+    P5 --> P6["Phase 6: GPU & Edge<br/>(In Progress)"]
     classDef done fill:#2e7d32,stroke:#1b5e20,color:#ffffff;
     classDef inprog fill:#f57f17,stroke:#e65100,color:#ffffff;
     classDef todo fill:#424242,stroke:#212121,color:#ffffff;
-    class P0,P1,P2,P3 done;
-    class P4 inprog;
-    class P5,P6 todo;
+    class P0,P1,P2,P3,P4 done;
+    class P5,P6 inprog;
 ```
 
 ### Phase 0: Prerequisites & Automation
@@ -921,35 +920,34 @@ Migrate stateful applications, native host storage, and media companion services
   - Exposed HTTP service via Gateway API HTTPRoute on `gitea.talos-1.gwebs.ca` with cluster wildcard TLS.
   - Exposed SSH service directly via `hostPort: 222` on Talos Linux control-plane node (`192.168.10.15`).
 - **Media Companion Stack Migration Roadmap**:
-  - **Part 1: Non-Media Arr Companions** (Overseerr, Prowlarr/Jackett, FlareSolverr):
-    - Migrate configs from `/Apps/...` on `Docker-1` to `local-path` PVCs using LAN Direct Streaming.
-    - Wire up Traefik Gateway API routes (`overseerr.talos-1.gwebs.ca`, `prowlarr.talos-1.gwebs.ca`).
-    - Verify interconnectivity between Overseerr and indexers before introducing download managers.
-  - **Part 2: VPN & Download Stack** (Gluetun + qBittorrent):
-    - Deploy Gluetun VPN container with qBittorrent sidecar in Kubernetes (`apps/base/qbittorrent/`).
-    - Mount `medias-pv` at `/medias` (mapping downloads to `/medias/downloads`), configured with `securityContext: { runAsUser: 950, runAsGroup: 950, fsGroup: 950 }` to strictly match host directory ownership (`950:950 drwxrws---`).
-    - Migrate `/Apps/qbittorrent` config via LAN Direct Streaming into `local-path` PVC.
-    - Verify VPN kill-switch and test multi-gigabit download write speeds to the native ZFS dataset.
-  - **Part 3: Media Automators & Atomic Hardlinks** (Sonarr & Radarr):
-    - Deploy Sonarr and Radarr mounting `medias-pv` at `/medias` (accessing `/medias/downloads` and library paths `/medias/tv`, `/medias/movies`), running as `950:950`.
-    - Migrate SQLite databases and configs from `/Apps/Sonarr` and `/Apps/Radarr` via LAN Direct Streaming into `local-path` PVCs.
-    - **Atomic Hardlink Verification**: Confirm that completed torrent downloads import instantly into media libraries without duplicating disk space or copying bytes across the filesystem.
-  - **Part 4: In-Cluster Samba Deployment & VM Retirement**:
-    - [x] Deploy declarative Samba container (`infrastructure/samba/`) on `k8s-talos-1` with `hostNetwork: true` (listening on node IP `192.168.10.15:445`).
+  - **Part 1: Non-Media Arr Companions (Complete)** (Overseerr, Prowlarr, Jackett, FlareSolverr):
+    - Migrated configs to `local-path` PVCs using LAN Direct Streaming.
+    - Wired up Traefik Gateway API routes (`overseerr.talos-1.gwebs.ca`, `prowlarr.talos-1.gwebs.ca`).
+    - Verified interconnectivity between Overseerr and indexers.
+  - **Part 2: VPN & Download Stack (Complete)** (Gluetun + qBittorrent):
+    - Deployed Gluetun VPN container with qBittorrent sidecar in Kubernetes (`apps/base/plexapps/torrents/`).
+    - Mounted `medias-pv` at `/medias` (mapping downloads to `/medias/downloads`), configured with `securityContext: { runAsUser: 950, runAsGroup: 950, fsGroup: 950 }` to strictly match host directory ownership (`950:950 drwxrws---`).
+    - Verified VPN kill-switch and multi-gigabit download write speeds to the native ZFS dataset.
+  - **Part 3: Media Automators & Atomic Hardlinks (Complete)** (Sonarr & Radarr):
+    - Deployed Sonarr and Radarr mounting `medias-pv` at `/medias` (accessing `/medias/downloads` and library paths `/medias/tv`, `/medias/movies`), running as `950:950`.
+    - Migrated SQLite databases and configs from `/Apps/Sonarr` and `/Apps/Radarr` via LAN Direct Streaming into `local-path` PVCs.
+    - **Atomic Hardlink Verification**: Confirmed that completed torrent downloads import instantly into media libraries without duplicating disk space or copying bytes across the filesystem.
+  - **Part 4: In-Cluster Samba Deployment & VM Retirement (Active)**:
+    - [x] Deploy declarative Samba container (`infrastructure/overlays/k8s-talos-1/samba/`) on `k8s-talos-1` with `hostNetwork: true` (listening on node IP `192.168.10.15:445`).
     - [x] Mount `vault-pv` at `/mnt/Vault` inside the container via `samba-vault-pvc`. Exposes `[Medias]` (`/mnt/Vault/Medias`, `force group = 950`) and `[Lightroom]` (`/mnt/Vault/Lightroom`, `force user = gabriel`).
     - [x] Configure authenticated credentials for user `gabriel` from Azure Key Vault (`gabriel-samba-password`) via External Secrets Operator (`samba-secrets`).
     - [ ] Update LAN DNS in AdGuard Home (`nas.lan` / `nas.gwebs.ca`) pointing to `192.168.10.15`.
     - [ ] Validate SMB read/write from desktop clients (Windows/Mac).
     - [ ] Stop, archive, and delete the legacy Ubuntu VM from Proxmox VE, recovering host RAM, CPU, and disk storage.
-  - **Part 5: OneDrive Rclone Sync CronJob**:
-    - Deploy a scheduled Kubernetes `CronJob` (`apps/base/rclone-onedrive/`) mounting `vault-pv` (subPath: `OneDrive`) with `runAsUser: 1000, runAsGroup: 1000` matching host ownership (`1000:1000 drwxrwx---`).
+  - **Part 5: OneDrive Rclone Sync CronJob (Pending)**:
+    - Deploy a scheduled Kubernetes `CronJob` mounting `vault-pv` (subPath: `OneDrive`) with `runAsUser: 1000, runAsGroup: 1000` matching host ownership (`1000:1000 drwxrwx---`).
     - Synchronize remote OneDrive to `/mnt/Vault/OneDrive` using Microsoft Graph API / OAuth2 credentials synchronized from Azure Key Vault via External Secrets Operator.
 
 ### Phase 6: Edge & Hardware-Bound Workloads
 
 Evaluate and migrate remaining complex workloads:
-- **Plex Media Server**: Add NVIDIA extensions (`siderolabs/nonfree-kmod-nvidia-lts`, `siderolabs/nvidia-container-toolkit-lts`), configure GPU passthrough on `talos-1`, mount `medias-pv` (`/medias`, UID `950:950`) via VirtioFS for library access, and migrate `/Apps/Plex` config to `local-path` storage.
-- **Home Assistant** (Home 2): Requires USB Zigbee stick passthrough (or network-attached Zigbee coordinator) and host networking configuration.
+- **Plex Media Server (Complete)**: Added NVIDIA extensions (`siderolabs/nonfree-kmod-nvidia-lts`, `siderolabs/nvidia-container-toolkit-lts`), configured GPU passthrough on `talos-1` with `runtimeClassName: nvidia`, mounted `plex-medias-pv` (`/medias`, UID `950:950`) via VirtioFS for library access, and migrated `/Apps/Plex` config to `local-path` storage.
+- **Home Assistant (Pending)** (Home 2): Requires USB Zigbee stick passthrough (or network-attached Zigbee coordinator) and host networking configuration.
 
 ---
 
