@@ -3,6 +3,8 @@ kind: ConfigMap
 metadata:
   name: pia-gen-script
   namespace: plexapps
+  annotations:
+    kustomize.toolkit.fluxcd.io/substitute: disabled
   labels:
     app.kubernetes.io/name: gluetun
     app.kubernetes.io/part-of: homelab-media
