@@ -95,7 +95,7 @@ flowchart TD
             H1_KC["Multi-Cluster Kubeconfig (/home/headlamp/.kube/config)"]
         end
         API1["kube-apiserver:6443 (VIP: 192.168.10.15)"]
-        TS1["Tailscale Router VM 1 (192.168.10.7)"]
+        TS1["Talos S2S Gateway (192.168.10.15)"]
     end
 
     subgraph Site2["Home 2 (Subnet: 192.168.15.0/24)"]
@@ -106,7 +106,7 @@ flowchart TD
             H2_KC["Multi-Cluster Kubeconfig (/home/headlamp/.kube/config)"]
         end
         API2["kube-apiserver:6443 (VIP: 192.168.15.15)"]
-        TS2["Tailscale Router VM 2 (192.168.15.7)"]
+        TS2["Talos S2S Gateway (192.168.15.15)"]
     end
 
     subgraph S2S["Tailscale Site-to-Site Mesh"]
@@ -130,10 +130,10 @@ flowchart TD
     H2_KC -->|"Local Context: k8s-talos-2"| API2
 
     %% Remote Cross-Cluster Connections over Tailscale Subnet Routers
-    H1_KC -->|"Remote Context: k8s-talos-2 (via 192.168.10.7)"| TS1
+    H1_KC -->|"Remote Context: k8s-talos-2 (via 192.168.10.15)"| TS1
     TS2 --> API2
 
-    H2_KC -->|"Remote Context: k8s-talos-1 (via 192.168.15.7)"| TS2
+    H2_KC -->|"Remote Context: k8s-talos-1 (via 192.168.15.15)"| TS2
     TS1 --> API1
 ```
 
@@ -237,29 +237,27 @@ All cross-cluster API communications occur exclusively over private network infr
 
 | Cluster | Local Subnet | Control Plane VIP | Local Tailscale Gateway | Routing Enforcement |
 | :--- | :--- | :--- | :--- | :--- |
-| **`k8s-talos-1`** | `192.168.10.0/24` (Home 1) | `https://192.168.10.15:6443` | `192.168.10.7` (TS Router VM 1) | Talos [`routes-talos-1.yaml`](../../Omni/clusters/patches/routes-talos-1.yaml) & DHCP Opt 121 |
-| **`k8s-talos-2`** | `192.168.15.0/24` (Home 2) | `https://192.168.15.15:6443` | `192.168.15.7` (TS Router VM 2) | Talos [`routes-talos-2.yaml`](../../Omni/clusters/patches/routes-talos-2.yaml) & DHCP Opt 121 |
+| **`k8s-talos-1`** | `192.168.10.0/24` (Home 1) | `https://192.168.10.15:6443` | `192.168.10.15` (Talos Node 1) | HostNetwork Gateway (table 52) & DHCP Opt 121 |
+| **`k8s-talos-2`** | `192.168.15.0/24` (Home 2) | `https://192.168.15.15:6443` | `192.168.15.15` (Talos Node 2) | HostNetwork Gateway (table 52) & DHCP Opt 121 |
 
 #### Routing & Transit Architecture:
-1. **Dedicated Tailscale Router VMs**:
-   - Each site hosts a dedicated Tailscale subnet router VM (`192.168.10.7` on Home 1, `192.168.15.7` on Home 2) provisioned via Ansible ([`tailscale-routers.yml`](../../../Ansible/playbooks/tailscale-routers.yml)).
-   - Subnet routers advertise their local LAN (`--advertise-routes=192.168.10.0/24` and `--advertise-routes=192.168.15.0/24`) and accept remote subnet routes (`--accept-routes`).
-   - Router VMs enable IP forwarding (`net.ipv4.ip_forward=1`), disable `rp_filter`, and configure TCP MSS clamping (`--clamp-mss-to-pmtu`) on `tailscale0` to prevent fragmentation over WAN links.
+1. **In-Cluster Standalone Tailscale Gateways**:
+   - Each cluster hosts a dedicated single-replica standalone Tailscale router with `hostNetwork: true` deployed directly on the Talos control-plane node (`192.168.10.15` on Home 1, `192.168.15.15` on Home 2) via GitOps ([`K8s/infrastructure/configs/tailscale/`](../tailscale/)).
+   - Subnet routers advertise their local LAN (`--advertise-routes=192.168.10.0/24` and `--advertise-routes=192.168.15.0/24`), accept remote subnet routes (`--accept-routes`), and disable SNAT (`--snat-subnet-routes=false`) to preserve client source IPs.
+   - Talos nodes enable IP forwarding (`net.ipv4.ip_forward=1`), loose rp_filter (`net.ipv4.conf.all.rp_filter=2`), and automatic TCP MSS clamping on `tailscale0` via Tailscale.
 
-2. **Talos Static Routing**:
-   - Talos nodes cannot rely on DHCP option updates for critical control plane traffic. Instead, each node has an explicit network interface route patch applied via Omni:
-     - On `k8s-talos-1` nodes: route to `192.168.15.0/24` via gateway `192.168.10.7`.
-     - On `k8s-talos-2` nodes: route to `192.168.10.0/24` via gateway `192.168.15.7`.
+2. **Talos Native On-Node Routing**:
+   - Because the Tailscale gateway runs with `hostNetwork: true`, `tailscale0` and kernel policy routing table `52` exist directly on the Talos host kernel. Traffic between the local node and remote cluster subnets traverses `tailscale0` directly without intermediary VMs.
 
 3. **DHCP Option 121 (Classless Static Routes)**:
    - Residential routers / DHCP servers at each home broadcast DHCP Option 121 to assign static routes for the remote subnet:
-     - Site 1 DHCP clients receive: `192.168.15.0/24` via gateway `192.168.10.7`.
-     - Site 2 DHCP clients receive: `192.168.10.0/24` via gateway `192.168.15.7`.
+     - Site 1 DHCP clients receive: `192.168.15.0/24` via gateway `192.168.10.15`.
+     - Site 2 DHCP clients receive: `192.168.10.0/24` via gateway `192.168.15.15`.
    - This allows any administrator laptop, workstation, or server on the local network to reach the remote cluster's API VIP without running a local Tailscale client.
 
 #### Network Security Safeguards:
 - **Zero Public Exposure**: Neither cluster's `kube-apiserver` (port 6443) is exposed to the public internet, public DNS, or WAN port forwarding.
-- **End-to-End Encrypted Tailscale Transit**: Traffic between `192.168.10.7` and `192.168.15.7` is authenticated and encrypted end-to-end via Tailscale's encrypted WireGuard-based mesh protocol.
+- **End-to-End Encrypted Tailscale Transit**: Traffic between `192.168.10.15` and `192.168.15.15` is authenticated and encrypted end-to-end via Tailscale's encrypted WireGuard-based mesh protocol.
 - **Cryptographic Trust**: Each cluster's root CA certificate is embedded directly into the kubeconfig (`certificate-authority-data`), guaranteeing strict TLS mutual verification and preventing man-in-the-middle attacks across the inter-site link.
 
 ---
@@ -499,22 +497,20 @@ Paste this token into the Headlamp login page to regain full administrative cont
 ### 5. Cross-Cluster Communication Timeout / Remote Cluster Unavailable
 
 - **Symptom**: The local cluster works fine in Headlamp, but selecting the remote cluster from the dropdown displays a loading spinner followed by `Cluster is unavailable` or `context deadline exceeded`.
-- **Root Cause**: The Headlamp pod cannot reach the remote Kubernetes API server VIP (`192.168.10.15:6443` or `192.168.15.15:6443`). Typical causes include the local Tailscale router VM (`192.168.10.7` or `192.168.15.7`) being offline, `tailscaled` service stopped, advertised subnet routes unapproved in the Tailscale admin console, IP forwarding disabled, or missing static routes on the Talos nodes.
+- **Root Cause**: The Headlamp pod cannot reach the remote Kubernetes API server VIP (`192.168.10.15:6443` or `192.168.15.15:6443`). Typical causes include the local Tailscale gateway pod (`tailscale-lan-s2s-gateway`) being offline, `tailscaled` service stopped, advertised subnet routes unapproved in the Tailscale admin console, IP forwarding disabled, or missing node labels/sysctls on the Talos nodes.
 - **Fix**:
   1. Test connectivity directly from the Headlamp container across the Tailscale subnet route:
      ```bash
      kubectl --context admin@k8s-talos-1 -n headlamp exec deploy/headlamp -- nc -zv 192.168.15.15 6443
      ```
-  2. Verify Tailscale service status and advertised routes on the local router VM (`192.168.10.7` or `192.168.15.7`):
+  2. Verify Tailscale gateway status and advertised routes on the local gateway pod:
      ```bash
-     tailscale status
+     kubectl --context admin@k8s-talos-1 -n tailscale exec deploy/tailscale-lan-s2s-gateway -- tailscale status
      ```
-  3. Ensure IPv4 forwarding is active on the router VM:
+  3. Ensure the gateway pod is running and bound to the node hostNetwork:
      ```bash
-     sysctl net.ipv4.ip_forward
-     # Expected output: net.ipv4.ip_forward = 1
+     kubectl --context admin@k8s-talos-1 -n tailscale get pods -l app=tailscale-lan-s2s -o wide
      ```
-  4. Verify that the Talos control plane has the static route patch applied ([`routes-talos-1.yaml`](../../Omni/clusters/patches/routes-talos-1.yaml) or [`routes-talos-2.yaml`](../../Omni/clusters/patches/routes-talos-2.yaml)).
 
 ### 6. Duplicate or Redundant `main` Cluster in Switcher
 
@@ -530,7 +526,7 @@ Paste this token into the Headlamp login page to regain full administrative cont
 | :--- | :--- | :--- |
 | **Zero Secrets in Git** | Credentials originate in Azure Key Vault (`k8s-app-secret`) and are templated in-memory via External Secrets Operator. No static secrets or ConfigMaps with sensitive fields exist in Git. | `git log -S` and repository scanning confirm 0 tokens/secrets committed. |
 | **Least-Privilege Pod Execution** | Container runs non-root as UID `100` (`runAsNonRoot: true`, `privileged: false`), with all Linux capabilities dropped (`drop: ["ALL"]`) in both init and app containers. | `kubectl get pod -n headlamp -o yaml` verifies strict securityContext. |
-| **Encrypted Transit (Network Security)** | Cross-site cluster API communication (`192.168.10.15:6443` <-> `192.168.15.15:6443`) traverses private subnets routed through dedicated Tailscale subnet router VMs (`192.168.10.7` and `192.168.15.7`) with static routes on Talos nodes and DHCP Option 121 for LAN clients. Apiservers are never exposed to the public internet. | TLS certificate validation with embedded root CAs; private IP endpoints only; Tailscale mesh encryption. |
+| **Encrypted Transit (Network Security)** | Cross-site cluster API communication (`192.168.10.15:6443` <-> `192.168.15.15:6443`) traverses private subnets routed through hostNetwork Tailscale gateways on Talos nodes (`192.168.10.15` and `192.168.15.15`) with DHCP Option 121 for LAN clients. Apiservers are never exposed to the public internet. | TLS certificate validation with embedded root CAs; private IP endpoints only; Tailscale mesh encryption. |
 | **Scoped Token Broadcasting** | Token broadcasting (`-oidc-use-token-broadcast=true`) strictly evaluates target contexts and will only broadcast the auth cookie if the target cluster's OIDC issuer URL and client ID match the source cluster. | Code audit of `backend/pkg/auth/broadcast.go` confirms strict issuer + clientID validation before cookie replication. |
 | **Strict Claim Mapping & RBAC** | Kubernetes Structured Authentication maps `preferred_username` to the Kubernetes User identity without arbitrary prefixing. `oidc-rbac.yaml` restricts `cluster-admin` strictly to the verified administrator account (`admin@example.com`). | ClusterRoleBinding `oidc-admin` enforces explicit subject authorization. |
 | **ClusterIP Isolation** | Headlamp services are deployed strictly as internal `ClusterIP` services, protected behind Traefik reverse proxy and Gateway API HTTPRoutes. | `kubectl get svc -n headlamp` confirms no external LoadBalancer or NodePort exposure. |

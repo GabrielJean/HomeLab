@@ -18,6 +18,7 @@ spec:
     substitute:
       CLUSTER_NAME: k8s-talos-1
       CLUSTER_DOMAIN: talos-1
+      TS_ROUTES: "192.168.10.0/24"
     substituteFrom:
       - kind: Secret
         name: cluster-secrets

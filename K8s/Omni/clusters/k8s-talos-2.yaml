@@ -14,6 +14,8 @@ patches:
     file: patches/allow-controlplane.yaml
   - name: flannel-network-policies
     file: patches/flannel-network-policies.yaml
+  - name: tailscale-gateway
+    file: patches/tailscale-gateway.yaml
   - name: site-to-site-routes
     file: patches/routes-talos-2.yaml
   - name: sa-issuer

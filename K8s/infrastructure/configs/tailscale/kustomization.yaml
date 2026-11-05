@@ -3,4 +3,5 @@ kind: Kustomization
 
 resources:
   - external-secret.yaml
-
+  - s2s-rbac.yaml
+  - s2s-deployment.yaml

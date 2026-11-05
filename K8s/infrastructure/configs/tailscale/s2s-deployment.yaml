@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tailscale-lan-s2s-gateway
+  namespace: tailscale
+  labels:
+    app.kubernetes.io/name: tailscale-lan-s2s
+    app.kubernetes.io/part-of: homelab-infrastructure
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: tailscale-lan-s2s
+  template:
+    metadata:
+      labels:
+        app: tailscale-lan-s2s
+    spec:
+      serviceAccountName: tailscale-s2s-sa
+      priorityClassName: infra-critical
+      nodeSelector:
+        tailscale-s2s-gateway: "true"
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: tailscale
+          image: ghcr.io/tailscale/tailscale:v1.80.3
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+                - NET_RAW
+          env:
+            - name: TS_KUBE_SECRET
+              value: "tailscale-s2s-state"
+            - name: TS_USERSPACE
+              value: "false"
+            - name: TS_ACCEPT_ROUTES
+              value: "true"
+            - name: TS_ROUTES
+              value: "${TS_ROUTES:=192.168.10.0/24}"
+            - name: TS_EXTRA_ARGS
+              value: "--snat-subnet-routes=false --accept-dns=false --advertise-tags=tag:k8s-operator --hostname=${CLUSTER_NAME:=k8s-talos-1}-s2s-router"
+            - name: TS_AUTHKEY
+              valueFrom:
+                secretKeyRef:
+                  name: operator-oauth
+                  key: client_secret
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: dev-tun
+              mountPath: /dev/net/tun
+      volumes:
+        - name: dev-tun
+          hostPath:
+            path: /dev/net/tun

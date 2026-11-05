@@ -1,8 +1,10 @@
-# Static routing patch for Home 2 (talos-2 / pve-2)
-# Cloud-Init configures the node's static IP and DNS nameservers.
+# Network routing patch for Home 2 (talos-2 / pve-2)
+# Cloud-Init configures the node's static IP (192.168.15.15) and DNS nameservers.
 # This patch defines the routing table on eth0:
 # 1. Default gateway for internet and Omni SaaS connectivity (192.168.15.1)
-# 2. Site-to-site route to Home 1 (192.168.10.0/24) via local Tailscale router (192.168.15.7)
+# 2. Existing static route to Home 1 (192.168.10.0/24) via local Tailscale router VM (192.168.15.7).
+# Note: When the in-cluster hostNetwork Tailscale gateway is active, Linux policy routing table 52
+# (priority 5210) takes precedence over this interface route, ensuring seamless zero-downtime transition.
 
 machine:
   network:
@@ -13,4 +15,3 @@ machine:
             gateway: 192.168.15.1
           - network: 192.168.10.0/24
             gateway: 192.168.15.7
-
