@@ -65,7 +65,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: operator-oauth
-                  key: client_secret
+                  key: TS_AUTHKEY
           resources:
             requests:
               cpu: 50m
