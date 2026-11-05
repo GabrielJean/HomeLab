@@ -214,13 +214,13 @@
     - name: "Set static route for LAN A hosts"
       ansible.builtin.set_fact:
         tailscale_route_to: "192.168.15.0/24"
-        tailscale_route_via: "192.168.10.7"
+        tailscale_route_via: "192.168.10.15"
       when: ansible_facts['default_ipv4']['address'] is match('^192\\.168\\.10\\.')
 
     - name: "Set static route for LAN B hosts"
       ansible.builtin.set_fact:
         tailscale_route_to: "192.168.10.0/24"
-        tailscale_route_via: "192.168.15.7"
+        tailscale_route_via: "192.168.15.15"
       when: ansible_facts['default_ipv4']['address'] is match('^192\\.168\\.15\\.')
 
     - name: "Configure netplan static route for site-to-site"
