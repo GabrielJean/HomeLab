@@ -44,7 +44,7 @@ spec:
             - name: TS_ROUTES
               value: "${TS_ROUTES:=192.168.10.0/24}"
             - name: TS_EXTRA_ARGS
-              value: "--snat-subnet-routes=false --accept-dns=false --advertise-tags=tag:k8s-operator --hostname=${CLUSTER_NAME:=k8s-talos-1}-s2s-router"
+              value: "--snat-subnet-routes=false --accept-routes --accept-dns=false --advertise-tags=tag:k8s-operator --hostname=${CLUSTER_NAME:=k8s-talos-1}-s2s-router"
             - name: TS_AUTHKEY
               valueFrom:
                 secretKeyRef:
