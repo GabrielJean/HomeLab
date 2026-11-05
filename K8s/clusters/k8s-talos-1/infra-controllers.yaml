@@ -12,3 +12,11 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
+  postBuild:
+    substitute:
+      CLUSTER_NAME: k8s-talos-1
+      CLUSTER_DOMAIN: talos-1
+    substituteFrom:
+      - kind: Secret
+        name: cluster-secrets
+        optional: true
