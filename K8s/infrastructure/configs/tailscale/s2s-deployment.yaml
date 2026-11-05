@@ -37,6 +37,8 @@ spec:
               value: "tailscale-s2s-state"
             - name: TS_USERSPACE
               value: "false"
+            - name: TS_DEBUG_FIREWALL_MODE
+              value: "auto"
             - name: TS_ACCEPT_ROUTES
               value: "true"
             - name: TS_ROUTES
