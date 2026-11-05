@@ -24,6 +24,22 @@ spec:
         tailscale-s2s-gateway: "true"
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
+      initContainers:
+        - name: configure-routing
+          image: ghcr.io/tailscale/tailscale:v1.80.3
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+          command:
+            - /bin/sh
+            - -c
+            - |
+              ip rule del priority 5200 2>/dev/null || true
+              ip rule add to "${TS_ROUTES:=192.168.10.0/24}" priority 5200 lookup main
+          env:
+            - name: TS_ROUTES
+              value: "${TS_ROUTES:=192.168.10.0/24}"
       containers:
         - name: tailscale
           image: ghcr.io/tailscale/tailscale:v1.80.3
