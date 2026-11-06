@@ -19,7 +19,7 @@ metadata:
   type: InstallationMediaConfigs.omni.sidero.dev
   id: talos-1
 spec:
-  talosversion: "1.14.4"
+  talosversion: "1.14.5"
   architecture: 1 # amd64
   cloud:
     platform: nocloud
