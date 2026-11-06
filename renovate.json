@@ -60,6 +60,13 @@
   ],
   "packageRules": [
     {
+      "description": "Restrict Python version in GitHub Actions workflows to versions supported by Ansible and passlib (<= 3.12)",
+      "matchPackageNames": [
+        "python"
+      ],
+      "allowedVersions": "<=3.12"
+    },
+    {
       "description": "Disable Kubernetes API version deprecation checks across YAML manifests",
       "matchDatasources": [
         "kubernetes-api"

@@ -40,7 +40,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: '3.15'
+          python-version: '3.12'
 
       - name: Install Ansible dependencies
         run: |
@@ -116,12 +116,6 @@ jobs:
               echo "Ansible failed with exit code $rc." ; exit "$rc" ;;
           esac
         working-directory: Ansible
-
-      - name: Cleanup sensitive credentials
-        if: always()
-        run: rm -f .vault_pass.txt
-        working-directory: Ansible
-
 
       - name: Cleanup sensitive credentials
         if: always()
