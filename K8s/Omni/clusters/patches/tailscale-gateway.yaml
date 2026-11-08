@@ -1,11 +1,15 @@
 # Machine configuration patch for Tailscale Site-to-Site Gateway node.
 # Configures node label for pod scheduling and kernel sysctls for IP forwarding and loose rp_filter.
-machine:
-  nodeLabels:
-    tailscale-s2s-gateway: "true"
-  sysctls:
-    net.ipv4.ip_forward: "1"
-    net.ipv6.conf.all.forwarding: "1"
-    net.ipv4.conf.all.rp_filter: "2"
-    net.ipv4.conf.default.rp_filter: "2"
+apiVersion: v1alpha1
+kind: KubeNodeConfig
+labels:
+  tailscale-s2s-gateway: "true"
+---
+apiVersion: v1alpha1
+kind: SysctlConfig
+params:
+  net.ipv4.ip_forward: "1"
+  net.ipv6.conf.all.forwarding: "1"
+  net.ipv4.conf.all.rp_filter: "2"
+  net.ipv4.conf.default.rp_filter: "2"
 
