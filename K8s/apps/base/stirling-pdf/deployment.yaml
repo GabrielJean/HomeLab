@@ -21,7 +21,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: stirling-pdf
-          image: frooodle/s-pdf:3.2.2
+          image: frooodle/s-pdf:3.3.0
           env:
             - name: DOCKER_ENABLE_SECURITY
               value: "false"
