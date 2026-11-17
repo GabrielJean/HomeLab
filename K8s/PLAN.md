@@ -9,7 +9,7 @@
   - [Cluster Topology: Independent Single-Node Clusters](#cluster-topology-independent-single-node-clusters)
   - [Management Layer: Sidero Omni SaaS & omnictl](#management-layer-sidero-omni-saas--omnictl)
   - [Dashboard & Workload Visibility: Headlamp](#dashboard--workload-visibility-headlamp)
-  - [Observability Architecture: Azure Managed Prometheus & Self-Hosted Grafana](#observability-architecture-azure-managed-prometheus--self-hosted-grafana)
+  - [Observability Architecture: Multi-Cluster Metrics, Centralized Logs & Alerting Pipeline](#observability-architecture-multi-cluster-metrics-centralized-logs--alerting-pipeline)
   - [GitOps Engine: Flux CD](#gitops-engine-flux-cd)
   - [Operational Tooling Separation](#operational-tooling-separation)
 - [Networking And Ingress](#networking-and-ingress)
@@ -33,6 +33,8 @@
   - [Phase 5: Stateful & Media Workloads](#phase-5-stateful--media-workloads)
   - [Phase 6: Edge & Hardware-Bound Workloads](#phase-6-edge--hardware-bound-workloads)
   - [Phase 7: Observability Stack](#phase-7-observability-stack)
+    - [Phase 7A: Metrics, Dashboards & Two-Tier Alerting (Priority 1)](#phase-7a-metrics-dashboards--two-tier-alerting-priority-1)
+    - [Phase 7B: Centralized Logging with Loki & Promtail (Priority 2)](#phase-7b-centralized-logging-with-loki--promtail-priority-2)
 - [Stateful Application Data Migration Runbook (LAN Direct Streaming)](#stateful-application-data-migration-runbook-lan-direct-streaming)
 - [Workloads Remaining Outside Kubernetes Initially](#workloads-remaining-outside-kubernetes-initially)
 - [Validation And Exit Criteria](#validation-and-exit-criteria)
@@ -54,13 +56,14 @@ flowchart LR
     P3 --> P4["Phase 4: Web Apps<br/>(Complete)"]
     P4 --> P5["Phase 5: Media & Storage<br/>(In Progress)"]
     P5 --> P6["Phase 6: Edge & Hardware<br/>(Pending)"]
-    P6 --> P7["Phase 7: Observability<br/>(Pending)"]
+    P6 --> P7A["Phase 7A: Metrics & Alerts<br/>(Priority 1)"]
+    P7A --> P7B["Phase 7B: Centralized Logs<br/>(Priority 2)"]
     classDef done fill:#2e7d32,stroke:#1b5e20,color:#ffffff;
     classDef inprog fill:#f57f17,stroke:#e65100,color:#ffffff;
     classDef todo fill:#424242,stroke:#212121,color:#ffffff;
     class P0,P1,P2,P3,P4 done;
     class P5 inprog;
-    class P6,P7 todo;
+    class P6,P7A,P7B todo;
 ```
 
 ### Phase 0: Prerequisites & Automation
@@ -128,7 +131,23 @@ flowchart LR
 - [ ] **Home Assistant**: Deploy on `talos-2` with host networking and Zigbee coordinator integration.
 
 ### Phase 7: Observability Stack (Pending)
-- [ ] **Observability Stack**: Deploy lightweight collector (`vmagent`) with Azure Managed Prometheus remote-write, Entra ID OAuth2 authentication, metric ingestion optimizations (<$0.50/mo), and self-hosted Grafana on `k8s-talos-1`.
+
+#### Phase 7A: Metrics, Dashboards & Two-Tier Alerting (Rollout Priority 1)
+- [ ] **Azure Monitor Workspace & Key Vault Secrets**: Provision Azure Monitor Workspace for Prometheus TSDB; create Entra ID App Registration (`Monitoring Metrics Publisher`, `Monitoring Data Reader`); sync credentials (`monitoring/azure-prom-auth`) via External Secrets Operator.
+- [ ] **Metrics Collection (`vmagent`)**: Deploy ultra-lightweight `vmagent` (~30MB RAM) on `k8s-talos-1` and `k8s-talos-2` scraping Kubernetes node metrics (`node-exporter`), cluster state (`kube-state-metrics`), container runtime (`cAdvisor`), Traefik ingress, cert-manager, and VolSync.
+- [ ] **Cost & Storage Optimization**: Apply remote-write sample pruning (60s scrape intervals, drop `*_bucket` and `^go_.*`/`^process_.*` runtime series) to guarantee <$0.50/mo total Azure cost with local disk buffer fallback.
+- [ ] **Tier 1 Out-of-Band Dead Man's Switch (Healthchecks.io + Pushover)**: Deploy featherweight 1-minute heartbeat CronJob on `talos-1` and `talos-2` pinging Healthchecks.io endpoints (`https://hc-ping.com/<uuid>`); Healthchecks.io fires Pushover Emergency sirens (Priority 2) if a single node dies, crashes, or loses power/WAN.
+- [ ] **Tailscale Site-to-Site VPN Monitoring**: Implement end-to-end monitoring of the Home 1 (`192.168.10.0/24`) <-> Home 2 (`192.168.15.0/24`) tunnel via cross-cluster heartbeat CronJob (Tier 1 via Healthchecks.io) and synthetic metric probes (`probe_success`, latency) with Grafana alerts and latency dashboard panels (Tier 2).
+- [ ] **Visualization Tier (Self-Hosted Grafana)**: Deploy Grafana on `k8s-talos-1` with Traefik Gateway API HTTPRoute (`grafana.talos-1.gwebs.ca`), wildcard TLS, Microsoft Entra ID OIDC SSO (`homelab-k8s-admins` mapped to Admin), and pre-provisioned Azure Managed Prometheus datasource.
+- [ ] **Tier 2 In-Cluster Built-in Grafana Alerting**: Enable native Grafana Alerting (eliminating standalone Alertmanager pod bloat) with dedicated Contact Point for Pushover (Priority 2 for Critical, Priority 0 for Warning).
+- [ ] **Metric Alert Rules Catalog**: Deploy declarative Prometheus alert rules covering node health, pod crashloops/OOMs, disk/PVC capacity, backup failures, ingress 5xx rates, cert expiration, and `TailscaleSiteToSiteDown`.
+- [ ] **Unified Multi-Cluster Dashboards**: Provision curated Grafana dashboards with `$cluster` variable selector (Cluster Overview, Kubernetes Workloads, Node Exporter, Storage/PVCs, Traefik Ingress, and Tailscale Site-to-Site VPN).
+
+#### Phase 7B: Centralized Logging with Loki & Promtail (Rollout Priority 2)
+- [ ] **Centralized Log Aggregation (Grafana Loki)**: Deploy Loki in single-binary mode on `k8s-talos-1` backed by persistent volume storage (`local-path` PVC or Azure Blob `gjtalossa`) with automated retention compaction (14–30 days).
+- [ ] **Kubernetes Pod Log Collection (Promtail)**: Deploy Promtail DaemonSet across `k8s-talos-1` and `k8s-talos-2` (in PSA privileged `monitoring` namespace) streaming `/var/log/pods` enriched with cluster, namespace, pod, and container labels.
+- [ ] **Cross-Cluster Log Transport**: Route `k8s-talos-2` Promtail log streams to `k8s-talos-1` Loki securely over the Tailscale site-to-site encrypted bridge.
+- [ ] **Grafana Loki Integration & LogQL Alerts**: Connect Loki datasource in Grafana, configure Loki Log Explorer dashboard, and establish LogQL error-spike alert rules.
 
 ---
 
@@ -249,55 +268,176 @@ Sidero Omni is the cloud-hosted management platform purpose-built for Talos Linu
 
 ---
 
-### Observability Architecture: Azure Managed Prometheus & Self-Hosted Grafana
+### Observability Architecture: Multi-Cluster Metrics, Centralized Logs & Alerting Pipeline
 
-Long-term metrics storage, alerting, and cross-cluster historical visualization are handled via a hybrid cloud model: **Azure Managed Prometheus** for cloud time-series storage combined with **Self-Hosted Grafana** on `k8s-talos-1`.
+In a single-node cluster environment, monitoring architecture must solve two critical realities:
+1. **Simplicity First**: Avoid heavy operators, complex microservice CRDs, and redundant daemons. Total resource footprint must stay under ~200 MB RAM per node.
+2. **The Single-Node Paradox ("Who Watches the Watcher?")**: If a single-node cluster suffers a power outage, kernel panic, hypervisor crash, or network cut, **every in-cluster monitoring and alerting pod dies with it**. An in-cluster alerting container cannot alert you that its own host is dead!
+
+To solve both challenges cleanly, observability is organized into **Three Core Pillars** backed by a **Two-Tier Fail-Safe Alerting Model**:
 
 ```mermaid
-flowchart LR
-    subgraph Home_1["Home 1 (k8s-talos-1)"]
-        EX_1["node-exporter & KSM"] --> AGENT_1["vmagent / Prometheus Agent<br/>(~30 MB RAM)"]
-        GRAFANA["Self-Hosted Grafana<br/>(talos-1 In-Cluster)"]
+flowchart TD
+    subgraph FailSafe_Tier1["Tier 1: Out-of-Band Cloud & Cross-Site Watchers (Survives Node Death)"]
+        AZ_MON["Azure Monitor (Cloud)<br/>Heartbeat & Absent Metric Evaluator"]
+        CROSS_WATCH["Cross-Cluster Watchdog<br/>(talos-1 & talos-2 Ping Each Other)"]
+        OMNI_SAAS["Sidero Omni SaaS<br/>(SideroLink Tunnel Status)"]
     end
 
-    subgraph Home_2["Home 2 (k8s-talos-2)"]
-        EX_2["node-exporter & KSM"] --> AGENT_2["vmagent / Prometheus Agent<br/>(~30 MB RAM)"]
+    subgraph Home_1["Home 1 (k8s-talos-1) — In-Cluster (Tier 2)"]
+        direction TB
+        EX_1["node-exporter, KSM & cAdvisor"] --> VMAGENT_1["vmagent Scraper (~30 MB)"]
+        LOGS_1["Container Logs (/var/log/pods)"] --> PROMTAIL_1["Promtail DaemonSet (~25 MB)"]
+        LOKI["Grafana Loki (Single-Binary, ~80 MB)"]
+        GRAFANA["Grafana (Dashboards + Built-in Alerting, ~60 MB)"]
     end
 
-    subgraph Azure_Cloud["Microsoft Azure"]
-        ENTRA["Microsoft Entra ID<br/>(OAuth2 Auth)"]
-        AZ_PROM["Azure Monitor Workspace<br/>(Azure Managed Prometheus TSDB)"]
+    subgraph Home_2["Home 2 (k8s-talos-2) — Featherweight Agent"]
+        direction TB
+        EX_2["node-exporter, KSM & cAdvisor"] --> VMAGENT_2["vmagent Scraper (~30 MB)"]
+        LOGS_2["Container Logs (/var/log/pods)"] --> PROMTAIL_2["Promtail DaemonSet (~25 MB)"]
     end
 
-    AGENT_1 -- "Outbound HTTPS (Port 443)<br/>Remote Write + Bearer Token" --> AZ_PROM
-    AGENT_2 -- "Outbound HTTPS (Port 443)<br/>Remote Write + Bearer Token" --> AZ_PROM
-    AGENT_1 -. "Fetch Token" .-> ENTRA
-    AGENT_2 -. "Fetch Token" .-> ENTRA
-    GRAFANA -- "PromQL Query (HTTPS 443)" --> AZ_PROM
+    subgraph Notifications["High-Signal Notification Channel"]
+        PUSHOVER["Pushover Push (Emergency Siren / DND Bypass)"]
+    end
+
+    %% Metrics Flow
+    VMAGENT_1 -- "Outbound HTTPS Remote Write (60s)" --> AZ_MON
+    VMAGENT_2 -- "Outbound HTTPS Remote Write (60s)" --> AZ_MON
+
+    %% Logs Flow
+    PROMTAIL_1 -- "Local File Tail" --> LOKI
+    PROMTAIL_2 -- "Tailscale S2S Tunnel" --> LOKI
+
+    %% Tier 1 Out-of-Band Alerting (Node Dead)
+    AZ_MON -- "🚨 Node Dead: Absent Metrics > 5m" --> PUSHOVER
+    CROSS_WATCH -- "Site-to-Site Ping Down" --> PUSHOVER
+    OMNI_SAAS -. "SideroLink Disconnect" .-> PUSHOVER
+
+    %% Tier 2 In-Cluster Alerting (Workload Health)
+    GRAFANA -- "In-Cluster App & PVC Alerts" --> PUSHOVER
+
+    %% Visualization
+    GRAFANA -- "PromQL Query" --> AZ_MON
+    GRAFANA -- "LogQL Query" --> LOKI
 ```
 
-#### Core Architectural Principles:
-1. **Zero Azure Arc Overhead**:
-   - Azure Arc is **not** used. This avoids the ~500 MB – 1 GB RAM footprint of Arc agents (`clusterconnect`, `guard`, `config-agent`) on the single-node Talos VMs.
-   - The cluster uses standard **Prometheus Remote Write API** over outbound HTTPS (Port 443).
-2. **100% Outbound Communication**:
-   - Collectors initiate all traffic outbound to Azure; no inbound ports, public IPs, port forwarding, or cross-site VPNs are required.
-   - Works seamlessly behind standard residential NAT and stateful firewalls.
-3. **Multi-Cluster Federation via `external_labels`**:
-   - Both `talos-1` and `talos-2` push to the exact same Azure Monitor Workspace.
-   - Metrics are tagged with `external_labels: { cluster: "home-1" }` and `{ cluster: "home-2" }`, allowing Grafana dashboards to switch clusters seamlessly via a `$cluster` dropdown.
-4. **Credential Security**:
-   - The collector authenticates against Entra ID using an App Registration (Service Principal) with `Monitoring Metrics Publisher` permissions.
-   - Grafana queries using `Monitoring Data Reader` permissions.
-   - Secrets (`client_id`, `client_secret`, `tenant_id`) are stored in Azure Key Vault and synchronized automatically into Kubernetes secrets via the **External Secrets Operator**.
-5. **Cost Engineering (<$0.50 / Month)**:
-   - Azure Managed Prometheus charges ~$0.16 per 10 million samples after 1 million free monthly samples.
-   - **60s Scrape Interval**: Cuts sample volume by 75% compared to standard 15s scraping.
-   - **High-Cardinality Pruning**: Drops all Prometheus histogram buckets (`*_bucket`) and internal runtime metrics (`^go_.*`, `^process_.*`), keeping only actionable counters and gauges.
-   - **Target Ingestion**: ~15M–25M samples/month total across both clusters, resulting in a predictable monthly bill of **~$0.30 to $0.40/month**.
-6. **Self-Hosted Grafana vs. Azure Managed Grafana**:
-   - Microsoft charges ~$42/month for an Azure Managed Grafana instance.
-   - By running a lightweight Grafana container on `k8s-talos-1`, the visualization tier is **$0/month**, while preserving the resilience and long retention (18 months) of cloud-stored metrics.
+---
+
+#### Two-Tier Fail-Safe Alerting Model (Solving the Single-Node Paradox)
+
+> [!IMPORTANT]
+> **Who Watches the Watcher?**
+> In a single-node cluster, in-cluster alerting pods cannot notify you that the cluster is dead because they go down with the node. Therefore, alerting is decoupled into two independent tiers:
+> 1. **Tier 1 (Out-of-Band Cloud & Cross-Site Watchers)**: Detects complete node/cluster death, power cuts, hypervisor crashes, and internet cuts.
+> 2. **Tier 2 (In-Cluster Built-in Grafana Alerting)**: Detects workload issues, pod crashloops, disk capacity warnings, backup failures, and log errors while the node is operating.
+
+##### Tier 1: Out-of-Band Dead Man's Switch & S2S VPN Watcher (Survives Node Death)
+1. **Healthchecks.io Dead Man's Switch (Survives Complete Node Death)**:
+   - Gabriel already has **Healthchecks.io** in place. Healthchecks.io is purpose-built as an external dead-man's switch with native Pushover integration.
+   - Each single-node cluster runs a featherweight 1-minute heartbeat CronJob (`curlimages/curl`, ~5 MB RAM) pinging its respective Healthchecks.io endpoint (`https://hc-ping.com/<uuid>`).
+   - If a node suffers hardware failure, kernel panic, hypervisor crash, power cut, or residential WAN drop, the ping stops. After the grace period (e.g. 2–3 minutes), Healthchecks.io independently triggers a **Pushover Emergency Siren (Priority 2 with 60s retries)**:
+     `🚨 [CRITICAL] Cluster k8s-talos-1 is DOWN (Missed heartbeat ping for 2m)`.
+   - **Zero Cloud Infrastructure Overhead**: Eliminates the need for custom Azure Action Group webhook bridges or lambda proxies.
+2. **Tailscale Site-to-Site LAN VPN Heartbeat (Home 1 <-> Home 2)**:
+   - The two homes are bridged via `tailscale-lan-s2s-gateway` connecting `192.168.10.0/24` and `192.168.15.0/24`.
+   - `k8s-talos-1` runs a scheduled check testing connectivity to `192.168.15.15:443` across the tunnel; on success, it pings its S2S check endpoint on Healthchecks.io.
+   - `k8s-talos-2` runs a reciprocal check testing `192.168.10.15:443` and pings its endpoint.
+   - If the Tailscale S2S bridge drops while both nodes are alive, the healthcheck misses its heartbeat and triggers:
+     `🚨 [CRITICAL] Tailscale Site-to-Site VPN is DOWN (Cross-site ping failed)`.
+3. **Sidero Omni SaaS Heartbeat**:
+   - Omni SaaS maintains persistent SideroLink WireGuard tunnels to each Talos node. If a node disconnects, Omni SaaS detects the outage immediately.
+
+##### Tier 2: Streamlined In-Cluster Alerting (Built-in Grafana Alerting)
+- **Eliminating Component Bloat**: Instead of deploying and maintaining a separate standalone Alertmanager pod, CRDs, and config operators, we utilize **native Grafana Alerting** built directly into the Grafana container!
+- Evaluates PromQL rules against Azure Monitor and LogQL rules against Loki.
+- Manages deduplication, grouping, and direct dispatch to **Pushover** (Priority 2 for Critical, Priority 0 for Warning) without any extra infrastructure.
+
+---
+
+#### Pillar 1: Metrics Architecture (Simple & Lightweight)
+
+1. **Featherweight Scraper (`vmagent`)**:
+   - Avoids heavy Prometheus operator pods (~400 MB–1 GB RAM). Uses single `vmagent` container (~30 MB RAM per node).
+   - Scrapes local Kubernetes components: `node-exporter` (host metrics), `kube-state-metrics` (object states), `cAdvisor` (container CPU/memory), `traefik` (ingress request rates & 5xx latencies), `cert-manager` (TLS cert expiration), and `volsync` (backup statuses).
+2. **Outbound HTTPS Remote Write to Azure Monitor**:
+   - Zero public inbound firewall ports. Pushes outbound over TCP 443 with Entra ID OAuth2 authentication (managed via External Secrets Operator syncing `azure-prom-auth`).
+3. **Resilient Local Disk Queuing (Zero WAN Data Loss)**:
+   - Configured with `-remoteWrite.tmpDataPath=/var/vmagent-data` on local storage. If residential internet drops, `vmagent` buffers samples to disk and flushes upon reconnection with zero data holes.
+4. **Cost Engineering (<$0.50 / Month Guarantee)**:
+   - 60s scrape intervals and drop filters (`*_bucket`, `^go_.*`, `^process_.*`) keep monthly sample volume low (~15M–25M samples/month across both clusters), resulting in a predictable bill of **~$0.30 to $0.40/month**.
+5. **Multi-Cluster Federation**:
+   - Metrics are tagged with `external_labels: { cluster: "k8s-talos-1" }` or `{ cluster: "k8s-talos-2" }`, selectable via a `$cluster` dropdown in Grafana.
+
+---
+
+#### Pillar 2: Centralized Logging (Single-Binary Loki & Promtail)
+
+1. **Kubernetes Host Log Collection (`Promtail` DaemonSet)**:
+   - Tails host container logs from `/var/log/pods/` on Talos Linux.
+   - Deployed in namespace `monitoring` with `pod-security.kubernetes.io/enforce: privileged`.
+   - Enriches log lines with Kubernetes metadata (`cluster`, `namespace`, `pod`, `container`, `stream`).
+2. **Central Log Engine (`Grafana Loki` Single-Binary)**:
+   - Deployed on `k8s-talos-1` in simple single-binary mode with TSDB index.
+   - Stored on persistent volume storage (`local-path` PVC or Azure Blob Storage `gjtalossa`).
+   - Automatically compacts and deletes logs older than 14–30 days.
+3. **Cross-Cluster Log Forwarding over Tailscale**:
+   - `k8s-talos-2` Promtail ships container logs directly over the encrypted Tailscale bridge to Loki on `k8s-talos-1`. If WAN is interrupted, Promtail buffers positions locally.
+
+---
+
+#### Pillar 3: High-Signal Alerting Matrix & Notification Channels
+
+##### Notification Dispatch Strategy:
+- **Pushover (Dedicated Mobile & Desktop Push Notification Channel)**:
+  - **Single Authoritative Channel**: Unified with existing Flux GitOps notification infrastructure in Key Vault (`pushover-token`, `pushover-user-key`).
+  - **Critical Alerts**: Dispatched with **Emergency Priority (`priority: 2`)**, siren sound, 60s retries until acknowledged, and automatic bypass of iOS/Android Do Not Disturb / Focus modes.
+  - **Warning Alerts**: Dispatched with **Normal Priority (`priority: 0`)**.
+  - **Info / Resolved**: Dispatched with **Low Priority (`priority: -1`)** (quiet delivery).
+  - Includes direct clickable deep links jumping to Grafana dashboards and Headlamp pod diagnostics.
+
+##### Production Alert Rules Matrix:
+
+| Category | Alert Name | Evaluator | Severity | Condition / PromQL / LogQL | Impact & Action Required |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Cluster** | `ClusterDown` | **Azure Cloud (Tier 1)** | **Critical** | `absent_over_time(up{cluster="k8s-talos-1"}[5m]) == 1` | **Node power outage, hardware death, or hypervisor crash**. Survives node failure! |
+| **Cluster** | `SiteToSiteDown` | **Cross-Cluster (Tier 1)** | **Warning** | `probe_success{instance="192.168.15.15"} == 0` for 3m | Inter-home Tailscale link interrupted. Verify site routers. |
+| **Node** | `NodeDiskSpaceFillingFast` | **Grafana (Tier 2)** | **Critical** | `predict_linear(node_filesystem_free_bytes[4h], 86400) < 0` | Root or storage disk will exhaust space within 24h. Prune logs/volumes. |
+| **Node** | `NodeMemoryPressure` | **Grafana (Tier 2)** | **Warning** | `(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 0.85` for 15m | Host RAM utilization exceeded 85%. Inspect top consumers. |
+| **Node** | `NodeCPUSaturation` | **Grafana (Tier 2)** | **Warning** | `100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90` for 15m | Sustained high CPU load. Check transcode jobs or runaway processes. |
+| **Workload**| `PodCrashLooping` | **Grafana (Tier 2)** | **Critical** | `increase(kube_pod_container_status_restarts_total[10m]) > 3` | Container repeatedly crashing. Inspect logs in Headlamp/Loki. |
+| **Workload**| `PodOOMKilled` | **Grafana (Tier 2)** | **Warning** | `kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1` | Container exceeded memory limits. Increase memory limit in GitOps. |
+| **Workload**| `PodNotReady` | **Grafana (Tier 2)** | **Warning** | `kube_pod_status_phase{phase=~"Pending\|Unknown"} == 1` for 10m | Workload failed to start. Check PVC binding or image pull. |
+| **Workload**| `JobFailed` | **Grafana (Tier 2)** | **Warning** | `kube_job_status_failed > 0` | Scheduled CronJob failed (e.g. DDNS updater, OneDrive rclone). Inspect logs. |
+| **Storage** | `PersistentVolumeFillingFast`| **Grafana (Tier 2)**| **Warning / Critical**| `kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes > 0.85` | PVC nearing capacity. Expand PVC in GitOps. |
+| **Storage** | `VolSyncReplicationFailed` | **Grafana (Tier 2)** | **Critical** | `volsync_replicationsource_last_sync_status != 1` for 1h | Offsite volume backup snapshot failed. Verify Azure Blob credentials. |
+| **Storage** | `VirtioFSMountDown` | **Grafana (Tier 2)** | **Critical** | `node_mountstats_nfs_total == 0` or missing `/var/mnt/vault` | VirtioFS ZFS pool unmounted on `talos-1`. Check Proxmox NUMA / mount tag. |
+| **Ingress** | `TraefikHigh5xxErrorRate` | **Grafana (Tier 2)** | **Critical** | `sum(rate(traefik_service_requests_total{code=~"5.."}[5m])) / sum(rate(traefik_service_requests_total[5m])) * 100 > 5` | Over 5% of web requests failing with 5xx errors. Backend service down. |
+| **Ingress** | `CertExpiringSoon` | **Grafana (Tier 2)** | **Warning / Critical**| `certmanager_certificate_expiration_timestamp_seconds - time() < 14 * 86400` | Let's Encrypt wildcard cert expiring in <14 days. Inspect cert-manager. |
+| **App** | `VPNKillswitchTriggered` | **Grafana (Tier 2)** | **Critical** | `container_network_receive_bytes_total{container="gluetun"} == 0` for 5m while qB active | Torrent VPN connection dropped and kill-switch blocked traffic. |
+| **Logs** | `LogFatalErrorSpike` | **Grafana (Tier 2)** | **Critical** | `sum(rate({namespace=~".+"} \|= "fatal" [5m])) > 5` | Spike in fatal application crashes across workloads. Drill down in Loki. |
+
+---
+
+#### Pillar 4: Visualization & Dashboards (Self-Hosted Grafana)
+
+1. **Lightweight Self-Hosted Instance ($0 / Month)**:
+   - Deployed on `k8s-talos-1` via Flux HelmRelease, eliminating the ~$42/month fee for Azure Managed Grafana while preserving cloud TSDB metric durability.
+   - Exposed securely via Traefik Gateway API at `https://grafana.talos-1.gwebs.ca` with cluster wildcard TLS.
+2. **Microsoft Entra ID OIDC SSO**:
+   - Single sign-on integrated with existing homelab Entra ID tenant.
+   - Role mapping: Users belonging to security group `homelab-k8s-admins` automatically receive `Admin` privileges; other authenticated users receive `Viewer`.
+3. **Unified Datasources**:
+   - **Metrics TSDB**: Azure Managed Prometheus.
+   - **Central Logs**: Grafana Loki (queryable with LogQL, live stream log tailing).
+4. **Curated Multi-Cluster Dashboard Catalog**:
+   - **Multi-Cluster Overview**: Node CPU/RAM utilization, cluster scheduling capacity, pod health counts, and cluster switcher dropdown (`$cluster`: `k8s-talos-1`, `k8s-talos-2`).
+   - **Kubernetes Workloads**: CPU/Memory throttles, pod restart counts, and live logs displayed side-by-side with metric spikes.
+   - **Loki Log Explorer**: Full-text log searching with streaming log output, multi-stream regex filters, and log level histograms.
+   - **Node Exporter Full**: Detailed hardware metrics, disk I/O latency, network interface throughput, and host memory buffers.
+   - **Storage & PVC Health**: Disk utilization per volume, ZFS dataset capacity, and VolSync snapshot timestamps.
+   - **Traefik Ingress Traffic**: Request volumes, response latency percentiles (p50, p95, p99), HTTP status codes (2xx, 4xx, 5xx), and active TLS sessions.
 
 ---
 
@@ -351,17 +491,26 @@ flowchart TD
         FLUX_INFRA["Infrastructure: Ingress, cert-manager, ESO"]
         FLUX_APPS["Applications: HelmReleases & Manifests"]
         FLUX_STORE["Storage: Local Path & VirtioFS PV/PVC"]
-        FLUX_MON["Monitoring: vmagent & Grafana"]
+        FLUX_MON["Observability: vmagent, Promtail, Loki, Grafana"]
     end
 
     subgraph Admin_Tools["Operator Access & Dashboards"]
         KUBECTL["kubectl / K9s (Direct API Control)"]
-        HEADLAMP["Headlamp UI (Live Pods & Logs)"]
-        GRAFANA["Grafana (Historical Trends & Metrics)"]
+        HEADLAMP["Headlamp UI (Live Pods & Immediate Actions)"]
+        GRAFANA["Grafana (Dashboards + Built-in Alerting)"]
     end
 
-    subgraph Cloud_Metrics["Azure Cloud (Outbound Port 443)"]
-        AZ_PROM["Azure Managed Prometheus (TSDB)"]
+    subgraph Observability_Engines["Observability & Storage"]
+        AZ_PROM["Azure Monitor Workspace (Cloud Metrics TSDB)"]
+        LOKI["Grafana Loki (In-Cluster Logs TSDB on talos-1)"]
+    end
+
+    subgraph FailSafe_Watchers["Fail-Safe Tier 1 Watchers (Out-of-Band)"]
+        HC_IO["Healthchecks.io (Cloud Dead-Man Switch & S2S VPN Heartbeat)"]
+    end
+
+    subgraph Notifications["High-Signal Channel"]
+        PUSHOVER["Pushover (Emergency Mobile Push & Siren)"]
     end
 
     subgraph Host_Infra["Ansible (Proxmox Host Layer)"]
@@ -375,17 +524,31 @@ flowchart TD
     GitOps_Flux --> HEADLAMP
     GitOps_Flux --> FLUX_MON
     FLUX_MON -- "Remote Write" --> AZ_PROM
+    FLUX_MON -- "Log Streams" --> LOKI
+    
+    %% Tier 1 (Node Down & S2S VPN Dead Man's Switch via Healthchecks.io)
+    FLUX_MON -- "1m Heartbeat Ping" --> HC_IO
+    HC_IO -- "🚨 Node/Cluster Dead (Priority 2)" --> PUSHOVER
+    HC_IO -- "🚨 Site-to-Site VPN Down" --> PUSHOVER
+
+    %% Tier 2 (In-Cluster Workload Alerts via Grafana)
+    GRAFANA -- "In-Cluster Alerts" --> PUSHOVER
     GRAFANA -- "PromQL Query" --> AZ_PROM
+    GRAFANA -- "LogQL Query" --> LOKI
 ```
 
 | Tool / Layer | Scope & Responsibility | Access / Interface |
 | --- | --- | --- |
 | **Sidero Omni** | Talos OS machine provisioning, maintenance, OS/k8s upgrades, and etcd snapshot health. | Omni SaaS UI & `omnictl` |
-| **Flux CD** | Declarative GitOps reconciliation of infrastructure and workloads from Git monorepo. | Git commits & PRs |
+| **Flux CD** | Declarative GitOps reconciliation of infrastructure, observability, and workloads from Git. | Git commits & PRs |
 | **Headlamp** | In-cluster, real-time workload inspection, container live logs, event viewing, and pod restarts. | `headlamp.<cluster>.gwebs.ca` (Entra ID OIDC) |
-| **vmagent (Collector)** | In-cluster lightweight metric scraper (~30MB RAM) pushing outbound samples via HTTPS Remote Write. | Internal K8s service |
-| **Azure Managed Prometheus** | Cloud time-series database storing 18 months of historical metrics across all clusters. | Azure Monitor Workspace (Private/HTTPS) |
-| **Self-Hosted Grafana** | Cross-cluster dashboards, node performance trends, application metrics, and alerting rules. | `grafana.talos-1.gwebs.ca` (Entra ID OIDC) |
+| **Healthchecks.io** | **Tier 1 Fail-Safe**: External dead-man's switch detecting node death, power cuts, WAN drops, and Site-to-Site VPN outages. | `https://healthchecks.io/` -> Pushover |
+| **vmagent (Metrics Collector)** | Ultra-lightweight metric scraper (~30 MB RAM) pushing outbound samples via HTTPS Remote Write. | In-cluster DaemonSet / Deployment |
+| **Azure Monitor Workspace** | Cloud time-series database storing 18 months of historical metrics across all clusters. | Azure Monitor Workspace (Private/HTTPS) |
+| **Promtail (Log Shipper)** | Host-level DaemonSet streaming `/var/log/pods` enriched with Kubernetes labels to Loki. | Host `/var/log/pods` (PSA: Privileged) |
+| **Grafana Loki (Log Engine)** | Centralized log aggregation, TSDB indexing, and retention engine running on `k8s-talos-1`. | `http://loki.monitoring.svc:3100` |
+| **Self-Hosted Grafana** | **Tier 2 In-Cluster Alerts & Dashboards**: Unified UI with built-in alerting to Pushover. | `https://grafana.talos-1.gwebs.ca` (Entra ID OIDC) |
+| **Pushover** | Immediate mobile & desktop emergency push notifications with priority sirens bypassing DND. | Mobile app & desktop browser |
 | **Ansible** | Underlying Proxmox host VMs, PBS backup scheduling, and physical networking. | SSH / Local Playbooks |
 
 ---
@@ -788,6 +951,8 @@ K8s/
 │   │   ├── gateway-api/                # Gateway API CRDs
 │   │   ├── local-path/                 # Local Path Provisioner HelmRelease
 │   │   ├── metrics-server/             # Metrics Server HelmRelease
+│   │   ├── monitoring/                 # vmagent metrics collector, node-exporter & kube-state-metrics
+│   │   ├── promtail/                   # Promtail container log collector DaemonSet (PSA: privileged)
 │   │   ├── tailscale/                  # Tailscale Operator HelmRelease
 │   │   ├── traefik/                    # Traefik Ingress & Gateway HelmRelease
 │   │   └── volsync/                    # VolSync Operator HelmRelease
@@ -795,14 +960,15 @@ K8s/
 │   │   ├── cert-manager/               # ClusterIssuer & wildcard TLS Certificate
 │   │   ├── external-secrets/           # ClusterSecretStore (Azure Key Vault) & cluster-secrets
 │   │   ├── headlamp/                   # Headlamp web dashboard & Entra ID OIDC RBAC
+│   │   ├── monitoring/                 # Azure Prom & Healthchecks.io credentials, S2S watchdog & alert rules
 │   │   ├── notifications/              # Flux Pushover Provider & Alert
 │   │   ├── priority-classes/           # Cluster priority classes
 │   │   ├── system-rbac/                # Control plane & kubelet RBAC bindings
 │   │   ├── tailscale/                  # Tailscale OAuth external secret
 │   │   └── traefik/                    # Traefik default certificate
 │   └── overlays/                       # Cluster-specific platform extensions
-│       ├── k8s-talos-1/                # Inherits configs + Samba & VirtioFS ZFS storage-vault
-│       └── k8s-talos-2/                # Inherits configs (clean, zero host-1 storage leakage)
+│       ├── k8s-talos-1/                # Inherits configs + Loki, Grafana (dashboards & alerts), Samba & VirtioFS
+│       └── k8s-talos-2/                # Inherits configs (featherweight, zero host-1 storage leakage)
 │
 ├── apps/                               # Application definitions (base catalog & cluster manifests)
 │   ├── base/                           # Application Catalog (ALL core manifests live here)
@@ -951,14 +1117,114 @@ Evaluate and migrate remaining complex workloads:
 
 ### Phase 7: Observability Stack
 
-Deploy lightweight collector and monitoring infrastructure across clusters:
-- **Observability Stack (Azure Managed Prometheus & Self-Hosted Grafana) (Pending)**:
-  - Create Azure Monitor Workspace and Entra ID App Registration with `Monitoring Metrics Publisher` and `Monitoring Data Reader` roles.
-  - Store Service Principal credentials in Azure Key Vault and synchronize via External Secrets Operator to `monitoring/azure-prom-auth`.
-  - Deploy lightweight `vmagent` (or Prometheus in agent mode) across both `k8s-talos-1` and `k8s-talos-2` via Flux HelmRelease.
-  - Configure outbound HTTPS Remote Write to Azure Monitor Workspace with `external_labels` (`cluster: home-1` / `cluster: home-2`).
-  - Apply cost-saving ingestion filters (60s scrape intervals, drop `*_bucket` histograms and `go_*` runtime series) to guarantee <$0.50/month total cost.
-  - Deploy self-hosted Grafana on `k8s-talos-1` with Azure Monitor datasource, Entra ID SSO, and multi-cluster dashboards.
+To ensure a fast, robust, and low-friction deployment, Phase 7 is executed in **two sequential stages**:
+1. **Phase 7A (Priority 1 — Immediate Rollout)**: Kubernetes metrics collection (`vmagent`), Azure Managed Prometheus TSDB, Self-Hosted Grafana dashboards, and the Fail-Safe Two-Tier Alerting Pipeline (Cloud Dead Man's Switch + In-Cluster Alerts to Pushover).
+2. **Phase 7B (Priority 2 — Follow-up Rollout)**: Centralized container logging engine (`Loki`), host log collectors (`Promtail`), and Tailscale cross-cluster log transport.
+
+---
+
+### Phase 7A: Metrics, Dashboards & Two-Tier Alerting (Priority 1)
+
+#### 7A.1: Azure Monitor Workspace & Service Principal Setup
+1. **Azure Monitor Workspace**: Create an Azure Monitor Workspace in resource group `homelab-rg` for centralized Prometheus TSDB storage.
+2. **Entra ID App Registration**: Register `k8s-monitoring-sp` in Microsoft Entra ID. Assign role `Monitoring Metrics Publisher` (write) at the workspace scope and `Monitoring Data Reader` (read) for Grafana.
+3. **Secret Synchronization**: Store Service Principal credentials (`azure-client-id`, `azure-client-secret`, `azure-tenant-id`, `azure-monitor-workspace-id`) in Azure Key Vault `gjtaloskv`.
+4. **External Secrets Operator**: Deploy `ExternalSecret` in namespace `monitoring` to synchronize credentials into `Secret/azure-prom-auth` across both clusters.
+
+#### 7A.2: Lightweight Kubernetes Metrics Collection (`vmagent`) & WAN Buffering
+1. **Collector Deployment**: Deploy `vmagent` via Flux HelmRelease in `infrastructure/controllers/monitoring/` on both `k8s-talos-1` and `k8s-talos-2`.
+2. **Kubernetes Scrape Targets**: Configure automated scraping of `node-exporter` (host metrics), `kube-state-metrics` (object states), `cAdvisor` (container CPU/memory), `traefik` (ingress request rates & 5xx errors), `cert-manager` (TLS cert expiration), `volsync` (backup replication status), and synthetic cross-site ICMP/TCP probes (`probe_success`, `probe_duration_seconds`).
+3. **Remote Write & Ingestion Optimization**:
+   - Configure outbound HTTPS Remote Write to Azure Monitor Workspace using Entra ID OAuth2 token refresh.
+   - Tag samples with `external_labels: { cluster: "k8s-talos-1" }` on Home 1 and `{ cluster: "k8s-talos-2" }` on Home 2.
+   - Apply 60s scrape intervals and drop filters (`*_bucket`, `^go_.*`, `^process_.*`) to guarantee monthly Azure bills remain **<$0.50/month**.
+   - Configure `-remoteWrite.tmpDataPath=/var/vmagent-data` on local storage to buffer metrics during residential internet outages without data loss.
+
+#### 7A.3: Tier 1 Out-of-Band Dead Man's Switch (Healthchecks.io + Pushover)
+1. **The Single-Node Paradox Solved**: In a single-node cluster, when the node dies (power outage, kernel panic, hypervisor crash, or WAN cut), all in-cluster monitoring (`vmagent`, `Promtail`, `Grafana`) goes down with it. **Healthchecks.io** provides an external, out-of-band heartbeat listener that requires zero cloud infrastructure overhead.
+2. **Heartbeat CronJob**: Deploy a featherweight heartbeat CronJob (`curlimages/curl` container, ~5 MB RAM) running every 1 minute on `k8s-talos-1` and `k8s-talos-2`:
+   ```bash
+   curl -fsS -m 10 --retry 3 https://hc-ping.com/<cluster-uuid>
+   ```
+3. **Pushover Emergency Siren**: Healthchecks.io is natively configured with Pushover integration (Priority 2 Emergency with siren sound and 60s retries). If a node fails to ping within the grace period (e.g., 2–3 minutes), Healthchecks.io immediately triggers the Pushover siren alert directly to your phone without relying on any local hardware.
+4. **Secret Management**: Ping UUIDs/URLs are stored in Azure Key Vault `gjtaloskv` (`hc-ping-talos-1`, `hc-ping-talos-2`) and synchronized via External Secrets Operator into `Secret/healthchecks-pings` in namespace `monitoring`.
+
+#### 7A.4: Tailscale Site-to-Site LAN VPN Monitoring (Home 1 <-> Home 2)
+The inter-site VPN connects Home 1 (`192.168.10.0/24`) and Home 2 (`192.168.15.0/24`) through `tailscale-lan-s2s-gateway` in namespace `tailscale`. It is monitored across both tiers:
+1. **Tier 1 Heartbeat Probe (Healthchecks.io Out-of-Band Alerting)**:
+   - On `k8s-talos-1`, a scheduled check tests connectivity to the Home 2 node (`192.168.15.15`) across the Tailscale S2S bridge:
+     ```bash
+     nc -z -w 3 192.168.15.15 443 && curl -fsS -m 10 https://hc-ping.com/<s2s-vpn-h1-uuid>
+     ```
+   - On `k8s-talos-2`, a reciprocal check tests connectivity to `192.168.10.15` across the tunnel and pings `https://hc-ping.com/<s2s-vpn-h2-uuid>`.
+   - If the Tailscale S2S bridge drops while both nodes are alive, the healthcheck misses its heartbeat and triggers a Pushover alert: **"Site-to-Site VPN Down"**.
+2. **Tier 2 Synthetic Probe & Telemetry (In-Cluster Metrics)**:
+   - Configure a synthetic probe (via blackbox exporter or vmagent probe) measuring cross-site reachability (`probe_success`) and round-trip latency (`probe_duration_seconds`) across the tunnel every 30s.
+   - Scrape `tailscale-lan-s2s-gateway` container CPU/memory usage and restart counts.
+3. **Grafana VPN Alert Rules**:
+   - `TailscaleSiteToSiteDown`: `probe_success{target=~"192.168.(10|15).15"} == 0` for 3m -> Pushover (Priority 2 Emergency).
+   - `TailscaleSiteToSiteHighLatency`: `probe_duration_seconds > 0.1` (>100ms) for 10m -> Pushover (Priority 0 Warning).
+4. **Grafana VPN Dashboard Panel**:
+   - Real-time cross-site latency graph (ms), packet loss %, gateway pod CPU/RAM, and 30-day tunnel uptime %.
+
+#### 7A.5: Visualization Tier (`Self-Hosted Grafana`)
+1. **Grafana Deployment**: Deploy Grafana via Flux HelmRelease on `k8s-talos-1` (`infrastructure/overlays/k8s-talos-1/grafana/`), saving ~$42/mo compared to Azure Managed Grafana.
+2. **Gateway API & Wildcard TLS**: Expose Grafana on `https://grafana.talos-1.gwebs.ca` using Traefik Gateway API `HTTPRoute`, inheriting cluster wildcard TLS.
+3. **Microsoft Entra ID OIDC SSO**: Configure native Entra ID OIDC single sign-on with role mapping: group `homelab-k8s-admins` assigned to `Admin`, other users assigned to `Viewer`.
+4. **Automated Datasource Provisioning**: Pre-configure Azure Managed Prometheus (Metrics) via declarative ConfigMaps.
+
+#### 7A.6: Tier 2 Native Grafana Alerting & Metric Rules Matrix
+1. **Simplicity First**: Utilize **native Grafana Alerting** built directly into Grafana (eliminating standalone Alertmanager pod bloat).
+2. **Contact Point**: Configure **Pushover** contact point using existing credentials synced from Azure Key Vault via ESO (`pushover-token`, `pushover-user-key`): Emergency priority (`priority: 2`) with siren sound and 60s retries for Critical rules; normal priority (`priority: 0`) for Warning rules.
+3. **Production Metric Rules**:
+   - Node health (`NodeDiskSpaceFillingFast`, `NodeMemoryPressure`, `NodeCPUSaturation`)
+   - Workload stability (`PodCrashLooping`, `PodOOMKilled`, `PodNotReady`, `JobFailed`)
+   - Storage integrity (`PersistentVolumeFillingFast`, `VolSyncReplicationFailed`, `VirtioFSMountDown`)
+   - Ingress & networking (`TraefikHigh5xxErrorRate`, `CertExpiringSoon`, `TailscaleSiteToSiteDown`, `TailscaleSiteToSiteHighLatency`)
+   - Applications (`VPNKillswitchTriggered`, `SambaShareDown`)
+
+#### 7A.7: Curated Multi-Cluster Dashboard Catalog
+1. Provision production Grafana dashboards with top-level `$cluster` variable:
+   - Multi-Cluster Overview & Resource Headroom
+   - Kubernetes Workloads & Pod Health
+   - Node Exporter Full (Hardware, Disks, Networks)
+   - Persistent Volumes & ZFS Storage Capacity
+   - Traefik Ingress Traffic, Latencies & HTTP Error Codes
+   - Tailscale Site-to-Site VPN (Cross-site latency, packet loss %, gateway pod metrics, uptime SLA)
+
+#### 7A.8: End-to-End Metrics & Alerts Testing
+1. **Metrics Verification**: Confirm `vmagent` scrapes all Kubernetes nodes and workloads, and verify sample ingestion in Azure Monitor Workspace PromQL query explorer.
+2. **Alert Trigger Verification**:
+   - Scale an ephemeral test deployment to trigger `PodCrashLooping`.
+   - Confirm Grafana dispatches alert to Pushover.
+   - Scale down the crashlooping pod and verify quiet "Resolved" notification is dispatched.
+3. **WAN Dropout Resilience Test**: Temporarily sever internet connectivity on `k8s-talos-1`. Confirm `vmagent` buffers samples to disk (`/var/vmagent-data`). Restore WAN and verify queued samples flush to Azure without data holes.
+
+---
+
+### Phase 7B: Centralized Logging with Loki & Promtail (Priority 2)
+
+#### 7B.1: Single-Binary Grafana Loki Deployment
+1. **Loki on talos-1**: Deploy Grafana Loki in single-binary mode on `k8s-talos-1` (`infrastructure/overlays/k8s-talos-1/loki/`) backed by a 20–50 Gi `local-path` PVC (or Azure Blob Storage `gjtalossa`).
+2. **Retention Compactor**: Configure TSDB indexing with automated 14-day log retention and compactor pruning to ensure zero disk creep.
+
+#### 7B.2: Promtail DaemonSet on Both Clusters
+1. **DaemonSet Deployment**: Deploy Promtail in `monitoring` namespace on both `k8s-talos-1` and `k8s-talos-2`.
+2. **Pod Security Admission**: Label `monitoring` namespace with `pod-security.kubernetes.io/enforce: privileged` to permit mounting `/var/log/pods/`.
+3. **Log Enrichment**: Configure CRI parsing pipeline to enrich log streams with `cluster`, `namespace`, `pod`, `container`, and `stream` (`stdout`/`stderr`).
+
+#### 7B.3: Cross-Cluster Log Transport over Tailscale
+1. Configure `k8s-talos-2` Promtail to forward log streams over the encrypted Tailscale site-to-site bridge directly to `k8s-talos-1` Loki (`http://192.168.10.15:3100/loki/api/v1/push`).
+
+#### 7B.4: Grafana Loki Datasource & LogQL Alerts
+1. Add Loki datasource to Grafana.
+2. Deploy Loki Log Explorer dashboard for streaming log inspection.
+3. Add LogQL alert rule in Grafana:
+   - `LogFatalErrorSpike`: `sum(rate({namespace=~".+"} |= "fatal" [5m])) > 5`
+
+#### 7B.5: Log Ingestion Validation
+1. Verify Promtail log delivery from both `talos-1` and `talos-2` via Grafana LogQL queries.
+2. Confirm automated 14-day retention compactor deletes expired chunks.
 
 ---
 
@@ -1116,12 +1382,14 @@ The migration of each phase will be deemed complete once all of the following cr
    - VirtioFS successfully mounts native Proxmox ZFS dataset on `talos-1` (`/var/mnt/vault`), bound to Kubernetes `ReadWriteMany` PV/PVC.
    - Instant atomic hardlinks verified across download and library directories on ZFS without file duplication.
    - VolSync successfully captures volume snapshots to Azure Blob Storage and replicates state between clusters.
-6. **Operations & Observability**:
-   - Headlamp web UI is reachable via HTTPS and secured by Entra ID OIDC.
+6. **Operations, Observability, Logging & Alerting**:
+   - Headlamp web UI is reachable via HTTPS and secured by Entra ID OIDC for live workload inspection.
    - PBS successfully backs up both Kubernetes VMs nightly.
-   - In-cluster metric collectors (`vmagent`) successfully push outbound metrics via HTTPS Remote Write to Azure Monitor Workspace using Entra ID OAuth2 authentication.
-   - Self-hosted Grafana successfully queries Azure Managed Prometheus and visualizes both clusters via the `$cluster` variable selector.
-   - Metric ingestion rates remain within the tuned target (<25M samples/month, <$0.50/month).
+   - In-cluster metric collectors (`vmagent`) successfully scrape Kubernetes nodes and workloads, pushing outbound metrics via HTTPS Remote Write to Azure Monitor Workspace using Entra ID OAuth2 authentication.
+   - Centralized Loki engine collects container logs from both clusters via Promtail; logs are queryable with label-based filtering in Grafana.
+   - In-cluster Grafana Alerting and out-of-band Healthchecks.io dead-man switches dispatch high-priority emergencies (with siren sound bypassing DND) and workload warnings exclusively to Pushover.
+   - Self-hosted Grafana successfully queries Azure Managed Prometheus and Loki, visualizing both clusters via the `$cluster` variable selector.
+   - Metric ingestion rates remain within the tuned target (<25M samples/month, <$0.50/month) and log retention enforces automatic rotation.
 
 ---
 
@@ -1138,7 +1406,7 @@ The migration of each phase will be deemed complete once all of the following cr
 - **Disaster Recovery & Replication**: VolSync with Restic (`copyMethod: Direct`) replicating and backing up `local-path` PVCs to Azure Blob Storage (`gjtalossa`) for cross-cluster failover and disaster recovery, combined with Flux GitOps as the authoritative source of truth for cluster state.
 - **Secrets**: Azure Key Vault + External Secrets Operator + SOPS.
 - **Storage**: Local Path Provisioner (local PVCs for configs/databases) + Native Proxmox ZFS via Talos VirtioFS External Volumes + In-Cluster Samba Container on `k8s-talos-1` (LAN SMB file sharing for desktops/clients, zero dedicated storage VMs).
-- **Observability & Metrics**: Azure Managed Prometheus (Azure Monitor Workspace) via outbound HTTPS Prometheus Remote Write (zero Azure Arc overhead) paired with Self-Hosted Grafana on `k8s-talos-1` (avoiding the ~$42/mo Azure Managed Grafana cost). Monthly ingestion costs capped (<$0.50/month) via 60-second scrape intervals and dropping high-cardinality Go/histogram metrics.
+- **Observability, Logging & Alerting**: Hybrid cloud/local architecture pairing Azure Managed Prometheus (Azure Monitor Workspace) via outbound HTTPS Prometheus Remote Write (zero Azure Arc overhead) with Self-Hosted Grafana on `k8s-talos-1` (saving ~$42/mo). Centralized log aggregation via single-binary Grafana Loki with Promtail DaemonSets (mounting `/var/log/pods` with PSA privileged). Alerting routed via native Grafana Alerting and out-of-band Healthchecks.io dead-man's switches exclusively to Pushover (emergency mobile sirens for critical node/VPN outages, normal alerts for warnings, zero Discord dependency). Monthly Azure ingestion costs capped (<$0.50/month) via 60-second scrape intervals and high-cardinality Go/histogram pruning.
 - **DNS & Ingress Isolation**: Strict separation of hostnames per cluster (`<app>.talos-1.gwebs.ca` vs `<app>.talos-2.gwebs.ca`) using Flux `postBuild.substitute` (`CLUSTER_NAME`) to prevent cross-cluster routing confusion and duplicate TLS certificate requests.
 
 ### Remaining Implementation Choices to Confirm:
