@@ -174,9 +174,14 @@ Cluster templates, machine classes, and installation media presets are automatic
 
 - **Workflow**: [`.github/workflows/omni-gitops.yml`](../../.github/workflows/omni-gitops.yml)
 - **Execution Matrix**:
-  - `pull_request`: Runs offline validation (`omnictl cluster template validate`) on modified templates.
-  - `push` (branches: `main`, `k8s-migration`): Validates templates, applies machine classes and media presets, and syncs cluster templates with verbose output.
-  - `workflow_dispatch`: Manual execution from GitHub Actions UI.
+  - `pull_request`: Runs offline validation (`omnictl cluster template validate`) on all templates.
+  - `push` (branches: `main`, `k8s-migration`) / `workflow_dispatch`:
+    - **Smart Rollout Detection**: Automatically checks git diff for changes to Talos OS (`talos.version` / `talosversion`) or Kubernetes (`kubernetes.version`).
+    - **Parallel Rollout (Patches & Config)**: If no OS/K8s versions were bumped (e.g., changes to OIDC, network policies, routes, machine classes, backup intervals), both clusters are synchronized concurrently at once.
+    - **Rolling Canary Rollout (Upgrades)**: If an OS or Kubernetes version bump is detected:
+      1. **Canary (`k8s-talos-2`)**: Applies machine classes and `talos-2` media preset, syncs `k8s-talos-2.yaml`, and waits for the cluster to finish upgrading and report healthy (`omnictl cluster status k8s-talos-2 --wait 20m`).
+      2. **Primary (`k8s-talos-1`)**: Gated strictly on canary success. Applies `talos-1` media preset, syncs `k8s-talos-1.yaml`, and verifies cluster readiness. If canary fails or times out, the primary cluster is never touched.
+  - `workflow_dispatch`: Allows manual rollout selection (`auto`, `rolling`, or `parallel`) via GitHub Actions UI.
 
 ### GitHub Repository Secrets
 To authenticate the workflow with Omni, configure the following repository secrets in GitHub (**Settings > Secrets and variables > Actions**):

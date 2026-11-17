@@ -14,6 +14,16 @@ on:
     paths:
       - 'K8s/Omni/**'
   workflow_dispatch:
+    inputs:
+      rollout_strategy:
+        description: 'Rollout strategy'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - 'auto'
+          - 'rolling'
+          - 'parallel'
 
 jobs:
   validate:
@@ -48,6 +58,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Install omnictl
         run: |
@@ -56,15 +68,109 @@ jobs:
           sudo mv omnictl-linux-amd64 /usr/local/bin/omnictl
           omnictl --version
 
-      - name: Apply Omni Media Presets & Machine Classes
+      - name: Detect Rollout Strategy (Upgrade vs Patch)
+        id: strategy
         run: |
-          omnictl apply -f K8s/Omni/media/
-          omnictl apply -f K8s/Omni/classes/
+          MANUAL_INPUT="${{ github.event.inputs.rollout_strategy }}"
 
-      - name: Sync Cluster Templates
+          if [ "$MANUAL_INPUT" = "rolling" ]; then
+            echo "Manual override: Rolling canary release requested."
+            echo "is_upgrade=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$MANUAL_INPUT" = "parallel" ]; then
+            echo "Manual override: Parallel release requested."
+            echo "is_upgrade=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Auto-detection via git diff
+          BASE="${{ github.event.before }}"
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            BASE="HEAD~1"
+          fi
+
+          if ! git rev-parse --verify "$BASE" >/dev/null 2>&1; then
+            BASE="HEAD"
+          fi
+
+          echo "Diffing $BASE against HEAD for Kubernetes or Talos version bumps..."
+
+          if [ "$BASE" != "HEAD" ] && git diff "$BASE" HEAD -- 'K8s/Omni/clusters/*.yaml' 'K8s/Omni/media/*.yaml' | grep -E '^[+-][[:space:]]*(version|talosversion):'; then
+            echo "Talos OS or Kubernetes version upgrade detected!"
+            echo "Applying ROLLING CANARY rollout (talos-2 first, then talos-1)."
+            echo "is_upgrade=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No OS/Kubernetes version bumps detected (patch/config update)."
+            echo "Applying PARALLEL rollout (both clusters at once)."
+            echo "is_upgrade=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ------------------------------------------------------------------------
+      # PARALLEL ROLLOUT (Normal config, patches, labels, routes, OIDC, backups)
+      # ------------------------------------------------------------------------
+      - name: Apply All Classes & Presets (Parallel)
+        if: steps.strategy.outputs.is_upgrade == 'false'
+        run: |
+          omnictl apply -f K8s/Omni/classes/
+          omnictl apply -f K8s/Omni/media/
+
+      - name: Sync All Cluster Templates (Parallel)
+        if: steps.strategy.outputs.is_upgrade == 'false'
         run: |
           for template in K8s/Omni/clusters/*.yaml; do
             echo "Syncing ${template}..."
             omnictl cluster template sync -f "${template}" -v
           done
 
+      - name: Verify All Clusters Ready (Parallel)
+        if: steps.strategy.outputs.is_upgrade == 'false'
+        run: |
+          echo "Verifying cluster readiness..."
+          omnictl cluster status k8s-talos-2 --wait 5m
+          omnictl cluster status k8s-talos-1 --wait 5m
+
+      # ------------------------------------------------------------------------
+      # ROLLING CANARY ROLLOUT (Talos OS / Kubernetes Version Upgrades)
+      # ------------------------------------------------------------------------
+      - name: Apply Classes & Canary Media (Rolling)
+        if: steps.strategy.outputs.is_upgrade == 'true'
+        run: |
+          omnictl apply -f K8s/Omni/classes/
+          if [ -f K8s/Omni/media/talos-2.yaml ]; then
+            omnictl apply -f K8s/Omni/media/talos-2.yaml
+          fi
+
+      - name: Sync Canary Cluster Template (k8s-talos-2)
+        if: steps.strategy.outputs.is_upgrade == 'true'
+        run: |
+          omnictl cluster template sync -f K8s/Omni/clusters/k8s-talos-2.yaml -v
+
+      - name: Wait for Canary Ready (k8s-talos-2)
+        if: steps.strategy.outputs.is_upgrade == 'true'
+        run: |
+          echo "Waiting 15s for Omni controller to initiate reconciliation..."
+          sleep 15
+          echo "Waiting for k8s-talos-2 to be ready and healthy..."
+          omnictl cluster status k8s-talos-2 --wait 20m
+
+      - name: Apply Primary Media (k8s-talos-1)
+        if: steps.strategy.outputs.is_upgrade == 'true'
+        run: |
+          if [ -f K8s/Omni/media/talos-1.yaml ]; then
+            omnictl apply -f K8s/Omni/media/talos-1.yaml
+          fi
+
+      - name: Sync Primary Cluster Template (k8s-talos-1)
+        if: steps.strategy.outputs.is_upgrade == 'true'
+        run: |
+          omnictl cluster template sync -f K8s/Omni/clusters/k8s-talos-1.yaml -v
+
+      - name: Wait for Primary Ready (k8s-talos-1)
+        if: steps.strategy.outputs.is_upgrade == 'true'
+        run: |
+          echo "Waiting 15s for Omni controller to initiate reconciliation..."
+          sleep 15
+          echo "Waiting for k8s-talos-1 to be ready and healthy..."
+          omnictl cluster status k8s-talos-1 --wait 20m
