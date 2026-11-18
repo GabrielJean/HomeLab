@@ -17,8 +17,6 @@ spec:
       labels:
         app: satisfactory
     spec:
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000
@@ -26,6 +24,11 @@ spec:
       containers:
         - name: satisfactory
           image: wolveix/satisfactory-server:v1.9.10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           env:
             - name: MAXPLAYERS
               value: "6"
@@ -43,15 +46,19 @@ spec:
               value: "60"
           ports:
             - containerPort: 7777
+              hostPort: 7777
               protocol: UDP
               name: game-udp
             - containerPort: 7777
+              hostPort: 7777
               protocol: TCP
               name: game-tcp
             - containerPort: 8080
+              hostPort: 8080
               protocol: TCP
               name: api
             - containerPort: 8888
+              hostPort: 8888
               protocol: TCP
               name: beacon
           resources:

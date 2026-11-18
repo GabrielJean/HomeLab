@@ -5,5 +5,6 @@ namespace: satisfactory
 
 resources:
   - namespace.yaml
+  - networkpolicy.yaml
   - pvc.yaml
   - deployment.yaml

@@ -5,6 +5,7 @@ namespace: zomboid
 
 resources:
   - namespace.yaml
+  - networkpolicy.yaml
   - external-secret.yaml
   - pvc.yaml
   - deployment.yaml

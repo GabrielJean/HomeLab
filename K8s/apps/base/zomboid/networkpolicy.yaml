@@ -1,0 +1,36 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: zomboid-lan-isolation
+  namespace: zomboid
+  labels:
+    app.kubernetes.io/name: zomboid
+    app.kubernetes.io/part-of: homelab-gaming
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # 1. Allow cluster DNS resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # 2. Allow Internet egress (Steam, auth, server list) while strictly blocking private subnets (LAN)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 192.168.0.0/16   # Local Home LANs (192.168.10.0/24, 192.168.15.0/24)
+              - 10.0.0.0/8       # K8s Pod/Service CIDRs & Private Class A
+              - 172.16.0.0/12    # Private Class B
+              - 100.64.0.0/10    # Tailscale CGNAT

@@ -17,13 +17,16 @@ spec:
       labels:
         app: zomboid
     spec:
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
       securityContext:
         fsGroup: 1000
       containers:
         - name: zomboid
           image: indifferentbroccoli/projectzomboid-server-docker:v1.2.0
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           env:
             - name: PUID
               value: "1000"
@@ -68,12 +71,15 @@ spec:
               value: "true"
           ports:
             - containerPort: 16261
+              hostPort: 16261
               protocol: UDP
               name: game
             - containerPort: 16262
+              hostPort: 16262
               protocol: UDP
               name: direct
             - containerPort: 27015
+              hostPort: 27015
               protocol: TCP
               name: rcon
           resources:

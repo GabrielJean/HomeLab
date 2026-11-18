@@ -126,7 +126,7 @@ flowchart LR
 - [x] **Media Companion Stack (Part 2 - Media Managers)**: Migrate Sonarr and Radarr via LAN Direct Streaming into `local-path` PVCs, mount `medias-pv` (`/medias`, UID 950:950), and validate instant atomic hardlinking from downloads to library datasets.
 - [x] **Plex Media Server**: Add NVIDIA extensions (`siderolabs/nonfree-kmod-nvidia-lts`, `siderolabs/nvidia-container-toolkit-lts`), configure GPU passthrough on `talos-1`, and mount `medias-pvc` via VirtioFS for 4K direct stream and NVENC transcode validation.
 - [ ] **OneDrive Rclone Sync CronJob**: Deploy scheduled rclone sync CronJob mounting `vault-pv` (`/mnt/Vault/OneDrive`, UID 1000:1000) with credentials managed via External Secrets Operator.
-- [ ] **Gaming Servers (Zomboid & Satisfactory)**: Migrate Project Zomboid and Satisfactory dedicated servers from `Gaming-1` (`192.168.10.14`) to `k8s-talos-1` with `hostNetwork: true`, `local-path` PVCs, and LAN Direct Streaming data migration. Zomboid credentials managed via External Secrets Operator (`zomboid-admin-username`, `zomboid-admin-password`). Deployments created at `replicas: 0` (not started until manually scaled up).
+- [ ] **Gaming Servers (Zomboid & Satisfactory)**: Migrate Project Zomboid and Satisfactory dedicated servers from `Gaming-1` (`192.168.10.14`) to `k8s-talos-1` with `hostPort`, `local-path` PVCs, drop all Linux capabilities, and Zero-Trust Egress `NetworkPolicy` blocking all private RFC1918/LAN subnets while permitting DNS and public internet. Zomboid credentials managed via External Secrets Operator (`zomboid-admin-username`, `zomboid-admin-password`). Deployments created at `replicas: 0` (not started until manually scaled up).
 
 ### Phase 6: Edge & Hardware-Bound Workloads (Pending)
 - [ ] **Home Assistant**: Deploy on `talos-2` with host networking and Zigbee coordinator integration.
@@ -1361,7 +1361,7 @@ The following services will remain on dedicated Docker or VM hosts until the cor
 
 - **AdGuard Home (`DNS-1` and `DNS-2`)**: Provides DNS and DHCP for the physical networks. Keeping these on dedicated VMs ensures local DNS remains functional even during Kubernetes cluster maintenance.
 - **Plex Media Server (`Plex-1`)**: Kept separate until GPU drivers and transcode pipelines on Talos Linux are fully tested in staging.
-- **~~Gaming Servers (`Gaming-1`)~~**: Migrated to `k8s-talos-1` as Phase 5 workloads with `hostNetwork: true` and `local-path` PVCs (Zomboid + Satisfactory).
+- **~~Gaming Servers (`Gaming-1`)~~**: Migrated to `k8s-talos-1` as Phase 5 workloads with `hostPort`, LAN-isolated `NetworkPolicy`, and `local-path` PVCs (Zomboid + Satisfactory).
 
 ---
 
