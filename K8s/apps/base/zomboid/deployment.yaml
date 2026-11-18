@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zomboid
+  namespace: zomboid
+  labels:
+    app.kubernetes.io/name: zomboid
+    app.kubernetes.io/part-of: homelab-gaming
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: zomboid
+  template:
+    metadata:
+      labels:
+        app: zomboid
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: zomboid
+          image: indifferentbroccoli/projectzomboid-server-docker:v1.2.0
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            - name: ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: zomboid-secrets
+                  key: ADMIN_USERNAME
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: zomboid-secrets
+                  key: ADMIN_PASSWORD
+            - name: RCON_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: zomboid-secrets
+                  key: RCON_PASSWORD
+            - name: RCON_PORT
+              value: "27015"
+            - name: SERVER_NAME
+              value: "pzserver"
+            - name: DEFAULT_PORT
+              value: "16261"
+            - name: UDP_PORT
+              value: "16262"
+            - name: MAX_PLAYERS
+              value: "6"
+            - name: MEMORY_XMX_GB
+              value: "4"
+            - name: MEMORY_XMS_GB
+              value: "2"
+            - name: GENERATE_SETTINGS
+              value: "true"
+            - name: UPDATE_ON_START
+              value: "true"
+            - name: STEAM_VAC
+              value: "true"
+            - name: USE_STEAM
+              value: "true"
+          ports:
+            - containerPort: 16261
+              protocol: UDP
+              name: game
+            - containerPort: 16262
+              protocol: UDP
+              name: direct
+            - containerPort: 27015
+              protocol: TCP
+              name: rcon
+          resources:
+            requests:
+              cpu: 500m
+              memory: 2Gi
+            limits:
+              cpu: 4000m
+              memory: 6Gi
+          volumeMounts:
+            - name: server-files
+              mountPath: /project-zomboid
+            - name: server-data
+              mountPath: /project-zomboid-config
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: server-files
+          persistentVolumeClaim:
+            claimName: zomboid-server-files
+        - name: server-data
+          persistentVolumeClaim:
+            claimName: zomboid-server-data

@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: satisfactory
+  namespace: satisfactory
+  labels:
+    app.kubernetes.io/name: satisfactory
+    app.kubernetes.io/part-of: homelab-gaming
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: satisfactory
+  template:
+    metadata:
+      labels:
+        app: satisfactory
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: satisfactory
+          image: wolveix/satisfactory-server:v1.9.10
+          env:
+            - name: MAXPLAYERS
+              value: "6"
+            - name: PGID
+              value: "1000"
+            - name: PUID
+              value: "1000"
+            - name: ROOTLESS
+              value: "false"
+            - name: STEAMBETA
+              value: "false"
+            - name: AUTOSAVENUM
+              value: "50"
+            - name: MAXTICKRATE
+              value: "60"
+          ports:
+            - containerPort: 7777
+              protocol: UDP
+              name: game-udp
+            - containerPort: 7777
+              protocol: TCP
+              name: game-tcp
+            - containerPort: 8080
+              protocol: TCP
+              name: api
+            - containerPort: 8888
+              protocol: TCP
+              name: beacon
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 4Gi
+            limits:
+              cpu: 6000m
+              memory: 8Gi
+          volumeMounts:
+            - name: config
+              mountPath: /config
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: satisfactory-config

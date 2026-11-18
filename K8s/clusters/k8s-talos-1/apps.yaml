@@ -9,6 +9,17 @@ spec:
   prune: true
   wait: true
   timeout: 5m
+  ignore:
+    - paths:
+        - /spec/replicas
+      target:
+        kind: Deployment
+        name: satisfactory
+    - paths:
+        - /spec/replicas
+      target:
+        kind: Deployment
+        name: zomboid
   dependsOn:
     - name: infra-configs
   sourceRef:

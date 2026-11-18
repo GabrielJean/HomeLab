@@ -18,3 +18,5 @@ resources:
   - ../base/plexapps
   - ../base/stirling-pdf
   - ../base/stockbot
+  - ../base/zomboid
+  - ../base/satisfactory
