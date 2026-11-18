@@ -1,7 +1,7 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: satisfactory-lan-isolation
+  name: satisfactory-security
   namespace: satisfactory
   labels:
     app.kubernetes.io/name: satisfactory
@@ -9,7 +9,22 @@ metadata:
 spec:
   podSelector: {}
   policyTypes:
+    - Ingress
     - Egress
+  ingress:
+    # Allow incoming game traffic from anywhere (Gaming PC on Home 1 LAN, Home 2 LAN, or Internet)
+    - from:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: UDP
+          port: 7777
+        - protocol: TCP
+          port: 7777
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8888
   egress:
     # 1. Allow cluster DNS resolution
     - to:
@@ -25,12 +40,26 @@ spec:
         - protocol: TCP
           port: 53
 
-    # 2. Allow Internet egress (Steam, auth, server list) while strictly blocking private subnets (LAN)
+    # 2. Allow Internet egress (Steam, Epic, updates, player sessions) while blocking general private subnets
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
             except:
-              - 192.168.0.0/16   # Local Home LANs (192.168.10.0/24, 192.168.15.0/24)
-              - 10.0.0.0/8       # K8s Pod/Service CIDRs & Private Class A
-              - 172.16.0.0/12    # Private Class B
-              - 100.64.0.0/10    # Tailscale CGNAT
+              - 192.168.0.0/16
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 100.64.0.0/10
+
+    # 3. Allow game traffic & client responses back to Gaming PCs on Home 1 and Home 2 LANs
+    - to:
+        - ipBlock:
+            cidr: 192.168.10.0/24   # Home 1 LAN
+        - ipBlock:
+            cidr: 192.168.15.0/24   # Home 2 LAN (across Tailscale S2S bridge)
+      ports:
+        - protocol: UDP
+          port: 1024
+          endPort: 65535
+        - protocol: TCP
+          port: 1024
+          endPort: 65535
