@@ -7,6 +7,7 @@ metadata:
     app.kubernetes.io/name: zomboid
     app.kubernetes.io/part-of: homelab-gaming
 spec:
+  replicas: 0
   strategy:
     type: Recreate
   selector:
@@ -22,11 +23,6 @@ spec:
       containers:
         - name: zomboid
           image: indifferentbroccoli/projectzomboid-server-docker:v1.2.0
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
           env:
             - name: PUID
               value: "1000"
