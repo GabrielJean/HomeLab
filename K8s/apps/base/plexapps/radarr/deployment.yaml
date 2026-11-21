@@ -22,7 +22,7 @@ spec:
         kubernetes.io/hostname: talos-1
       containers:
         - name: radarr
-          image: linuxserver/radarr:6.4.4
+          image: linuxserver/radarr:7.0.3
           env:
             - name: PUID
               value: "950"
