@@ -23,7 +23,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: satisfactory
-          image: wolveix/satisfactory-server:v1.9.11
+          image: wolveix/satisfactory-server:v1.10.0
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
